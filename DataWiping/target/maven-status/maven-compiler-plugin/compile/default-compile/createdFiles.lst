@@ -1,0 +1,5 @@
+com/sanitizer/detector/UsbDetector$UsbDriveInfo.class
+com/sanitizer/engine/WipeEngine.class
+com/sanitizer/detector/UsbDetector.class
+com/sanitizer/engine/MacUtil.class
+com/sanitizer/Maintest.class
