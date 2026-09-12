@@ -1,0 +1,21 @@
+# Maven build output
+target/
+**/target/
+
+# Local database and generated PDF certificates
+*.db
+*.pdf
+sanitizer_history.db
+Sanitization_Certificate_*.pdf
+
+# Operating system files
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+*.iml
+.classpath
+.project
+.settings/

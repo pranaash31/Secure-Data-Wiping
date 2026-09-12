@@ -4,6 +4,7 @@ import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
+import com.sanitizer.pdf.CertificateGenerator;
 
 import java.util.List;
 
@@ -48,8 +49,12 @@ public class Maintest {
 
             if (dbSaved) {
                 System.out.println("[3/3] Audit Record Persisted into SQLite Database!");
+                List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
+                if (!records.isEmpty()) {
+                    CertificateGenerator.generateCertificate(records.get(0));
+                }
                 System.out.println("\n--- Current SQLite Audit History ---");
-                for (AuditDb.AuditRecord record : AuditDb.getAllRecords()) {
+                for (AuditDb.AuditRecord record : records) {
                     System.out.println("ID: " + record.id() + " | Time: " + record.timestamp() +
                             " | Model: " + record.driveModel() + " | Serial: " + record.serialNumber() +
                             " | Status: " + record.status());
