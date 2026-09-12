@@ -78,7 +78,7 @@ public class WipingView {
         cmbDrives = new ComboBox<>();
         cmbDrives.setMaxWidth(Double.MAX_VALUE);
         cmbDrives.setPromptText("Scanning connected USB drives...");
-        cmbDrives.setCellFactory(param -> new ListCell<>() {
+        cmbDrives.setCellFactory(param -> new ListCell<UsbDetector.UsbDriveInfo>() {
             @Override
             protected void updateItem(UsbDetector.UsbDriveInfo item, boolean empty) {
                 super.updateItem(item, empty);

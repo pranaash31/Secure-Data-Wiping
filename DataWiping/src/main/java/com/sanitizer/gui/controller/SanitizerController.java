@@ -105,7 +105,7 @@ public class SanitizerController {
         cmbDrives = new ComboBox<>();
         cmbDrives.setMaxWidth(Double.MAX_VALUE);
         cmbDrives.setPromptText("Scanning for USB pen drives...");
-        cmbDrives.setCellFactory(param -> new ListCell<>() {
+        cmbDrives.setCellFactory(param -> new ListCell<UsbDetector.UsbDriveInfo>() {
             @Override
             protected void updateItem(UsbDetector.UsbDriveInfo item, boolean empty) {
                 super.updateItem(item, empty);

@@ -2,9 +2,10 @@
 target/
 **/target/
 
-# Local database and generated PDF certificates
+# Local database, cryptographic keys, and generated PDF certificates
 *.db
 *.pdf
+*.key
 sanitizer_history.db
 Sanitization_Certificate_*.pdf
 
