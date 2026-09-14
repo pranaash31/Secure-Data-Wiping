@@ -24,7 +24,6 @@ public class HomeView {
 
     private void buildUi() {
         rootContainer.setPadding(new Insets(24));
-        rootContainer.setStyle("-fx-background-color: #F8FAFC;");
 
         // --- Hero Banner ---
         VBox heroCard = new VBox(16);
@@ -32,7 +31,7 @@ public class HomeView {
         heroCard.setStyle("-fx-background-color: linear-gradient(to right, #0F172A, #1E3A8A); -fx-padding: 30;");
 
         HBox heroBadgeBox = new HBox(8);
-        Label lblHeroBadge = new Label("GOVERNMENT DEFENSE PORTAL v1.0");
+        Label lblHeroBadge = new Label("ENTERPRISE SANITIZATION PLATFORM v1.0");
         lblHeroBadge.setStyle("-fx-background-color: rgba(255, 255, 255, 0.15); -fx-text-fill: #FFFFFF; -fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 4 10; -fx-background-radius: 12px;");
         heroBadgeBox.getChildren().add(lblHeroBadge);
 
@@ -47,12 +46,12 @@ public class HomeView {
         lblHeroDesc.setStyle("-fx-font-size: 13px; -fx-text-fill: #94A3B8; -fx-max-width: 800px;");
 
         HBox heroBtnBox = new HBox(12);
-        Button btnWipeNow = new Button("🛡️  Start Data Wiping");
+        Button btnWipeNow = new Button("Start Data Wiping");
         btnWipeNow.getStyleClass().add("button-primary");
         btnWipeNow.setStyle("-fx-font-size: 14px; -fx-padding: 10 20;");
         btnWipeNow.setOnAction(e -> NavigationManager.getInstance().navigateTo("wiping"));
 
-        Button btnViewLogs = new Button("📜  View Audit Logs");
+        Button btnViewLogs = new Button("View Audit Logs");
         btnViewLogs.setStyle("-fx-font-size: 14px; -fx-padding: 10 20;");
         btnViewLogs.setOnAction(e -> NavigationManager.getInstance().navigateTo("audit"));
 
@@ -66,10 +65,10 @@ public class HomeView {
         HBox statusHeader = new HBox(10);
         statusHeader.setAlignment(Pos.CENTER_LEFT);
 
-        Label lblStatusTitle = new Label("⚡ Hardware Diagnostics & Safety Shield");
+        Label lblStatusTitle = new Label("Hardware Diagnostics & Safety Status");
         lblStatusTitle.getStyleClass().add("card-title");
 
-        Label lblShieldBadge = new Label("🛡️ SAFETY SHIELD ACTIVE");
+        Label lblShieldBadge = new Label("SAFETY SHIELD ACTIVE");
         lblShieldBadge.getStyleClass().add("badge-success");
 
         statusHeader.getChildren().addAll(lblStatusTitle, new Region(), lblShieldBadge);

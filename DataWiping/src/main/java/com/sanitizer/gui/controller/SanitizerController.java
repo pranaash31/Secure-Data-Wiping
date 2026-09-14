@@ -60,7 +60,7 @@ public class SanitizerController {
         VBox headerBox = new VBox(4);
         headerBox.getStyleClass().add("header-box");
 
-        Label lblTitle = new Label("🛡️ SECURE DATA WIPING SUITE");
+        Label lblTitle = new Label("SECURE DATA SANITIZATION SUITE");
         lblTitle.getStyleClass().add("header-title");
 
         Label lblSubtitle = new Label("Defense-Grade Sector Sanitization, Cryptographic Audit Trail & PDF Certification");
@@ -73,8 +73,8 @@ public class SanitizerController {
         TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        Tab tabWipe = new Tab("⚡ Sanitization Dashboard", buildWipeDashboardTab());
-        Tab tabAudit = new Tab("📜 Audit Log & Certificates", buildAuditHistoryTab());
+        Tab tabWipe = new Tab("Sanitization Dashboard", buildWipeDashboardTab());
+        Tab tabAudit = new Tab("Audit Log & Certificates", buildAuditHistoryTab());
 
         tabPane.getTabs().addAll(tabWipe, tabAudit);
         rootPane.setCenter(tabPane);
@@ -119,7 +119,7 @@ public class SanitizerController {
         cmbDrives.setButtonCell(cmbDrives.getCellFactory().call(null));
         cmbDrives.setOnAction(e -> updateSelectedDriveDetails());
 
-        btnRefreshDrives = new Button("🔄 Refresh Drives");
+        btnRefreshDrives = new Button("Refresh Drives");
         btnRefreshDrives.setOnAction(e -> refreshDriveList());
 
         HBox driveActionBox = new HBox(10, cmbDrives, btnRefreshDrives);
@@ -148,7 +148,7 @@ public class SanitizerController {
 
         VBox radioBox = new VBox(8, rdoDod, rdoNist);
 
-        chkTestMode = new CheckBox("⚡ Fast Test Mode (Cap wipe to 1 GB for safe testing)");
+        chkTestMode = new CheckBox("Fast Test Mode (Cap wipe to 1 GB for evaluation)");
         chkTestMode.setSelected(true);
         chkTestMode.getStyleClass().add("label");
 
@@ -164,7 +164,7 @@ public class SanitizerController {
         HBox execHeader = new HBox(16);
         execHeader.setAlignment(Pos.CENTER_LEFT);
 
-        btnExecuteWipe = new Button("🚨 EXECUTE SANITIZATION");
+        btnExecuteWipe = new Button("EXECUTE SANITIZATION");
         btnExecuteWipe.getStyleClass().add("button-danger");
         btnExecuteWipe.setOnAction(e -> handleWipeExecution());
 
@@ -209,14 +209,14 @@ public class SanitizerController {
         Label lblHistoryTitle = new Label("SQLite Tamper-Evident Audit Trail");
         lblHistoryTitle.getStyleClass().add("card-title");
 
-        Button btnRefresh = new Button("🔄 Refresh Log");
+        Button btnRefresh = new Button("Refresh Log");
         btnRefresh.setOnAction(e -> loadAuditHistory());
 
-        Button btnExportPdf = new Button("📄 Export PDF Certificate");
+        Button btnExportPdf = new Button("Export PDF Certificate");
         btnExportPdf.getStyleClass().add("button-primary");
         btnExportPdf.setOnAction(e -> handleExportPdf());
 
-        Button btnVerify = new Button("🔒 Verify RSA Signature");
+        Button btnVerify = new Button("Verify RSA Signature");
         btnVerify.setOnAction(e -> handleVerifySignature());
 
         toolbar.getChildren().addAll(lblHistoryTitle, new Region(), btnRefresh, btnExportPdf, btnVerify);
@@ -311,7 +311,7 @@ public class SanitizerController {
 
         // Safety Confirmation Alert
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("🚨 CONFIRM DATA SANITIZATION");
+        confirm.setTitle("CONFIRM DATA SANITIZATION");
         confirm.setHeaderText("PERMANENT DATA LOSS WARNING");
         confirm.setContentText(String.format(
                 "Target Drive: %s (%s)\nPath: %s\nAlgorithm: %s\nMode: %s\n\nAre you absolutely sure you want to proceed?",
@@ -450,10 +450,10 @@ public class SanitizerController {
 
         if (valid) {
             showAlert(Alert.AlertType.INFORMATION, "Signature Verified",
-                    "✅ VERIFICATION SUCCESSFUL\n\nThe SHA256withRSA signature matches the record payload.\nThis audit log is authentic and tamper-free!");
+                    "VERIFICATION SUCCESSFUL\n\nThe SHA256withRSA signature matches the record payload.\nThis audit log is authentic and tamper-free!");
         } else {
             showAlert(Alert.AlertType.ERROR, "Verification Failed",
-                    "❌ SIGNATURE MISMATCH\n\nThe signature does not match this record payload or keypair has changed.");
+                    "SIGNATURE MISMATCH\n\nThe signature does not match this record payload or keypair has changed.");
         }
     }
 

@@ -34,14 +34,14 @@ public class AuditView {
 
     private void buildUi() {
         rootContainer.setPadding(new Insets(24));
-        rootContainer.setStyle("-fx-background-color: #F8FAFC;");
 
         // Header Title
         VBox titleBox = new VBox(4);
-        Label lblTitle = new Label("📜 Tamper-Evident Audit Trail & PDF Certification");
-        lblTitle.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #0F172A;");
+        Label lblTitle = new Label("Audit Trail & Digital Certification");
+        lblTitle.getStyleClass().add("card-title");
+        lblTitle.setStyle("-fx-font-size: 22px;");
         Label lblSub = new Label("Cryptographically signed sanitization logs with verifiable chain of custody");
-        lblSub.setStyle("-fx-font-size: 13px; -fx-text-fill: #64748B;");
+        lblSub.getStyleClass().add("card-subtitle");
         titleBox.getChildren().addAll(lblTitle, lblSub);
 
         // --- Card: Audit Log Table & Toolbar ---
@@ -53,18 +53,18 @@ public class AuditView {
         toolbar.setAlignment(Pos.CENTER_LEFT);
 
         TextField txtSearch = new TextField();
-        txtSearch.setPromptText("🔍 Search by model, serial, standard...");
+        txtSearch.setPromptText("Search by model, serial, standard...");
         txtSearch.setPrefWidth(260);
         txtSearch.textProperty().addListener((obs, oldVal, newVal) -> filterLog(newVal));
 
-        Button btnRefresh = new Button("🔄 Refresh Log");
+        Button btnRefresh = new Button("Refresh Log");
         btnRefresh.setOnAction(e -> loadAuditHistory());
 
-        Button btnExportPdf = new Button("📄 Export PDF Certificate");
+        Button btnExportPdf = new Button("Export PDF Certificate");
         btnExportPdf.getStyleClass().add("button-primary");
         btnExportPdf.setOnAction(e -> handleExportPdf());
 
-        Button btnVerify = new Button("🔒 Verify RSA Signature");
+        Button btnVerify = new Button("Verify RSA Signature");
         btnVerify.setOnAction(e -> handleVerifySignature());
 
         toolbar.getChildren().addAll(txtSearch, new Region(), btnRefresh, btnExportPdf, btnVerify);
@@ -167,10 +167,10 @@ public class AuditView {
 
         if (valid) {
             showAlert(Alert.AlertType.INFORMATION, "Signature Authenticated",
-                    "✅ VERIFICATION SUCCESSFUL\n\nThe SHA256withRSA signature matches the record payload.\nThis record is authentic and tamper-free!");
+                    "VERIFICATION SUCCESSFUL\n\nThe SHA256withRSA signature matches the record payload.\nThis record is authentic and tamper-free!");
         } else {
             showAlert(Alert.AlertType.ERROR, "Verification Failed",
-                    "❌ SIGNATURE MISMATCH\n\nThe digital signature could not be verified against the current keypair or record payload.");
+                    "SIGNATURE MISMATCH\n\nThe digital signature could not be verified against the current keypair or record payload.");
         }
     }
 

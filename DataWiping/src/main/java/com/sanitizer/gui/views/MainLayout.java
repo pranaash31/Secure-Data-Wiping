@@ -6,6 +6,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
 import javafx.scene.layout.*;
 
 import java.util.HashMap;
@@ -22,14 +23,10 @@ public class MainLayout {
         buildUi();
     }
 
-    public Parent getRoot() {
-        return rootPane;
-    }
+    public Parent getRoot() { return rootPane; }
 
     public void setContent(Node content, String activeView) {
         rootPane.setCenter(content);
-
-        // Update nav active states
         navButtons.forEach((key, btn) -> {
             if (key.equalsIgnoreCase(activeView)) {
                 btn.getStyleClass().setAll("nav-button", "nav-button-active");
@@ -40,55 +37,99 @@ public class MainLayout {
     }
 
     private void buildUi() {
-        // --- Top Bar ---
+        // ── TOP BAR ─────────────────────────────────────────────────────
         HBox topBar = new HBox(16);
         topBar.getStyleClass().add("top-bar");
+        topBar.setAlignment(Pos.CENTER_LEFT);
 
-        Label lblPortalTitle = new Label("🏛️ NATIONAL DEFENSE DATA SANITIZATION SUITE");
-        lblPortalTitle.getStyleClass().add("top-bar-title");
+        HBox brandRow = new HBox(12);
+        brandRow.setAlignment(Pos.CENTER_LEFT);
+        Label shieldIcon = new Label("[S]");
+        shieldIcon.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #60A5FA; " +
+                "-fx-background-color: rgba(59,130,246,0.12); -fx-background-radius: 8px; -fx-padding: 4 8;");
+        Label lblTitle = new Label("SecureErase Pro");
+        lblTitle.getStyleClass().add("top-bar-title");
+        brandRow.getChildren().addAll(shieldIcon, lblTitle);
 
-        Label lblBadge = new Label("🔒 NIST & DoD 5220.22-M VERIFIED");
+        Label lblBadge = new Label("ENTERPRISE v2.0");
         lblBadge.getStyleClass().add("top-bar-badge");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Label lblUserInfo = new Label(String.format("Officer: %s  |  Agency: %s", navManager.getOfficerName(), navManager.getAgencyId()));
+        Label lblUserInfo = new Label(
+                "Officer: " + navManager.getOfficerName() + "   |   Agency: " + navManager.getAgencyId()
+        );
         lblUserInfo.getStyleClass().add("top-bar-user");
 
-        topBar.getChildren().addAll(lblPortalTitle, lblBadge, spacer, lblUserInfo);
-        topBar.setAlignment(Pos.CENTER_LEFT);
+        Button btnTheme = new Button("Light Theme");
+        btnTheme.getStyleClass().add("button-theme-toggle");
+        btnTheme.setOnAction(e -> {
+            if (rootPane.getStyleClass().contains("light-theme")) {
+                rootPane.getStyleClass().remove("light-theme");
+                btnTheme.setText("Light Theme");
+            } else {
+                rootPane.getStyleClass().add("light-theme");
+                btnTheme.setText("Dark Theme");
+            }
+        });
+
+        Button btnLogoutTop = new Button("Sign Out");
+        btnLogoutTop.getStyleClass().add("button-theme-toggle");
+        btnLogoutTop.setOnAction(e -> navManager.logout());
+
+        topBar.getChildren().addAll(brandRow, lblBadge, spacer, lblUserInfo, btnTheme, btnLogoutTop);
         rootPane.setTop(topBar);
 
-        // --- Sidebar Menu ---
-        VBox sidebar = new VBox(8);
+        // ── SIDEBAR ──────────────────────────────────────────────────────
+        VBox sidebar = new VBox(4);
         sidebar.getStyleClass().add("sidebar");
 
-        Label lblNavTitle = new Label("PORTAL NAVIGATION");
-        lblNavTitle.getStyleClass().add("sidebar-title");
+        // MAIN section
+        Label mainLabel = new Label("MAIN");
+        mainLabel.getStyleClass().add("sidebar-section-label");
+        Button btnDashboard = createNavBtn("  Dashboard", "dashboard");
 
-        Button btnHome = createNavBtn("🏠  Home Portal", "home");
-        Button btnDashboard = createNavBtn("📊  Analytics Dashboard", "dashboard");
-        Button btnWiping = createNavBtn("🛡️  Data Wiping Suite", "wiping");
-        Button btnAudit = createNavBtn("📜  Audit & Certificates", "audit");
-        Button btnSettings = createNavBtn("⚙️  Security & Settings", "settings");
+        // OPERATIONS section
+        Label opsLabel = new Label("OPERATIONS");
+        opsLabel.getStyleClass().add("sidebar-section-label");
+        Button btnWiping    = createNavBtn("  Data Wiping Workplace", "wiping");
+        Button btnBatch     = createNavBtn("  Batch Wipe Queue", "batchWipe");
+        Button btnDiag      = createNavBtn("  Drive Diagnostics", "diagnostics");
+
+        // MANAGEMENT section
+        Label mgmtLabel = new Label("MANAGEMENT");
+        mgmtLabel.getStyleClass().add("sidebar-section-label");
+        Button btnClients   = createNavBtn("  Client Manager", "clients");
+        Button btnKeyVault  = createNavBtn("  Key Vault", "keyvault");
+
+        // COMPLIANCE section
+        Label compLabel = new Label("COMPLIANCE");
+        compLabel.getStyleClass().add("sidebar-section-label");
+        Button btnAudit     = createNavBtn("  Audit Trail", "audit");
+        Button btnSettings  = createNavBtn("  Settings", "settings");
 
         Region sidebarSpacer = new Region();
         VBox.setVgrow(sidebarSpacer, Priority.ALWAYS);
 
-        Button btnLogout = new Button("🔒  Sign Out");
-        btnLogout.getStyleClass().add("nav-button");
-        btnLogout.setOnAction(e -> navManager.logout());
+        // Officer info card at bottom of sidebar
+        VBox officerCard = new VBox(4);
+        officerCard.setStyle("-fx-background-color: #1E293B; -fx-background-radius: 10px; -fx-padding: 12;");
+        Label officerName = new Label(navManager.getOfficerName());
+        officerName.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #E2E8F0;");
+        Label officerRole = new Label("Senior Inspector");
+        officerRole.setStyle("-fx-font-size: 10px; -fx-text-fill: #475569;");
+        Label officerAgency = new Label(navManager.getAgencyId());
+        officerAgency.setStyle("-fx-font-size: 10px; -fx-text-fill: #3B82F6; -fx-font-weight: bold;");
+        officerCard.getChildren().addAll(officerName, officerRole, officerAgency);
 
         sidebar.getChildren().addAll(
-                lblNavTitle,
-                btnHome,
-                btnDashboard,
-                btnWiping,
-                btnAudit,
-                btnSettings,
+                mainLabel, btnDashboard,
+                opsLabel, btnWiping, btnBatch, btnDiag,
+                mgmtLabel, btnClients, btnKeyVault,
+                compLabel, btnAudit, btnSettings,
                 sidebarSpacer,
-                btnLogout
+                officerCard
         );
 
         rootPane.setLeft(sidebar);
@@ -97,6 +138,7 @@ public class MainLayout {
     private Button createNavBtn(String text, String viewKey) {
         Button btn = new Button(text);
         btn.getStyleClass().add("nav-button");
+        btn.setMaxWidth(Double.MAX_VALUE);
         btn.setOnAction(e -> navManager.navigateTo(viewKey));
         navButtons.put(viewKey, btn);
         return btn;

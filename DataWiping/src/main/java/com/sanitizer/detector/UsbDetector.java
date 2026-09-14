@@ -21,7 +21,7 @@ public class UsbDetector {
             String name = disk.getName().toLowerCase();
             long sizeBytes = disk.getSize();
 
-            // ❌ SAFETY SHIELD: Ignore primary macOS drive & internal SSDs
+            // SAFETY SHIELD: Ignore primary macOS drive & internal SSDs
             boolean isSsdOrSystem = name.contains("disk0")
                     || model.contains("apple")
                     || model.contains("internal")
@@ -37,7 +37,7 @@ public class UsbDetector {
                 continue;
             }
 
-            // ✅ PEN DRIVE FILTER (1 GB to 128 GB)
+            // PEN DRIVE FILTER (1 GB to 128 GB)
             long minPenDriveSizeBytes = 1L * 1024 * 1024 * 1024;
             long maxPenDriveSizeBytes = 128L * 1024 * 1024 * 1024;
 
@@ -70,5 +70,31 @@ public class UsbDetector {
             }
         }
         return drives;
+    }
+
+    private static final java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<List<UsbDriveInfo>>> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private static java.util.concurrent.ScheduledExecutorService scheduler;
+
+    public static synchronized void registerListener(java.util.function.Consumer<List<UsbDriveInfo>> listener) {
+        listeners.add(listener);
+        if (scheduler == null || scheduler.isShutdown()) {
+            scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "UsbPollerThread");
+                t.setDaemon(true);
+                return t;
+            });
+            scheduler.scheduleAtFixedRate(() -> {
+                try {
+                    List<UsbDriveInfo> drives = getConnectedUsbDrives();
+                    for (var l : listeners) {
+                        javafx.application.Platform.runLater(() -> l.accept(drives));
+                    }
+                } catch (Exception ignored) {}
+            }, 0, 2, java.util.concurrent.TimeUnit.SECONDS);
+        }
+    }
+
+    public static synchronized void unregisterListener(java.util.function.Consumer<List<UsbDriveInfo>> listener) {
+        listeners.remove(listener);
     }
 }

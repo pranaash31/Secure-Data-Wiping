@@ -40,6 +40,7 @@ public class WipingView {
     public WipingView() {
         buildUi();
         refreshDriveList();
+        UsbDetector.registerListener(drives -> updateDriveList(drives));
     }
 
     public Parent getRoot() {
@@ -48,14 +49,14 @@ public class WipingView {
 
     private void buildUi() {
         rootContainer.setPadding(new Insets(24));
-        rootContainer.setStyle("-fx-background-color: #F8FAFC;");
 
         // Header Title
         VBox titleBox = new VBox(4);
-        Label lblTitle = new Label("🛡️ Hardware Data Sanitization Workplace");
-        lblTitle.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #0F172A;");
+        Label lblTitle = new Label("Hardware Data Sanitization Workplace");
+        lblTitle.getStyleClass().add("card-title");
+        lblTitle.setStyle("-fx-font-size: 22px;");
         Label lblSub = new Label("Direct low-level raw sector sanitization with hardware protection shield");
-        lblSub.setStyle("-fx-font-size: 13px; -fx-text-fill: #64748B;");
+        lblSub.getStyleClass().add("card-subtitle");
         titleBox.getChildren().addAll(lblTitle, lblSub);
 
         // Row 1: Cards
@@ -68,7 +69,7 @@ public class WipingView {
 
         HBox driveTitleBox = new HBox(10);
         driveTitleBox.setAlignment(Pos.CENTER_LEFT);
-        Label lblDriveTitle = new Label("1. Target Hardware Drive");
+        Label lblDriveTitle = new Label("Target Hardware Drive");
         lblDriveTitle.getStyleClass().add("card-title");
 
         lblDriveBadge = new Label("0 Drives Found");
@@ -92,7 +93,7 @@ public class WipingView {
         cmbDrives.setButtonCell(cmbDrives.getCellFactory().call(null));
         cmbDrives.setOnAction(e -> updateSelectedDriveDetails());
 
-        btnRefreshDrives = new Button("🔄 Refresh Drives");
+        btnRefreshDrives = new Button("Refresh Drives");
         btnRefreshDrives.setOnAction(e -> refreshDriveList());
 
         HBox driveActionBox = new HBox(10, cmbDrives, btnRefreshDrives);
@@ -108,7 +109,7 @@ public class WipingView {
         cardConfig.getStyleClass().add("card");
         HBox.setHgrow(cardConfig, Priority.ALWAYS);
 
-        Label lblConfigTitle = new Label("2. Defense Standard & Mode");
+        Label lblConfigTitle = new Label("Sanitization Standard & Execution Mode");
         lblConfigTitle.getStyleClass().add("card-title");
 
         ToggleGroup group = new ToggleGroup();
@@ -121,7 +122,7 @@ public class WipingView {
 
         VBox radioBox = new VBox(8, rdoDod, rdoNist);
 
-        chkTestMode = new CheckBox("⚡ Fast Test Mode (Cap wipe to 1 GB for safe testing)");
+        chkTestMode = new CheckBox("Fast Test Mode (Cap wipe to 1 GB for evaluation)");
         chkTestMode.setSelected(true);
 
         cardConfig.getChildren().addAll(lblConfigTitle, radioBox, new Separator(), chkTestMode);
@@ -136,7 +137,7 @@ public class WipingView {
         HBox execHeader = new HBox(16);
         execHeader.setAlignment(Pos.CENTER_LEFT);
 
-        btnExecuteWipe = new Button("🚨 EXECUTE SANITIZATION");
+        btnExecuteWipe = new Button("EXECUTE SANITIZATION");
         btnExecuteWipe.getStyleClass().add("button-danger");
         btnExecuteWipe.setStyle("-fx-font-size: 14px; -fx-padding: 10 24;");
         btnExecuteWipe.setOnAction(e -> handleWipeExecution());
@@ -172,18 +173,27 @@ public class WipingView {
     }
 
     private void refreshDriveList() {
-        List<UsbDetector.UsbDriveInfo> drives = UsbDetector.getConnectedUsbDrives();
+        updateDriveList(UsbDetector.getConnectedUsbDrives());
+    }
+
+    private void updateDriveList(List<UsbDetector.UsbDriveInfo> drives) {
+        UsbDetector.UsbDriveInfo prevSelected = cmbDrives.getSelectionModel().getSelectedItem();
         cmbDrives.setItems(FXCollections.observableArrayList(drives));
 
         if (drives.isEmpty()) {
             lblDriveBadge.setText("0 Target Drives");
             lblDriveBadge.getStyleClass().setAll("badge-warning");
-            lblSelectedDriveInfo.setText("No USB pen drives detected. Insert a pen drive and click 'Refresh'.");
+            lblSelectedDriveInfo.setText("Scanning... Insert a USB drive to begin.");
             btnExecuteWipe.setDisable(true);
         } else {
-            lblDriveBadge.setText(drives.size() + " Pen Drive(s) Detected");
+            lblDriveBadge.setText(drives.size() + " Pen Drive(s) Auto-Detected");
             lblDriveBadge.getStyleClass().setAll("badge-success");
-            cmbDrives.getSelectionModel().select(0);
+
+            if (prevSelected != null && drives.contains(prevSelected)) {
+                cmbDrives.getSelectionModel().select(prevSelected);
+            } else {
+                cmbDrives.getSelectionModel().select(0);
+            }
             updateSelectedDriveDetails();
             btnExecuteWipe.setDisable(false);
         }
@@ -210,7 +220,7 @@ public class WipingView {
         boolean isTestMode = chkTestMode.isSelected();
 
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("🚨 CONFIRM GOVERNMENT DATA SANITIZATION");
+        confirm.setTitle("CONFIRM DATA SANITIZATION");
         confirm.setHeaderText("PERMANENT MEDIA DATA DESTRUCTION WARNING");
         confirm.setContentText(String.format(
                 "Target Device: %s (%s)\nBlock Path: %s\nSanitization Standard: %s\nMode: %s\n\n" +

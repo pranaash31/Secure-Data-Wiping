@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 
 public class WipeEngine {
 
-    // ⚡ DEV TEST TOGGLE DEFAULT
+    // DEV TEST TOGGLE DEFAULT
     private static final long TEST_CAP_BYTES = 1L * 1024 * 1024 * 1024; // 1 GB cap in bytes
 
     public enum WipeStandard {
@@ -22,7 +22,7 @@ public class WipeEngine {
 
     public static boolean executeWipe(String systemPath, long totalBytes, WipeStandard standard, boolean isTestMode,
                                      Consumer<Double> progressCallback, Consumer<String> logCallback) {
-        // 🚨 HARD SAFETY GUARDRAIL: Block primary system disk
+        // HARD SAFETY GUARDRAIL: Block primary system disk
         if (systemPath.contains("disk0") || systemPath.contains("rdisk0")) {
             String err = "CRITICAL ERROR: Primary system drive blocked from wiping!";
             System.err.println(err);

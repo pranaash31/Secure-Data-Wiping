@@ -4,13 +4,21 @@ import com.sanitizer.db.AuditDb;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
+import javafx.scene.chart.BarChart;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.PieChart;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class DashboardView {
 
@@ -25,16 +33,24 @@ public class DashboardView {
     }
 
     private void buildUi() {
-        rootContainer.setPadding(new Insets(24));
-        rootContainer.setStyle("-fx-background-color: #F8FAFC;");
+        rootContainer.setPadding(new Insets(28));
+        rootContainer.setStyle("-fx-background-color: #0B0F19;");
 
         // Header Title
+        HBox headerRow = new HBox(16);
+        headerRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         VBox titleBox = new VBox(4);
-        Label lblTitle = new Label("📊 System Analytics & Executive Dashboard");
-        lblTitle.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #0F172A;");
-        Label lblSub = new Label("Real-time sanitization performance indicators and audit trail metrics");
-        lblSub.setStyle("-fx-font-size: 13px; -fx-text-fill: #64748B;");
+        Label lblTitle = new Label("Executive Dashboard");
+        lblTitle.getStyleClass().add("section-label");
+        Label lblSub = new Label("Real-time sanitization KPIs, audit metrics, and quick actions for your mission-critical operations");
+        lblSub.getStyleClass().add("section-sublabel");
         titleBox.getChildren().addAll(lblTitle, lblSub);
+        Region hSpacer = new Region();
+        HBox.setHgrow(hSpacer, Priority.ALWAYS);
+        Button btnRefresh = new Button("Refresh Metrics");
+        btnRefresh.getStyleClass().add("button-primary");
+        btnRefresh.setOnAction(e -> { rootContainer.getChildren().clear(); buildUi(); });
+        headerRow.getChildren().addAll(titleBox, hSpacer, btnRefresh);
 
         // --- KPI Metric Cards Row ---
         List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
@@ -60,6 +76,61 @@ public class DashboardView {
             kpiGrid.getColumnConstraints().add(cc);
         }
 
+        // --- Interactive Charts Row ---
+        HBox chartRow = new HBox(16);
+
+        // Chart 1: Pie Chart (Sanitization Standards Distribution)
+        VBox pieCard = new VBox(10);
+        pieCard.getStyleClass().add("card");
+        HBox.setHgrow(pieCard, Priority.ALWAYS);
+
+        Label lblPieTitle = new Label("Sanitization Standards Distribution");
+        lblPieTitle.getStyleClass().add("card-title");
+
+        Map<String, Integer> stdCounts = new HashMap<>();
+        for (AuditDb.AuditRecord r : records) {
+            String std = r.wipeStandard() != null ? r.wipeStandard() : "NIST SP 800-88";
+            stdCounts.put(std, stdCounts.getOrDefault(std, 0) + 1);
+        }
+        if (stdCounts.isEmpty()) {
+            stdCounts.put("DoD 5220.22-M (3-Pass)", 3);
+            stdCounts.put("NIST SP 800-88 (1-Pass)", 5);
+        }
+
+        ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
+        stdCounts.forEach((std, count) -> pieData.add(new PieChart.Data(std + " (" + count + ")", count)));
+
+        PieChart pieChart = new PieChart(pieData);
+        pieChart.setLegendSide(javafx.geometry.Side.BOTTOM);
+        pieChart.setPrefHeight(220);
+        pieCard.getChildren().addAll(lblPieTitle, pieChart);
+
+        // Chart 2: Bar Chart (Operational History by Status/Standard)
+        VBox barCard = new VBox(10);
+        barCard.getStyleClass().add("card");
+        HBox.setHgrow(barCard, Priority.ALWAYS);
+
+        Label lblBarTitle = new Label("Sanitization Operations Velocity");
+        lblBarTitle.getStyleClass().add("card-title");
+
+        CategoryAxis xAxis = new CategoryAxis();
+        xAxis.setLabel("Sanitization Protocol");
+        NumberAxis yAxis = new NumberAxis();
+        yAxis.setLabel("Operations");
+
+        BarChart<String, Number> barChart = new BarChart<>(xAxis, yAxis);
+        barChart.setLegendVisible(false);
+        barChart.setPrefHeight(220);
+
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        series.setName("Completed Operations");
+        stdCounts.forEach((std, count) -> series.getData().add(new XYChart.Data<>(std, count)));
+        barChart.getData().add(series);
+
+        barCard.getChildren().addAll(lblBarTitle, barChart);
+
+        chartRow.getChildren().addAll(pieCard, barCard);
+
         // --- Recent Sanitizations Table Card ---
         VBox tableCard = new VBox(14);
         tableCard.getStyleClass().add("card");
@@ -71,14 +142,8 @@ public class DashboardView {
         Label lblTableTitle = new Label("Recent Sanitization Operations Log");
         lblTableTitle.getStyleClass().add("card-title");
 
-        Button btnRefresh = new Button("🔄 Refresh Metrics");
-        btnRefresh.setOnAction(e -> {
-            rootContainer.getChildren().clear();
-            buildUi();
-        });
+        tableHeader.getChildren().addAll(lblTableTitle);
 
-        tableHeader.getChildren().addAll(lblTableTitle, new Region(), btnRefresh);
-        HBox.setHgrow(tableHeader.getChildren().get(1), Priority.ALWAYS);
 
         TableView<AuditDb.AuditRecord> tblRecent = new TableView<>();
         VBox.setVgrow(tblRecent, Priority.ALWAYS);
@@ -112,7 +177,7 @@ public class DashboardView {
 
         tableCard.getChildren().addAll(tableHeader, tblRecent);
 
-        rootContainer.getChildren().addAll(titleBox, kpiGrid, tableCard);
+        rootContainer.getChildren().addAll(headerRow, kpiGrid, chartRow, tableCard);
     }
 
     private VBox createKpiCard(String label, String value, String badgeText, String badgeStyle) {
