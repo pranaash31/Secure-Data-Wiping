@@ -2,7 +2,9 @@ package com.sanitizer.gui.navigation;
 
 import com.sanitizer.gui.views.*;
 import javafx.application.Platform;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 
 import java.net.URL;
@@ -30,32 +32,44 @@ public class NavigationManager {
         return instance;
     }
 
-    /** Entry point: show animated splash, then auto-navigate to login. */
+    /** Entry point: show static web-style Hero landing page maximized to screen bounds. */
     public void init(Stage stage) {
         this.primaryStage = stage;
-        showSplash();
+        
+        Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
+        primaryStage.setX(bounds.getMinX());
+        primaryStage.setY(bounds.getMinY());
+        primaryStage.setWidth(bounds.getWidth());
+        primaryStage.setHeight(bounds.getHeight());
+        
+        showHeroView();
+        primaryStage.setMaximized(true);
     }
 
-    // ── Splash ──────────────────────────────────────────────────────────────
-    private void showSplash() {
-        SplashView splash = new SplashView(this::showLoginView);
-        scene = new Scene(splash, 1180, 780);
+    // ── Static Web Hero Landing Page ─────────────────────────────────────────
+    public void showHeroView() {
+        Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
+        HeroView heroView = new HeroView(this::showLoginView);
+        scene = new Scene(heroView, bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
-        primaryStage.setTitle("SecureErase Pro — Enterprise Data Sanitization Suite");
+        primaryStage.setTitle("SecureErase Pro — Enterprise Hardware Sanitization Platform");
         primaryStage.setScene(scene);
         primaryStage.setMinWidth(1100);
         primaryStage.setMinHeight(700);
+        primaryStage.setMaximized(true);
         primaryStage.show();
     }
 
     // ── Login ────────────────────────────────────────────────────────────────
     public void showLoginView() {
         this.isAuthenticated = false;
+        Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
         LoginView loginView = new LoginView(this);
-        scene = new Scene(loginView.getRoot(), 1180, 780);
+        scene = new Scene(loginView.getRoot(), bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
         primaryStage.setTitle("SecureErase Pro — Officer Authentication Portal");
         primaryStage.setScene(scene);
+        primaryStage.setMaximized(true);
     }
 
     // ── Auth Success → Main Portal ───────────────────────────────────────────
@@ -67,11 +81,13 @@ public class NavigationManager {
     }
 
     public void showMainPortal() {
+        Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
         mainLayout = new MainLayout(this);
-        scene = new Scene(mainLayout.getRoot(), 1280, 840);
+        scene = new Scene(mainLayout.getRoot(), bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
         primaryStage.setTitle("SecureErase Pro — Enterprise Suite | " + officerName);
         primaryStage.setScene(scene);
+        primaryStage.setMaximized(true);
 
         // Default landing — Dashboard
         navigateTo("dashboard");
