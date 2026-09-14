@@ -62,23 +62,11 @@ public class MainLayout {
         );
         lblUserInfo.getStyleClass().add("top-bar-user");
 
-        Button btnTheme = new Button("Light Theme");
-        btnTheme.getStyleClass().add("button-theme-toggle");
-        btnTheme.setOnAction(e -> {
-            if (rootPane.getStyleClass().contains("light-theme")) {
-                rootPane.getStyleClass().remove("light-theme");
-                btnTheme.setText("Light Theme");
-            } else {
-                rootPane.getStyleClass().add("light-theme");
-                btnTheme.setText("Dark Theme");
-            }
-        });
-
         Button btnLogoutTop = new Button("Sign Out");
         btnLogoutTop.getStyleClass().add("button-theme-toggle");
         btnLogoutTop.setOnAction(e -> navManager.logout());
 
-        topBar.getChildren().addAll(brandRow, lblBadge, spacer, lblUserInfo, btnTheme, btnLogoutTop);
+        topBar.getChildren().addAll(brandRow, lblBadge, spacer, lblUserInfo, btnLogoutTop);
         rootPane.setTop(topBar);
 
         // ── SIDEBAR ──────────────────────────────────────────────────────

@@ -20,7 +20,6 @@ public class KeyVaultView {
 
     private void buildUi() {
         rootContainer.setPadding(new Insets(28));
-        rootContainer.setStyle("-fx-background-color: #0B0F19;");
 
         // ── Header ──────────────────────────────────────────────────────
         HBox header = new HBox(16);
@@ -123,12 +122,16 @@ public class KeyVaultView {
         GridPane certForm = new GridPane();
         certForm.setHgap(16); certForm.setVgap(12);
 
+        String officerName = com.sanitizer.gui.navigation.NavigationManager.getInstance().getOfficerName();
+        String agencyId = com.sanitizer.gui.navigation.NavigationManager.getInstance().getAgencyId();
+        int totalSigned = com.sanitizer.db.AuditDb.getTamperVerifiedCount();
+
         String[][] certFields = {
-                {"Issuing Organization", "SecureErase Technologies Pvt. Ltd."},
-                {"Certificate Authority", "Govt. of India Root CA Level 2"},
-                {"Country", "IN — India"},
-                {"Province / State", "Tamil Nadu"},
-                {"Officer Signatory Name", "Officer Pranaash"},
+                {"Issuing Organization", "SecureErase Technologies Enterprise"},
+                {"Certificate Authority", "Govt. Defense Root CA Level 2"},
+                {"Issuing Clearance Agency", agencyId},
+                {"Officer Signatory Name", officerName},
+                {"Digital PKI Seals Issued", String.valueOf(totalSigned) + " Cryptographic Certificates"},
                 {"Certificate Series", "CERT-2025-SE"},
                 {"Validity Duration", "365 Days (1 Year)"}
         };

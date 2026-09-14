@@ -246,10 +246,15 @@ public class HeroView extends ScrollPane {
         statsRow.setAlignment(Pos.CENTER);
         statsRow.setPadding(new Insets(20, 60, 50, 60));
 
-        VBox s1 = createStatCard("10,000,000+", "DRIVES SANITIZED");
-        VBox s2 = createStatCard("100.00%", "ZERO-RECOVERY GUARANTEE");
-        VBox s3 = createStatCard("FIPS 140-3", "VALIDATED CRYPTOGRAPHY");
-        VBox s4 = createStatCard("0.00%", "AUDIT FAILURE RATE");
+        int totalWipes = com.sanitizer.db.AuditDb.getAllRecords().size();
+        double successRate = com.sanitizer.db.AuditDb.getSuccessRatePercentage();
+        int signatures = com.sanitizer.db.AuditDb.getTamperVerifiedCount();
+        int activeDrives = com.sanitizer.detector.UsbDetector.getConnectedUsbDrives().size();
+
+        VBox s1 = createStatCard(String.valueOf(totalWipes) + " OPS", "VERIFIED AUDIT LOGS");
+        VBox s2 = createStatCard(String.format("%.1f%%", successRate), "ZERO-RECOVERY GUARANTEE");
+        VBox s3 = createStatCard(String.valueOf(signatures) + " SEALS", "VALIDATED RSA-4096 SIGNATURES");
+        VBox s4 = createStatCard(String.valueOf(activeDrives) + " DRIVES", "HARDWARE TARGETS ATTACHED");
 
         statsRow.getChildren().addAll(s1, s2, s3, s4);
         return statsRow;

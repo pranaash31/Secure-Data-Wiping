@@ -20,7 +20,6 @@ public class SettingsView {
 
     private void buildUi() {
         rootContainer.setPadding(new Insets(28));
-        rootContainer.setStyle("-fx-background-color: #0B0F19;");
 
         // ── Header ──────────────────────────────────────────────────────
         VBox titleBox = new VBox(4);

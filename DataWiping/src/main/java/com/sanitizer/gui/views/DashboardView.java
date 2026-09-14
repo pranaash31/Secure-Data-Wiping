@@ -34,7 +34,6 @@ public class DashboardView {
 
     private void buildUi() {
         rootContainer.setPadding(new Insets(28));
-        rootContainer.setStyle("-fx-background-color: #0B0F19;");
 
         // Header Title
         HBox headerRow = new HBox(16);
@@ -55,15 +54,18 @@ public class DashboardView {
         // --- KPI Metric Cards Row ---
         List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
         int totalWipes = records.size();
+        double successRate = AuditDb.getSuccessRatePercentage();
+        int signatureCount = AuditDb.getTamperVerifiedCount();
+        int activeDrives = com.sanitizer.detector.UsbDetector.getConnectedUsbDrives().size();
 
         GridPane kpiGrid = new GridPane();
         kpiGrid.setHgap(16);
         kpiGrid.setVgap(16);
 
-        VBox kpi1 = createKpiCard("TOTAL DISKS SANITIZED", String.valueOf(totalWipes), "100% Defense Compliant", "badge-success");
-        VBox kpi2 = createKpiCard("NIST / DOD COMPLIANCE", "100%", "SP 800-88 & DoD 5220.22-M", "badge-info");
-        VBox kpi3 = createKpiCard("DIGITAL SIGNATURES ISSUED", String.valueOf(totalWipes), "SHA256withRSA 2048-bit", "badge-info");
-        VBox kpi4 = createKpiCard("SAFETY SHIELD STATUS", "PROTECTED", "disk0 System Disk Guarded", "badge-success");
+        VBox kpi1 = createKpiCard("TOTAL SANITIZATION OPERATIONS", String.valueOf(totalWipes), "SQLite Audit DB", "badge-success");
+        VBox kpi2 = createKpiCard("ZERO-RECOVERY SUCCESS RATE", String.format("%.1f%%", successRate), "SP 800-88 & DoD 5220.22-M", "badge-info");
+        VBox kpi3 = createKpiCard("DIGITAL PKI SIGNATURES", String.valueOf(signatureCount), "RSA-4096 / SHA-256", "badge-info");
+        VBox kpi4 = createKpiCard("CONNECTED TARGET DRIVES", String.valueOf(activeDrives) + " Active", activeDrives > 0 ? "Target Detected" : "Scanning...", activeDrives > 0 ? "badge-success" : "badge-warning");
 
         kpiGrid.add(kpi1, 0, 0);
         kpiGrid.add(kpi2, 1, 0);

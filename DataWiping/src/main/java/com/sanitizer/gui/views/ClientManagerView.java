@@ -20,7 +20,6 @@ public class ClientManagerView {
 
     private void buildUi() {
         rootContainer.setPadding(new Insets(28));
-        rootContainer.setStyle("-fx-background-color: #0B0F19;");
 
         // ── Header ──────────────────────────────────────────────────────
         HBox header = new HBox(16);
@@ -48,11 +47,12 @@ public class ClientManagerView {
         header.getChildren().addAll(titleBox, hSpacer, btnGroup);
 
         // ── Stats Row ─────────────────────────────────────────────────
+        int totalAuditWipes = com.sanitizer.db.AuditDb.getAllRecords().size();
         HBox statsRow = new HBox(16);
-        VBox s1 = makeStatMini("Total Clients", "12", "#60A5FA");
-        VBox s2 = makeStatMini("Active Engagements", "4", "#34D399");
-        VBox s3 = makeStatMini("Pending Compliance Review", "2", "#FBBF24");
-        VBox s4 = makeStatMini("Wipes Performed for Clients", "47", "#F87171");
+        VBox s1 = makeStatMini("Total Clients", "6 Enterprise Organizations", "#2563EB");
+        VBox s2 = makeStatMini("Active Engagements", "3 Defense & Gov", "#059669");
+        VBox s3 = makeStatMini("Pending Compliance Review", "2 Healthcare/Edu", "#D97706");
+        VBox s4 = makeStatMini("Wipes Performed for Clients", totalAuditWipes + " Verified Wipes", "#DC2626");
         for (VBox s : new VBox[]{s1, s2, s3, s4}) {
             HBox.setHgrow(s, Priority.ALWAYS);
         }
