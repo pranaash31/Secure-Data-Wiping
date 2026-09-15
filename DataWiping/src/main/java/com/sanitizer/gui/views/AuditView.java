@@ -32,6 +32,7 @@ public class AuditView {
         return rootContainer;
     }
 
+    @SuppressWarnings("unchecked")
     private void buildUi() {
         rootContainer.setPadding(new Insets(24));
 

@@ -121,7 +121,8 @@ public class ClientManagerView {
         // Organization info
         VBox orgInfo = new VBox(6);
         Label orgName = new Label(name);
-        orgName.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #F1F5F9;");
+        orgName.getStyleClass().add("card-title");
+        orgName.setStyle("-fx-font-size: 14px;");
         Label sectorLabel = new Label("Sector: " + sector + "  |  " + wipes + " performed");
         sectorLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #475569;");
 

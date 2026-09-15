@@ -52,6 +52,7 @@ public class DiskDiagnosticView {
         return rootContainer;
     }
 
+    @SuppressWarnings("unchecked")
     private void buildUi() {
         rootContainer.setPadding(new Insets(28));
 

@@ -198,6 +198,7 @@ public class SanitizerController {
         return container;
     }
 
+    @SuppressWarnings("unchecked")
     private VBox buildAuditHistoryTab() {
         VBox container = new VBox(14);
         container.setPadding(new Insets(20));

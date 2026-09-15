@@ -4,7 +4,6 @@ import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
-import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.pdf.CertificateGenerator;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;

@@ -54,7 +54,8 @@ public class KeyVaultView {
                 "-fx-background-color: rgba(245,158,11,0.12); -fx-background-radius: 8px; -fx-padding: 6 10;");
         VBox keyTitleBox = new VBox(2);
         Label keyTitle = new Label("Active Signing Keypair");
-        keyTitle.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #FFFFFF;");
+        keyTitle.getStyleClass().add("card-title");
+        keyTitle.setStyle("-fx-font-size: 15px;");
         Label keySubtitle = new Label("Used for all certificate signing operations");
         keySubtitle.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B;");
         keyTitleBox.getChildren().addAll(keyTitle, keySubtitle);

@@ -2,13 +2,10 @@ package com.sanitizer.gui.views;
 
 import com.sanitizer.gui.navigation.NavigationManager;
 import javafx.animation.FadeTransition;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
 
 public class LoginView {

@@ -6,7 +6,6 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.Separator;
 import javafx.scene.layout.*;
 
 import java.util.HashMap;
@@ -62,11 +61,24 @@ public class MainLayout {
         );
         lblUserInfo.getStyleClass().add("top-bar-user");
 
+        Button btnThemeToggle = new Button("🌙 Dark Mode");
+        btnThemeToggle.getStyleClass().add("button-theme-toggle");
+        btnThemeToggle.setOnAction(e -> {
+            boolean isDark = rootPane.getStyleClass().contains("dark-theme");
+            if (isDark) {
+                rootPane.getStyleClass().remove("dark-theme");
+                btnThemeToggle.setText("🌙 Dark Mode");
+            } else {
+                rootPane.getStyleClass().add("dark-theme");
+                btnThemeToggle.setText("☀️ Light Mode");
+            }
+        });
+
         Button btnLogoutTop = new Button("Sign Out");
         btnLogoutTop.getStyleClass().add("button-theme-toggle");
         btnLogoutTop.setOnAction(e -> navManager.logout());
 
-        topBar.getChildren().addAll(brandRow, lblBadge, spacer, lblUserInfo, btnLogoutTop);
+        topBar.getChildren().addAll(brandRow, lblBadge, spacer, lblUserInfo, btnThemeToggle, btnLogoutTop);
         rootPane.setTop(topBar);
 
         // ── SIDEBAR ──────────────────────────────────────────────────────
