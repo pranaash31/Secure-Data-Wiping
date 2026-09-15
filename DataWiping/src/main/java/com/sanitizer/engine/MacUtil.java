@@ -1,9 +1,13 @@
 package com.sanitizer.engine;
 
+import com.sanitizer.util.AppLogger;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
 public class MacUtil {
+
+    private static final String MODULE = "MacUtil";
 
     /**
      * Unmounts all logical volumes on a macOS disk so low-level block write isn't blocked by the OS.
@@ -16,17 +20,22 @@ public class MacUtil {
 
         try {
             String diskPath = systemPath.replace("/dev/rdisk", "/dev/disk");
-            Process process = Runtime.getRuntime().exec(new String[]{"diskutil", "unmountDisk", diskPath});
+            ProcessBuilder pb = new ProcessBuilder("diskutil", "unmountDisk", diskPath);
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    System.out.println("[macOS diskutil]: " + line);
+                    AppLogger.info(MODULE, "[macOS diskutil]: " + line);
                 }
             }
-            process.waitFor();
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                AppLogger.warn(MODULE, "diskutil unmount exited with code: " + exitCode);
+            }
         } catch (Exception e) {
-            System.err.println("macOS diskutil unmount warning: " + e.getMessage());
+            AppLogger.warn(MODULE, "macOS diskutil unmount warning: " + e.getMessage());
         }
     }
 }

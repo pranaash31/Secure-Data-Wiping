@@ -1,11 +1,14 @@
 package com.sanitizer.db;
 
+import com.sanitizer.util.AppLogger;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class AuditDb {
 
+    private static final String MODULE = "AuditDb";
     private static final String DB_URL = "jdbc:sqlite:sanitizer_history.db";
 
     public record AuditRecord(
@@ -24,6 +27,14 @@ public class AuditDb {
         seedInitialDataIfEmpty();
     }
 
+    private static synchronized Connection getConnection() throws SQLException {
+        Connection conn = DriverManager.getConnection(DB_URL);
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("PRAGMA journal_mode=WAL;");
+        }
+        return conn;
+    }
+
     private static void initDatabase() {
         String sql = """
             CREATE TABLE IF NOT EXISTS wipe_logs (
@@ -37,18 +48,18 @@ public class AuditDb {
                 digital_signature TEXT NOT NULL
             );
             """;
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
         } catch (SQLException e) {
-            System.err.println("SQLite Init Error: " + e.getMessage());
+            AppLogger.error(MODULE, "SQLite Init Error", e);
         }
     }
 
     private static void seedInitialDataIfEmpty() {
         if (!getAllRecords().isEmpty()) return;
 
-        System.out.println("[AuditDb] Database is empty. Seeding initial baseline production audit records...");
+        AppLogger.info(MODULE, "Database is empty. Seeding initial baseline production audit records...");
         saveRecord("SanDisk Ultra Flair 32GB", "SD-FLAIR-99421", "32 GB", "DoD 5220.22-M", "SUCCESS", "SIG_SHA256_RSA4096_0x99A418F");
         saveRecord("Kingston DataTraveler 64GB", "KG-DT100-3882", "64 GB", "NIST SP 800-88", "SUCCESS", "SIG_SHA256_RSA4096_0x77B312E");
         saveRecord("Corsair Voyager 128GB", "CS-VYG-88210", "128 GB", "DoD 5220.22-M", "SUCCESS", "SIG_SHA256_RSA4096_0x55C109D");
@@ -60,7 +71,7 @@ public class AuditDb {
     public static boolean saveRecord(String driveModel, String serialNumber, String capacity,
                                      String wipeStandard, String status, String signature) {
         String sql = "INSERT INTO wipe_logs(drive_model, serial_number, capacity, wipe_standard, status, digital_signature) VALUES(?,?,?,?,?,?)";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, driveModel);
             pstmt.setString(2, serialNumber);
@@ -71,7 +82,7 @@ public class AuditDb {
             pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            System.err.println("DB Insert Error: " + e.getMessage());
+            AppLogger.error(MODULE, "DB Insert Error", e);
             return false;
         }
     }
@@ -79,7 +90,7 @@ public class AuditDb {
     public static List<AuditRecord> getAllRecords() {
         List<AuditRecord> records = new ArrayList<>();
         String sql = "SELECT * FROM wipe_logs ORDER BY id DESC";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
@@ -95,20 +106,27 @@ public class AuditDb {
                 ));
             }
         } catch (SQLException e) {
-            System.err.println("DB Query Error: " + e.getMessage());
+            AppLogger.error(MODULE, "DB Query Error", e);
         }
         return records;
     }
 
     public static double getSuccessRatePercentage() {
-        List<AuditRecord> records = getAllRecords();
-        if (records.isEmpty()) return 100.0;
+        return getSuccessRatePercentage(getAllRecords());
+    }
+
+    public static double getSuccessRatePercentage(List<AuditRecord> records) {
+        if (records == null || records.isEmpty()) return 100.0;
         long successCount = records.stream().filter(r -> "SUCCESS".equalsIgnoreCase(r.status())).count();
         return ((double) successCount / records.size()) * 100.0;
     }
 
     public static int getTamperVerifiedCount() {
-        List<AuditRecord> records = getAllRecords();
+        return getTamperVerifiedCount(getAllRecords());
+    }
+
+    public static int getTamperVerifiedCount(List<AuditRecord> records) {
+        if (records == null) return 0;
         return (int) records.stream().filter(r -> r.digitalSignature() != null && !r.digitalSignature().isEmpty()).count();
     }
 }

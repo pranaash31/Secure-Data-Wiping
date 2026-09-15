@@ -232,8 +232,10 @@ public class AuditView {
         alert.setHeaderText(null);
         alert.setContentText(content);
         // Auto-focus OK button so Enter/Space dismisses the dialog
-        alert.getDialogPane().setOnShown(ev ->
-            alert.getDialogPane().lookupButton(ButtonType.OK) instanceof Button ok && ok.requestFocus());
+        alert.setOnShown(ev -> {
+            Button ok = (Button) alert.getDialogPane().lookupButton(ButtonType.OK);
+            if (ok != null) ok.requestFocus();
+        });
         alert.showAndWait();
     }
 }

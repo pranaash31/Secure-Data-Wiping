@@ -358,8 +358,10 @@ public class WipingView {
         alert.setHeaderText(null);
         alert.setContentText(content);
         // Focus the default button immediately for keyboard accessibility
-        alert.getDialogPane().setOnShown(ev ->
-            alert.getDialogPane().lookupButton(ButtonType.OK) instanceof Button ok && ok.requestFocus());
+        alert.setOnShown(ev -> {
+            Button ok = (Button) alert.getDialogPane().lookupButton(ButtonType.OK);
+            if (ok != null) ok.requestFocus();
+        });
         alert.showAndWait();
     }
 }

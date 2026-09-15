@@ -114,13 +114,13 @@ public class MainLayout {
 
         // Officer info card at bottom of sidebar
         VBox officerCard = new VBox(4);
-        officerCard.setStyle("-fx-background-color: #1E293B; -fx-background-radius: 10px; -fx-padding: 12;");
+        officerCard.getStyleClass().add("sidebar-officer-card");
         Label officerName = new Label(navManager.getOfficerName());
-        officerName.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #E2E8F0;");
-        Label officerRole = new Label("Senior Inspector");
-        officerRole.setStyle("-fx-font-size: 10px; -fx-text-fill: #475569;");
+        officerName.getStyleClass().add("sidebar-officer-name");
+        Label officerRole = new Label(navManager.getRole());
+        officerRole.getStyleClass().add("sidebar-officer-role");
         Label officerAgency = new Label(navManager.getAgencyId());
-        officerAgency.setStyle("-fx-font-size: 10px; -fx-text-fill: #3B82F6; -fx-font-weight: bold;");
+        officerAgency.getStyleClass().add("sidebar-officer-agency");
         officerCard.getChildren().addAll(officerName, officerRole, officerAgency);
 
         sidebar.getChildren().addAll(

@@ -1,13 +1,21 @@
 package com.sanitizer.detector;
 
+import com.sanitizer.util.AppLogger;
 import oshi.SystemInfo;
 import oshi.hardware.HWDiskStore;
 import oshi.hardware.HardwareAbstractionLayer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public class UsbDetector {
+
+    private static final String MODULE = "UsbDetector";
 
     public record UsbDriveInfo(String model, String serial, long sizeBytes, String formattedSize, String systemPath) {}
 
@@ -33,7 +41,7 @@ public class UsbDetector {
                     || serial.contains("nvme");
 
             if (isSsdOrSystem) {
-                System.out.println("[Safety Shield] Blocked Non-Pen Drive / SSD: " + disk.getModel());
+                AppLogger.shield(MODULE, "Blocked Non-Pen Drive / System Disk: " + disk.getModel());
                 continue;
             }
 
@@ -58,7 +66,7 @@ public class UsbDetector {
                     fullPath = rawName;
                 }
 
-                System.out.println("[Pen Drive Detected] Model: " + disk.getModel() + " | Size: " + formattedSize + " | Path: " + fullPath);
+                AppLogger.info(MODULE, "Pen Drive Detected: " + disk.getModel() + " | Size: " + formattedSize + " | Path: " + fullPath);
 
                 drives.add(new UsbDriveInfo(
                         disk.getModel().trim().isEmpty() ? "32GB USB Flash Drive" : disk.getModel(),
@@ -72,13 +80,13 @@ public class UsbDetector {
         return drives;
     }
 
-    private static final java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<List<UsbDriveInfo>>> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
-    private static java.util.concurrent.ScheduledExecutorService scheduler;
+    private static final CopyOnWriteArrayList<Consumer<List<UsbDriveInfo>>> listeners = new CopyOnWriteArrayList<>();
+    private static ScheduledExecutorService scheduler;
 
-    public static synchronized void registerListener(java.util.function.Consumer<List<UsbDriveInfo>> listener) {
+    public static synchronized void registerListener(Consumer<List<UsbDriveInfo>> listener) {
         listeners.add(listener);
         if (scheduler == null || scheduler.isShutdown()) {
-            scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+            scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "UsbPollerThread");
                 t.setDaemon(true);
                 return t;
@@ -89,12 +97,24 @@ public class UsbDetector {
                     for (var l : listeners) {
                         javafx.application.Platform.runLater(() -> l.accept(drives));
                     }
-                } catch (Exception ignored) {}
-            }, 0, 2, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    AppLogger.error(MODULE, "Polling Error", e);
+                }
+            }, 0, 2, TimeUnit.SECONDS);
+
+            // Shutdown hook to clean up thread pool on app exit
+            Runtime.getRuntime().addShutdownHook(new Thread(UsbDetector::shutdown));
         }
     }
 
-    public static synchronized void unregisterListener(java.util.function.Consumer<List<UsbDriveInfo>> listener) {
+    public static synchronized void unregisterListener(Consumer<List<UsbDriveInfo>> listener) {
         listeners.remove(listener);
+    }
+
+    public static synchronized void shutdown() {
+        if (scheduler != null && !scheduler.isShutdown()) {
+            AppLogger.info(MODULE, "Shutting down USB detector polling executor...");
+            scheduler.shutdownNow();
+        }
     }
 }

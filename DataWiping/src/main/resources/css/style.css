@@ -214,6 +214,28 @@
     -fx-letter-spacing: 1px;
 }
 .sidebar-title { -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #64748B; -fx-padding: 10 14 6 14; }
+.sidebar-officer-card {
+    -fx-background-color: #F1F5F9;
+    -fx-background-radius: 10px;
+    -fx-padding: 12;
+    -fx-border-color: #E2E8F0;
+    -fx-border-width: 1;
+    -fx-border-radius: 10px;
+}
+.sidebar-officer-name {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+.sidebar-officer-role {
+    -fx-font-size: 10px;
+    -fx-text-fill: #64748B;
+}
+.sidebar-officer-agency {
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2563EB;
+}
 .nav-button {
     -fx-background-color: transparent;
     -fx-text-fill: #475569;
@@ -604,6 +626,19 @@
 }
 .dark-theme .sidebar-section-label,
 .dark-theme .sidebar-title { -fx-text-fill: #3B7BF5; }
+.dark-theme .sidebar-officer-card {
+    -fx-background-color: #121A2D;
+    -fx-border-color: #1E2D44;
+}
+.dark-theme .sidebar-officer-name {
+    -fx-text-fill: #E2E8F0;
+}
+.dark-theme .sidebar-officer-role {
+    -fx-text-fill: #64748B;
+}
+.dark-theme .sidebar-officer-agency {
+    -fx-text-fill: #60A5FA;
+}
 
 /* ─── NAVIGATION BUTTONS ───────────────────────────────────────────────── */
 .dark-theme .nav-button {

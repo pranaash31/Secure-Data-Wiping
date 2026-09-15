@@ -1,47 +1,55 @@
 package com.sanitizer.gui.navigation;
 
 import com.sanitizer.gui.views.*;
+import com.sanitizer.session.SessionContext;
+import com.sanitizer.util.AppLogger;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 
 public class NavigationManager {
 
-    private static NavigationManager instance;
+    private static final String MODULE = "NavigationManager";
 
     private Stage primaryStage;
     private Scene scene;
     private MainLayout mainLayout;
 
     // Session State
-    private String officerName = "Officer Pranaash";
-    private String agencyId   = "GOV-DEF-8942";
-    private String role       = "Senior Sanitization Inspector";
+    private SessionContext sessionContext;
     private boolean isAuthenticated = false;
+
+    // View Node Cache (ViewKey -> Root Node)
+    private final Map<String, Node> viewCache = new HashMap<>();
 
     private NavigationManager() {}
 
+    /** Thread-safe Initialization-on-Demand Holder Singleton. */
+    private static class InstanceHolder {
+        private static final NavigationManager INSTANCE = new NavigationManager();
+    }
+
     public static NavigationManager getInstance() {
-        if (instance == null) {
-            instance = new NavigationManager();
-        }
-        return instance;
+        return InstanceHolder.INSTANCE;
     }
 
     /** Entry point: show static web-style Hero landing page maximized to screen bounds. */
     public void init(Stage stage) {
         this.primaryStage = stage;
-        
+
         Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
         primaryStage.setX(bounds.getMinX());
         primaryStage.setY(bounds.getMinY());
         primaryStage.setWidth(bounds.getWidth());
         primaryStage.setHeight(bounds.getHeight());
-        
+
         showHeroView();
         primaryStage.setMaximized(true);
     }
@@ -63,6 +71,8 @@ public class NavigationManager {
     // ── Login ────────────────────────────────────────────────────────────────
     public void showLoginView() {
         this.isAuthenticated = false;
+        this.sessionContext = null;
+        this.viewCache.clear();
         Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
         LoginView loginView = new LoginView(this);
         scene = new Scene(loginView.getRoot(), bounds.getWidth(), bounds.getHeight());
@@ -74,9 +84,9 @@ public class NavigationManager {
 
     // ── Auth Success → Main Portal ───────────────────────────────────────────
     public void loginSuccess(String username, String agency) {
-        this.officerName = (username != null && !username.isBlank()) ? username : "Officer Pranaash";
-        this.agencyId    = (agency != null && !agency.isBlank()) ? agency : "GOV-DEF-8942";
+        this.sessionContext = new SessionContext(username, agency, "Senior Sanitization Inspector");
         this.isAuthenticated = true;
+        AppLogger.info(MODULE, "Authenticated session established for: " + sessionContext.officerName());
         showMainPortal();
     }
 
@@ -98,7 +108,7 @@ public class NavigationManager {
             }
         });
 
-        primaryStage.setTitle("SecureErase Pro — Enterprise Suite | " + officerName);
+        primaryStage.setTitle("SecureErase Pro — Enterprise Suite | " + getOfficerName());
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
 
@@ -113,17 +123,32 @@ public class NavigationManager {
             return;
         }
 
-        switch (viewName.toLowerCase()) {
-            case "dashboard"   -> mainLayout.setContent(new DashboardView().getRoot(), "dashboard");
-            case "wiping"      -> mainLayout.setContent(new WipingView().getRoot(), "wiping");
-            case "batchWipe"   -> mainLayout.setContent(new BatchWipeView().getRoot(), "batchWipe");
-            case "diagnostics" -> mainLayout.setContent(new DiskDiagnosticView().getRoot(), "diagnostics");
-            case "clients"     -> mainLayout.setContent(new ClientManagerView().getRoot(), "clients");
-            case "keyvault"    -> mainLayout.setContent(new KeyVaultView().getRoot(), "keyvault");
-            case "audit"       -> mainLayout.setContent(new AuditView().getRoot(), "audit");
-            case "settings"    -> mainLayout.setContent(new SettingsView().getRoot(), "settings");
-            default            -> mainLayout.setContent(new DashboardView().getRoot(), "dashboard");
+        String key = viewName.toLowerCase();
+        Node viewNode = viewCache.get(key);
+
+        if (viewNode == null) {
+            AppLogger.info(MODULE, "Instantiating view: " + key);
+            viewNode = createViewNode(key);
+            viewCache.put(key, viewNode);
+        } else {
+            AppLogger.info(MODULE, "Loaded view from cache: " + key);
         }
+
+        mainLayout.setContent(viewNode, key);
+    }
+
+    private Node createViewNode(String key) {
+        return switch (key) {
+            case "dashboard"   -> new DashboardView().getRoot();
+            case "wiping"      -> new WipingView().getRoot();
+            case "batchwipe"   -> new BatchWipeView().getRoot();
+            case "diagnostics" -> new DiskDiagnosticView().getRoot();
+            case "clients"     -> new ClientManagerView().getRoot();
+            case "keyvault"    -> new KeyVaultView().getRoot();
+            case "audit"       -> new AuditView().getRoot();
+            case "settings"    -> new SettingsView().getRoot();
+            default            -> new DashboardView().getRoot();
+        };
     }
 
     public void logout() {
@@ -146,7 +171,11 @@ public class NavigationManager {
     }
 
     // ── Getters ──────────────────────────────────────────────────────────────
-    public String getOfficerName() { return officerName; }
-    public String getAgencyId()    { return agencyId; }
-    public String getRole()        { return role; }
+    public SessionContext getSessionContext() {
+        return sessionContext != null ? sessionContext : new SessionContext("Officer Pranaash", "GOV-DEF-8942", "Senior Inspector");
+    }
+
+    public String getOfficerName() { return getSessionContext().officerName(); }
+    public String getAgencyId()    { return getSessionContext().agencyId(); }
+    public String getRole()        { return getSessionContext().role(); }
 }

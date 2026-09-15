@@ -1,5 +1,7 @@
 package com.sanitizer.engine;
 
+import com.sanitizer.util.AppLogger;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -8,7 +10,7 @@ import java.util.function.Consumer;
 
 public class WipeEngine {
 
-    // DEV TEST TOGGLE DEFAULT
+    private static final String MODULE = "WipeEngine";
     private static final long TEST_CAP_BYTES = 1L * 1024 * 1024 * 1024; // 1 GB cap in bytes
 
     public enum WipeStandard {
@@ -24,8 +26,8 @@ public class WipeEngine {
                                      Consumer<Double> progressCallback, Consumer<String> logCallback) {
         // HARD SAFETY GUARDRAIL: Block primary system disk
         if (systemPath.contains("disk0") || systemPath.contains("rdisk0")) {
-            String err = "CRITICAL ERROR: Primary system drive blocked from wiping!";
-            System.err.println(err);
+            String err = "CRITICAL SAFETY SHIELD: Primary system drive (" + systemPath + ") blocked from wiping!";
+            AppLogger.shield(MODULE, err);
             if (logCallback != null) logCallback.accept(err);
             return false;
         }
@@ -58,7 +60,7 @@ public class WipeEngine {
     }
 
     private static void log(Consumer<String> logCallback, String msg) {
-        System.out.println(msg);
+        AppLogger.info(MODULE, msg);
         if (logCallback != null) logCallback.accept(msg);
     }
 
@@ -105,7 +107,7 @@ public class WipeEngine {
             return process.waitFor() == 0;
         } catch (Exception e) {
             String err = "Wipe Command Execution Error: " + e.getMessage();
-            System.err.println(err);
+            AppLogger.error(MODULE, err, e);
             if (logCallback != null) logCallback.accept(err);
             return false;
         }

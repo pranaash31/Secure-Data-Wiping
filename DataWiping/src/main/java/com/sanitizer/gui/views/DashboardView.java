@@ -1,6 +1,7 @@
 package com.sanitizer.gui.views;
 
 import com.sanitizer.db.AuditDb;
+import com.sanitizer.util.AppLogger;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -23,11 +24,25 @@ import java.util.Map;
 
 public class DashboardView {
 
+    private static final String MODULE = "DashboardView";
+
     private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(20);
 
+    // Dynamic Controls & Observable Data
+    private Label lblValTotalWipes;
+    private Label lblValSuccessRate;
+    private Label lblValSignatures;
+    private Label lblValActiveDrives;
+    private Label lblBadgeActiveDrives;
+
+    private final ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
+    private final XYChart.Series<String, Number> barSeries = new XYChart.Series<>();
+    private final ObservableList<AuditDb.AuditRecord> tableRecords = FXCollections.observableArrayList();
+
     public DashboardView() {
-        buildUi();
+        buildStructure();
+        refreshData();
     }
 
     public Parent getRoot() {
@@ -35,7 +50,7 @@ public class DashboardView {
     }
 
     @SuppressWarnings("unchecked")
-    private void buildUi() {
+    private void buildStructure() {
         scrollRoot.setFitToWidth(true);
         scrollRoot.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollRoot.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
@@ -44,13 +59,12 @@ public class DashboardView {
 
         rootContainer.setPadding(new Insets(28));
 
-        // F5 = refresh metrics
+        // F5 = refresh metrics in-place
         rootContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
                 newScene.setOnKeyPressed(ev -> {
                     if (ev.getCode() == KeyCode.F5) {
-                        rootContainer.getChildren().clear();
-                        buildUi();
+                        refreshData();
                     }
                 });
             }
@@ -58,41 +72,46 @@ public class DashboardView {
 
         // Header Title
         HBox headerRow = new HBox(16);
-        headerRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        headerRow.setAlignment(Pos.CENTER_LEFT);
         VBox titleBox = new VBox(4);
         Label lblTitle = new Label("Executive Dashboard");
         lblTitle.getStyleClass().add("section-label");
         Label lblSub = new Label("Real-time sanitization KPIs, audit metrics, and quick actions for your mission-critical operations");
         lblSub.getStyleClass().add("section-sublabel");
         titleBox.getChildren().addAll(lblTitle, lblSub);
+
         Region hSpacer = new Region();
         HBox.setHgrow(hSpacer, Priority.ALWAYS);
         Button btnRefresh = new Button("Refresh Metrics (F5)");
         btnRefresh.getStyleClass().add("button-primary");
         btnRefresh.setTooltip(new Tooltip("Reload all KPI metrics and charts (F5)"));
-        btnRefresh.setOnAction(e -> { rootContainer.getChildren().clear(); buildUi(); });
+        btnRefresh.setOnAction(e -> refreshData());
         headerRow.getChildren().addAll(titleBox, hSpacer, btnRefresh);
 
         // --- KPI Metric Cards Row ---
-        List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
-        int totalWipes = records.size();
-        double successRate = AuditDb.getSuccessRatePercentage();
-        int signatureCount = AuditDb.getTamperVerifiedCount();
-        int activeDrives = com.sanitizer.detector.UsbDetector.getConnectedUsbDrives().size();
+        lblValTotalWipes = new Label("0");
+        lblValTotalWipes.getStyleClass().add("kpi-value");
+
+        lblValSuccessRate = new Label("100.0%");
+        lblValSuccessRate.getStyleClass().add("kpi-value");
+
+        lblValSignatures = new Label("0");
+        lblValSignatures.getStyleClass().add("kpi-value");
+
+        lblValActiveDrives = new Label("0 Active");
+        lblValActiveDrives.getStyleClass().add("kpi-value");
+
+        lblBadgeActiveDrives = new Label("Scanning...");
+        lblBadgeActiveDrives.getStyleClass().add("badge-warning");
 
         GridPane kpiGrid = new GridPane();
         kpiGrid.setHgap(16);
         kpiGrid.setVgap(16);
 
-        VBox kpi1 = createKpiCard("TOTAL SANITIZATION OPERATIONS", String.valueOf(totalWipes), "SQLite Audit DB", "badge-success");
-        VBox kpi2 = createKpiCard("ZERO-RECOVERY SUCCESS RATE", String.format("%.1f%%", successRate), "SP 800-88 & DoD 5220.22-M", "badge-info");
-        VBox kpi3 = createKpiCard("DIGITAL PKI SIGNATURES", String.valueOf(signatureCount), "RSA-4096 / SHA-256", "badge-info");
-        VBox kpi4 = createKpiCard("CONNECTED TARGET DRIVES", String.valueOf(activeDrives) + " Active", activeDrives > 0 ? "Target Detected" : "Scanning...", activeDrives > 0 ? "badge-success" : "badge-warning");
-
-        kpiGrid.add(kpi1, 0, 0);
-        kpiGrid.add(kpi2, 1, 0);
-        kpiGrid.add(kpi3, 2, 0);
-        kpiGrid.add(kpi4, 3, 0);
+        kpiGrid.add(createKpiCard("TOTAL SANITIZATION OPERATIONS", lblValTotalWipes, "SQLite Audit DB", "badge-success"), 0, 0);
+        kpiGrid.add(createKpiCard("ZERO-RECOVERY SUCCESS RATE", lblValSuccessRate, "SP 800-88 & DoD 5220.22-M", "badge-info"), 1, 0);
+        kpiGrid.add(createKpiCard("DIGITAL PKI SIGNATURES", lblValSignatures, "RSA-4096 / SHA-256", "badge-info"), 2, 0);
+        kpiGrid.add(createKpiCard("CONNECTED TARGET DRIVES", lblValActiveDrives, lblBadgeActiveDrives), 3, 0);
 
         for (int i = 0; i < 4; i++) {
             ColumnConstraints cc = new ColumnConstraints();
@@ -110,19 +129,6 @@ public class DashboardView {
 
         Label lblPieTitle = new Label("Sanitization Standards Distribution");
         lblPieTitle.getStyleClass().add("card-title");
-
-        Map<String, Integer> stdCounts = new HashMap<>();
-        for (AuditDb.AuditRecord r : records) {
-            String std = r.wipeStandard() != null ? r.wipeStandard() : "NIST SP 800-88";
-            stdCounts.put(std, stdCounts.getOrDefault(std, 0) + 1);
-        }
-        if (stdCounts.isEmpty()) {
-            stdCounts.put("DoD 5220.22-M (3-Pass)", 3);
-            stdCounts.put("NIST SP 800-88 (1-Pass)", 5);
-        }
-
-        ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
-        stdCounts.forEach((std, count) -> pieData.add(new PieChart.Data(std + " (" + count + ")", count)));
 
         PieChart pieChart = new PieChart(pieData);
         pieChart.setLegendSide(javafx.geometry.Side.BOTTOM);
@@ -145,11 +151,8 @@ public class DashboardView {
         BarChart<String, Number> barChart = new BarChart<>(xAxis, yAxis);
         barChart.setLegendVisible(false);
         barChart.setPrefHeight(220);
-
-        XYChart.Series<String, Number> series = new XYChart.Series<>();
-        series.setName("Completed Operations");
-        stdCounts.forEach((std, count) -> series.getData().add(new XYChart.Data<>(std, count)));
-        barChart.getData().add(series);
+        barSeries.setName("Completed Operations");
+        barChart.getData().add(barSeries);
 
         barCard.getChildren().addAll(lblBarTitle, barChart);
 
@@ -160,14 +163,8 @@ public class DashboardView {
         tableCard.getStyleClass().add("card");
         VBox.setVgrow(tableCard, Priority.ALWAYS);
 
-        HBox tableHeader = new HBox(12);
-        tableHeader.setAlignment(Pos.CENTER_LEFT);
-
         Label lblTableTitle = new Label("Recent Sanitization Operations Log");
         lblTableTitle.getStyleClass().add("card-title");
-
-        tableHeader.getChildren().addAll(lblTableTitle);
-
 
         TableView<AuditDb.AuditRecord> tblRecent = new TableView<>();
         VBox.setVgrow(tblRecent, Priority.ALWAYS);
@@ -197,14 +194,67 @@ public class DashboardView {
         colStatus.setPrefWidth(100);
 
         tblRecent.getColumns().addAll(colId, colTime, colModel, colSerial, colStandard, colStatus);
-        tblRecent.setItems(FXCollections.observableArrayList(records));
+        tblRecent.setItems(tableRecords);
 
-        tableCard.getChildren().addAll(tableHeader, tblRecent);
+        tableCard.getChildren().addAll(lblTableTitle, tblRecent);
 
         rootContainer.getChildren().addAll(headerRow, kpiGrid, chartRow, tableCard);
     }
 
-    private VBox createKpiCard(String label, String value, String badgeText, String badgeStyle) {
+    /** Efficient in-place metrics refresh — zero scene graph thrashing. */
+    public void refreshData() {
+        AppLogger.info(MODULE, "Refreshing dashboard metrics...");
+
+        // Single DB Query for all metrics
+        List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
+        int totalWipes = records.size();
+        double successRate = AuditDb.getSuccessRatePercentage(records);
+        int signatureCount = AuditDb.getTamperVerifiedCount(records);
+        int activeDrives = com.sanitizer.detector.UsbDetector.getConnectedUsbDrives().size();
+
+        lblValTotalWipes.setText(String.valueOf(totalWipes));
+        lblValSuccessRate.setText(String.format("%.1f%%", successRate));
+        lblValSignatures.setText(String.valueOf(signatureCount));
+        lblValActiveDrives.setText(activeDrives + " Active");
+
+        if (activeDrives > 0) {
+            lblBadgeActiveDrives.setText("Target Detected");
+            lblBadgeActiveDrives.getStyleClass().setAll("badge-success");
+        } else {
+            lblBadgeActiveDrives.setText("Scanning...");
+            lblBadgeActiveDrives.getStyleClass().setAll("badge-warning");
+        }
+
+        // Standard distribution computation
+        Map<String, Integer> stdCounts = new HashMap<>();
+        for (AuditDb.AuditRecord r : records) {
+            String std = r.wipeStandard() != null ? r.wipeStandard() : "NIST SP 800-88";
+            stdCounts.put(std, stdCounts.getOrDefault(std, 0) + 1);
+        }
+        if (stdCounts.isEmpty()) {
+            stdCounts.put("DoD 5220.22-M (3-Pass)", 3);
+            stdCounts.put("NIST SP 800-88 (1-Pass)", 5);
+        }
+
+        // In-place Pie Chart update
+        pieData.clear();
+        stdCounts.forEach((std, count) -> pieData.add(new PieChart.Data(std + " (" + count + ")", count)));
+
+        // In-place Bar Chart update
+        barSeries.getData().clear();
+        stdCounts.forEach((std, count) -> barSeries.getData().add(new XYChart.Data<>(std, count)));
+
+        // In-place Table update
+        tableRecords.setAll(records);
+    }
+
+    private VBox createKpiCard(String label, Label valueLabel, String badgeText, String badgeStyle) {
+        Label lblBadge = new Label(badgeText);
+        lblBadge.getStyleClass().add(badgeStyle);
+        return createKpiCard(label, valueLabel, lblBadge);
+    }
+
+    private VBox createKpiCard(String label, Label valueLabel, Label badgeLabel) {
         VBox card = new VBox(8);
         card.getStyleClass().add("kpi-card");
 
@@ -217,15 +267,9 @@ public class DashboardView {
         Region r = new Region();
         HBox.setHgrow(r, Priority.ALWAYS);
 
-        Label lblB = new Label(badgeText);
-        lblB.getStyleClass().add(badgeStyle);
+        topBox.getChildren().addAll(lblL, r, badgeLabel);
 
-        topBox.getChildren().addAll(lblL, r, lblB);
-
-        Label lblV = new Label(value);
-        lblV.getStyleClass().add("kpi-value");
-
-        card.getChildren().addAll(topBox, lblV);
+        card.getChildren().addAll(topBox, valueLabel);
         return card;
     }
 }
