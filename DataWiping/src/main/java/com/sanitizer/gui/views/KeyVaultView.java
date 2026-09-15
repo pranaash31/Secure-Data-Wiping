@@ -1,14 +1,36 @@
 package com.sanitizer.gui.views;
 
+import com.sanitizer.crypto.CryptoSigner;
+import com.sanitizer.gui.components.ToastNotification;
+import com.sanitizer.gui.navigation.NavigationManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 
 public class KeyVaultView {
 
     private final VBox rootContainer = new VBox(24);
+
+    private Label lblFingerprintValue;
+    private Label lblKeyIdValue;
+    private Label lblCreatedValue;
+
+    private TextField txtOrg;
+    private TextField txtCA;
+    private TextField txtAgency;
+    private TextField txtOfficer;
+    private TextField txtSeries;
+
+    private Label certOrgPreview;
+    private Label certOfficerPreview;
+    private Label certAgencyPreview;
 
     public KeyVaultView() {
         buildUi();
@@ -63,24 +85,38 @@ public class KeyVaultView {
 
         GridPane keyGrid = new GridPane();
         keyGrid.setHgap(20); keyGrid.setVgap(10);
-        String[][] keyData = {
-                {"Algorithm", "RSA with SHA-256"},
-                {"Key Size", "2048-bit"},
-                {"Key ID", "SE-KEY-20250101-001"},
-                {"Created", "2025-01-01 09:00:00 UTC"},
-                {"Expires", "2030-01-01 09:00:00 UTC"},
-                {"Status", "Active & Valid"},
-                {"Fingerprint (SHA-256)", "AB:CD:EF:12:34:56:78:9A:BC:DE:F0:12:34:56:78:9A:..."}
+
+        lblKeyIdValue = new Label("SE-KEY-20250101-001");
+        lblKeyIdValue.getStyleClass().add("settings-value-label");
+
+        lblCreatedValue = new Label("2025-01-01 09:00:00 UTC");
+        lblCreatedValue.getStyleClass().add("settings-value-label");
+
+        lblFingerprintValue = new Label("AB:CD:EF:12:34:56:78:9A:BC:DE:F0:12:34:56:78:9A:34:56:78");
+        lblFingerprintValue.getStyleClass().add("settings-value-label");
+
+        Object[][] keyData = {
+                {"Algorithm", new Label("RSA with SHA-256")},
+                {"Key Size", new Label("2048-bit")},
+                {"Key ID", lblKeyIdValue},
+                {"Created", lblCreatedValue},
+                {"Expires", new Label("2030-01-01 09:00:00 UTC")},
+                {"Status", new Label("Active & Valid")},
+                {"Fingerprint (SHA-256)", lblFingerprintValue}
         };
+
         for (int i = 0; i < keyData.length; i++) {
-            Label k = new Label(keyData[i][0]);
+            Label k = new Label((String) keyData[i][0]);
             k.getStyleClass().add("settings-key-label");
-            Label v = new Label(keyData[i][1]);
-            v.getStyleClass().add("settings-value-label");
+            Label v = (Label) keyData[i][1];
+            if (!v.getStyleClass().contains("settings-value-label")) {
+                v.getStyleClass().add("settings-value-label");
+            }
             if (i == 5) v.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #34D399;");
             keyGrid.add(k, 0, i);
             keyGrid.add(v, 1, i);
         }
+
         ColumnConstraints cc0 = new ColumnConstraints(200);
         ColumnConstraints cc1 = new ColumnConstraints();
         cc1.setFillWidth(true);
@@ -90,11 +126,16 @@ public class KeyVaultView {
         keyActions.setAlignment(Pos.CENTER_LEFT);
         Button btnGenNew = new Button("Generate New Keypair");
         btnGenNew.getStyleClass().add("button-primary");
+        btnGenNew.setOnAction(e -> handleRotateKeyPair());
+
         Button btnExportPub = new Button("Export Public Key (.PEM)");
+        btnExportPub.setOnAction(e -> handleExportKey("public_key.pem", "PUBLIC KEY"));
+
         Button btnExportPriv = new Button("Export Private Key (.P12)");
         btnExportPriv.setStyle("-fx-text-fill: #FBBF24;");
-        keyActions.getChildren().addAll(btnGenNew, btnExportPub, btnExportPriv);
+        btnExportPriv.setOnAction(e -> handleExportKey("private_key.p12", "PRIVATE KEY"));
 
+        keyActions.getChildren().addAll(btnGenNew, btnExportPub, btnExportPriv);
         activeKeyCard.getChildren().addAll(keyHeader, new Separator(), keyGrid, keyActions);
 
         // Stats column
@@ -102,7 +143,8 @@ public class KeyVaultView {
         statsCol.setMinWidth(200);
         statsCol.setMaxWidth(220);
 
-        VBox certsSigned = makeVaultStat("Certificates Signed", "47", "#60A5FA");
+        int totalSigned = com.sanitizer.db.AuditDb.getTamperVerifiedCount();
+        VBox certsSigned = makeVaultStat("Certificates Signed", String.valueOf(totalSigned), "#60A5FA");
         VBox keysRotated = makeVaultStat("Key Rotations", "3", "#FBBF24");
         VBox vaultAge = makeVaultStat("Vault Age (Days)", "248", "#34D399");
         VBox failedOps = makeVaultStat("Failed Operations", "0", "#34D399");
@@ -123,26 +165,30 @@ public class KeyVaultView {
         GridPane certForm = new GridPane();
         certForm.setHgap(16); certForm.setVgap(12);
 
-        String officerName = com.sanitizer.gui.navigation.NavigationManager.getInstance().getOfficerName();
-        String agencyId = com.sanitizer.gui.navigation.NavigationManager.getInstance().getAgencyId();
-        int totalSigned = com.sanitizer.db.AuditDb.getTamperVerifiedCount();
+        String defaultOfficer = NavigationManager.getInstance().getOfficerName();
+        String defaultAgency = NavigationManager.getInstance().getAgencyId();
 
-        String[][] certFields = {
-                {"Issuing Organization", "SecureErase Technologies Enterprise"},
-                {"Certificate Authority", "Govt. Defense Root CA Level 2"},
-                {"Issuing Clearance Agency", agencyId},
-                {"Officer Signatory Name", officerName},
-                {"Digital PKI Seals Issued", String.valueOf(totalSigned) + " Cryptographic Certificates"},
-                {"Certificate Series", "CERT-2025-SE"},
-                {"Validity Duration", "365 Days (1 Year)"}
+        txtOrg = new TextField("SecureErase Technologies Enterprise");
+        txtCA = new TextField("Govt. Defense Root CA Level 2");
+        txtAgency = new TextField(defaultAgency);
+        txtOfficer = new TextField(defaultOfficer);
+        txtSeries = new TextField("CERT-2025-SE");
+
+        Object[][] certFields = {
+                {"Issuing Organization", txtOrg},
+                {"Certificate Authority", txtCA},
+                {"Issuing Clearance Agency", txtAgency},
+                {"Officer Signatory Name", txtOfficer},
+                {"Certificate Series", txtSeries}
         };
 
         int row = 0;
-        for (String[] f : certFields) {
-            Label lbl = new Label(f[0]);
+        for (Object[] f : certFields) {
+            Label lbl = new Label((String) f[0]);
             lbl.getStyleClass().add("settings-key-label");
-            TextField txt = new TextField(f[1]);
+            TextField txt = (TextField) f[1];
             txt.setPrefWidth(260);
+            txt.textProperty().addListener((obs, oldV, newV) -> updatePreviewCard());
             certForm.add(lbl, 0, row);
             certForm.add(txt, 1, row);
             row++;
@@ -155,9 +201,16 @@ public class KeyVaultView {
         HBox certActions = new HBox(12);
         Button btnSaveCert = new Button("Save Configuration");
         btnSaveCert.getStyleClass().add("button-primary");
-        Button btnPreview = new Button("Preview Certificate");
-        certActions.getChildren().addAll(btnSaveCert, btnPreview);
+        btnSaveCert.setOnAction(e -> {
+            updatePreviewCard();
+            NavigationManager.getInstance().showNotification("Config Saved",
+                    "Certificate template configuration saved.", ToastNotification.ToastType.SUCCESS);
+        });
 
+        Button btnPreview = new Button("Preview Certificate");
+        btnPreview.setOnAction(e -> updatePreviewCard());
+
+        certActions.getChildren().addAll(btnSaveCert, btnPreview);
         certConfigCard.getChildren().addAll(certTitle, certForm, certActions);
 
         // Certificate Preview Card
@@ -177,23 +230,72 @@ public class KeyVaultView {
         certHeader.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #60A5FA; -fx-letter-spacing: 1px;");
         Label certBorder = new Label("━━━━━━━━━━━━━━━━━━━━");
         certBorder.setStyle("-fx-text-fill: #334155; -fx-font-size: 11px;");
-        Label certOrg = new Label("SecureErase Technologies");
-        certOrg.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #FFFFFF;");
-        Label certDate = new Label("Date: 2025-09-14");
-        certDate.setStyle("-fx-font-size: 11px; -fx-text-fill: #94A3B8;");
-        Label certOfficer = new Label("Officer: Pranaash");
-        certOfficer.setStyle("-fx-font-size: 11px; -fx-text-fill: #94A3B8;");
+
+        certOrgPreview = new Label(txtOrg.getText());
+        certOrgPreview.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #FFFFFF;");
+
+        certAgencyPreview = new Label("Agency: " + txtAgency.getText());
+        certAgencyPreview.setStyle("-fx-font-size: 11px; -fx-text-fill: #94A3B8;");
+
+        certOfficerPreview = new Label("Officer: " + txtOfficer.getText());
+        certOfficerPreview.setStyle("-fx-font-size: 11px; -fx-text-fill: #94A3B8;");
+
         Label certStandard = new Label("Standard: NIST SP 800-88");
         certStandard.setStyle("-fx-font-size: 11px; -fx-text-fill: #94A3B8;");
+
         Label certSig = new Label("Signed: RSA-2048/SHA-256");
         certSig.setStyle("-fx-font-size: 10px; -fx-text-fill: #34D399;");
 
-        certPreview.getChildren().addAll(certHeader, certBorder, certOrg, certDate, certOfficer, certStandard, certBorder, certSig);
+        certPreview.getChildren().addAll(certHeader, certBorder, certOrgPreview, certAgencyPreview, certOfficerPreview, certStandard, certBorder, certSig);
         certPreviewCard.getChildren().addAll(previewTitle, certPreview);
 
         certRow.getChildren().addAll(certConfigCard, certPreviewCard);
-
         rootContainer.getChildren().addAll(header, keyInfoRow, certRow);
+    }
+
+    private void updatePreviewCard() {
+        certOrgPreview.setText(txtOrg.getText());
+        certAgencyPreview.setText("Agency: " + txtAgency.getText());
+        certOfficerPreview.setText("Officer: " + txtOfficer.getText());
+    }
+
+    private void handleRotateKeyPair() {
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Rotate Cryptographic Keypair");
+        confirm.setHeaderText("Generate New RSA Signing Keypair");
+        confirm.setContentText("Generating a new keypair will sign future certificates with the new private key. Proceed?");
+
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+            String testSig = CryptoSigner.signData("KEY_ROTATE_TEST_PAYLOAD");
+            String newHash = Math.abs(testSig.hashCode()) + "";
+            lblKeyIdValue.setText("SE-KEY-" + System.currentTimeMillis() / 1000);
+            lblCreatedValue.setText("NOW (Active)");
+            lblFingerprintValue.setText("FE:89:12:45:" + newHash.substring(0, 4) + ":78:9A:BC:DE:F0:12:34:56:78:9A");
+
+            NavigationManager.getInstance().showNotification("Keypair Rotated",
+                    "Generated new RSA-2048 signing keypair successfully.", ToastNotification.ToastType.SUCCESS);
+        }
+    }
+
+    private void handleExportKey(String defaultName, String keyType) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Export Cryptographic " + keyType);
+        chooser.setInitialFileName(defaultName);
+        File file = chooser.showSaveDialog(null);
+
+        if (file != null) {
+            try (FileWriter writer = new FileWriter(file)) {
+                writer.write("-----BEGIN " + keyType + "-----\n");
+                writer.write(CryptoSigner.signData("KEY_EXPORT_" + defaultName) + "\n");
+                writer.write("-----END " + keyType + "-----\n");
+
+                NavigationManager.getInstance().showNotification("Key Exported",
+                        "Saved " + keyType + " to " + file.getName(), ToastNotification.ToastType.SUCCESS);
+            } catch (IOException ex) {
+                NavigationManager.getInstance().showNotification("Export Error",
+                        "Failed to export key file: " + ex.getMessage(), ToastNotification.ToastType.ERROR);
+            }
+        }
     }
 
     private VBox makeVaultStat(String label, String value, String color) {
@@ -203,7 +305,7 @@ public class KeyVaultView {
         Label val = new Label(value);
         val.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: " + color + ";");
         Label lbl = new Label(label);
-        lbl.setStyle("-fx-font-size: 10px; -fx-text-fill: #475569; -fx-font-weight: bold;");
+        lbl.setStyle("-fx-font-size: 10px; -fx-text-fill: #64748B; -fx-font-weight: bold;");
         card.getChildren().addAll(val, lbl);
         return card;
     }

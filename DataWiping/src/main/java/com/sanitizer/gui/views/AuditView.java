@@ -143,23 +143,28 @@ public class AuditView {
     private void handleExportPdf() {
         AuditDb.AuditRecord selected = tblAuditHistory.getSelectionModel().getSelectedItem();
         if (selected == null) {
-            showAlert(Alert.AlertType.WARNING, "No Log Selected", "Please select an audit log entry from the table to export PDF certificate.");
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("No Selection",
+                    "Select an audit log entry from the table first.", com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
             return;
         }
 
         String pdfPath = CertificateGenerator.generateCertificate(selected);
         if (pdfPath != null) {
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("PDF Exported",
+                    "Certificate generated at: " + pdfPath, com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
             showAlert(Alert.AlertType.INFORMATION, "PDF Certificate Exported",
                     "Sanitization Proof Certificate created successfully:\n" + pdfPath);
         } else {
-            showAlert(Alert.AlertType.ERROR, "Export Error", "Failed to generate PDF Certificate.");
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Export Error",
+                    "Failed to generate PDF Certificate.", com.sanitizer.gui.components.ToastNotification.ToastType.ERROR);
         }
     }
 
     private void handleVerifySignature() {
         AuditDb.AuditRecord selected = tblAuditHistory.getSelectionModel().getSelectedItem();
         if (selected == null) {
-            showAlert(Alert.AlertType.WARNING, "No Log Selected", "Please select an audit record to verify signature.");
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("No Selection",
+                    "Select an audit record to verify signature.", com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
             return;
         }
 
@@ -167,9 +172,13 @@ public class AuditView {
         boolean valid = CryptoSigner.verifySignature(payload, selected.digitalSignature());
 
         if (valid) {
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Signature Authenticated",
+                    "SHA256withRSA signature matches payload!", com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
             showAlert(Alert.AlertType.INFORMATION, "Signature Authenticated",
                     "VERIFICATION SUCCESSFUL\n\nThe SHA256withRSA signature matches the record payload.\nThis record is authentic and tamper-free!");
         } else {
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Signature Mismatch",
+                    "Verification failed!", com.sanitizer.gui.components.ToastNotification.ToastType.ERROR);
             showAlert(Alert.AlertType.ERROR, "Verification Failed",
                     "SIGNATURE MISMATCH\n\nThe digital signature could not be verified against the current keypair or record payload.");
         }

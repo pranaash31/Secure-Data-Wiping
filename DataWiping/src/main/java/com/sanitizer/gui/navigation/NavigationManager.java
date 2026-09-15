@@ -124,6 +124,13 @@ public class NavigationManager {
         }
     }
 
+    // ── Toast Notifications ──────────────────────────────────────────────────
+    public void showNotification(String title, String message, com.sanitizer.gui.components.ToastNotification.ToastType type) {
+        if (primaryStage != null) {
+            com.sanitizer.gui.components.ToastNotification.show(primaryStage, title, message, type);
+        }
+    }
+
     // ── Getters ──────────────────────────────────────────────────────────────
     public String getOfficerName() { return officerName; }
     public String getAgencyId()    { return agencyId; }

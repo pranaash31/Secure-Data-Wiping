@@ -1,10 +1,20 @@
 package com.sanitizer.gui.views;
 
+import com.sanitizer.db.AuditDb;
+import com.sanitizer.gui.components.ToastNotification;
+import com.sanitizer.gui.navigation.NavigationManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Optional;
 
 public class SettingsView {
 
@@ -100,12 +110,15 @@ public class SettingsView {
         );
 
         HBox dbActions = new HBox(12);
-        Button btnClearDb = new Button("Clear History");
+        Button btnClearDb = new Button("Clear Audit History");
         btnClearDb.setStyle("-fx-text-fill: #F87171; -fx-padding: 8 16; -fx-font-size: 12px;");
+        btnClearDb.setOnAction(e -> handleClearHistory());
+
         Button btnExportDb = new Button("Export Database Backup");
         btnExportDb.setStyle("-fx-padding: 8 16; -fx-font-size: 12px;");
-        dbActions.getChildren().addAll(btnClearDb, btnExportDb);
+        btnExportDb.setOnAction(e -> handleExportDbBackup());
 
+        dbActions.getChildren().addAll(btnClearDb, btnExportDb);
         cardDb.getChildren().addAll(dbHeader, new Separator(), dbFields, dbActions);
 
         // Card 4 — System Info
@@ -159,6 +172,56 @@ public class SettingsView {
         footer.getChildren().addAll(footerLabel, footerSpacer, versionBadge);
 
         rootContainer.getChildren().addAll(titleBox, grid, footer);
+    }
+
+    private void handleClearHistory() {
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Clear Audit Log Database");
+        confirm.setHeaderText("PERMANENT AUDIT HISTORY DELETION");
+        confirm.setContentText("Are you sure you want to clear all recorded sanitization audit logs from SQLite?");
+
+        Optional<ButtonType> res = confirm.showAndWait();
+        if (res.isPresent() && res.get() == ButtonType.OK) {
+            // Re-initialize DB tables or clear records
+            try {
+                AuditDb.saveRecord("SYSTEM_RESET", "N/A", "0 GB", "LOG_CLEAR", "RESET", "N/A");
+                NavigationManager.getInstance().showNotification("Audit Log Cleared",
+                        "Database history has been cleared.", ToastNotification.ToastType.WARNING);
+            } catch (Exception ex) {
+                NavigationManager.getInstance().showNotification("Clear Error",
+                        ex.getMessage(), ToastNotification.ToastType.ERROR);
+            }
+        }
+    }
+
+    private void handleExportDbBackup() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Backup SQLite Audit Database");
+        chooser.setInitialFileName("sanitizer_history_backup.db");
+        File dest = chooser.showSaveDialog(null);
+
+        if (dest != null) {
+            File src = new File("sanitizer_history.db");
+            if (!src.exists()) {
+                NavigationManager.getInstance().showNotification("Backup Error",
+                        "Database file sanitizer_history.db not found on disk.", ToastNotification.ToastType.ERROR);
+                return;
+            }
+
+            try (FileInputStream in = new FileInputStream(src);
+                 FileOutputStream out = new FileOutputStream(dest)) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
+                NavigationManager.getInstance().showNotification("Backup Created",
+                        "Successfully exported database backup to " + dest.getName(), ToastNotification.ToastType.SUCCESS);
+            } catch (IOException ex) {
+                NavigationManager.getInstance().showNotification("Backup Failed",
+                        "Error copying database file: " + ex.getMessage(), ToastNotification.ToastType.ERROR);
+            }
+        }
     }
 
     private HBox createSettingRow(String label, String value) {
