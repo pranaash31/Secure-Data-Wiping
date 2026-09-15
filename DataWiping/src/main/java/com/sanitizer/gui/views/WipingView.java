@@ -12,6 +12,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.Optional;
 
 public class WipingView {
 
+    private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(20);
 
     private ComboBox<UsbDetector.UsbDriveInfo> cmbDrives;
@@ -39,15 +41,32 @@ public class WipingView {
     public WipingView() {
         buildUi();
         refreshDriveList();
-        UsbDetector.registerListener(drives -> updateDriveList(drives));
+        UsbDetector.registerListener(drives -> Platform.runLater(() -> updateDriveList(drives)));
     }
 
     public Parent getRoot() {
-        return rootContainer;
+        return scrollRoot;
     }
 
     private void buildUi() {
+        scrollRoot.setFitToWidth(true);
+        scrollRoot.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollRoot.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollRoot.setContent(rootContainer);
+        scrollRoot.getStyleClass().add("edge-to-edge");
+
         rootContainer.setPadding(new Insets(24));
+
+        // Global keyboard shortcuts: F5 = refresh drives
+        rootContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                newScene.setOnKeyPressed(ev -> {
+                    if (ev.getCode() == KeyCode.F5) {
+                        refreshDriveList();
+                    }
+                });
+            }
+        });
 
         // Header Title
         VBox titleBox = new VBox(4);
@@ -92,8 +111,13 @@ public class WipingView {
         cmbDrives.setButtonCell(cmbDrives.getCellFactory().call(null));
         cmbDrives.setOnAction(e -> updateSelectedDriveDetails());
 
-        btnRefreshDrives = new Button("Refresh Drives");
+        btnRefreshDrives = new Button("Refresh Drives (F5)");
         btnRefreshDrives.setOnAction(e -> refreshDriveList());
+        btnRefreshDrives.setTooltip(new Tooltip("Rescan connected USB drives (F5)"));
+        // Also trigger load when drive selection changes via keyboard
+        cmbDrives.setOnKeyPressed(ev -> {
+            if (ev.getCode() == KeyCode.ENTER) updateSelectedDriveDetails();
+        });
 
         HBox driveActionBox = new HBox(10, cmbDrives, btnRefreshDrives);
         HBox.setHgrow(cmbDrives, Priority.ALWAYS);
@@ -140,6 +164,11 @@ public class WipingView {
         btnExecuteWipe.getStyleClass().add("button-danger");
         btnExecuteWipe.setStyle("-fx-font-size: 14px; -fx-padding: 10 24;");
         btnExecuteWipe.setOnAction(e -> handleWipeExecution());
+        btnExecuteWipe.setTooltip(new Tooltip("Begin low-level sector sanitization on the selected drive"));
+        // Allow Enter to trigger execute button when it holds focus
+        btnExecuteWipe.setOnKeyPressed(ev -> {
+            if (ev.getCode() == KeyCode.ENTER) handleWipeExecution();
+        });
 
         lblStatusMessage = new Label("Status: Ready.");
         lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #1E293B;");
@@ -328,6 +357,9 @@ public class WipingView {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(content);
+        // Focus the default button immediately for keyboard accessibility
+        alert.getDialogPane().setOnShown(ev ->
+            alert.getDialogPane().lookupButton(ButtonType.OK) instanceof Button ok && ok.requestFocus());
         alert.showAndWait();
     }
 }

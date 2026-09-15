@@ -8,10 +8,12 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 
 import java.util.List;
@@ -58,18 +60,30 @@ public class AuditView {
         txtSearch.setPrefWidth(260);
         txtSearch.textProperty().addListener((obs, oldVal, newVal) -> filterLog(newVal));
 
-        Button btnRefresh = new Button("Refresh Log");
+        Button btnRefresh = new Button("Refresh Log (F5)");
+        btnRefresh.setTooltip(new Tooltip("Reload audit log from SQLite (F5)"));
         btnRefresh.setOnAction(e -> loadAuditHistory());
 
         Button btnExportPdf = new Button("Export PDF Certificate");
         btnExportPdf.getStyleClass().add("button-primary");
+        btnExportPdf.setTooltip(new Tooltip("Generate PDF certificate for selected record (also: double-click row)"));
         btnExportPdf.setOnAction(e -> handleExportPdf());
 
         Button btnVerify = new Button("Verify RSA Signature");
+        btnVerify.setTooltip(new Tooltip("Verify SHA256withRSA signature for selected record"));
         btnVerify.setOnAction(e -> handleVerifySignature());
 
         toolbar.getChildren().addAll(txtSearch, new Region(), btnRefresh, btnExportPdf, btnVerify);
         HBox.setHgrow(toolbar.getChildren().get(1), Priority.ALWAYS);
+
+        // F5 shortcut = refresh audit log
+        toolbar.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                newScene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, ev -> {
+                    if (ev.getCode() == KeyCode.F5) loadAuditHistory();
+                });
+            }
+        });
 
         // Table
         tblAuditHistory = new TableView<>();
@@ -116,6 +130,21 @@ public class AuditView {
         filteredData = new FilteredList<>(auditData, p -> true);
         tblAuditHistory.setItems(filteredData);
 
+        // Double-click row → export PDF
+        tblAuditHistory.setRowFactory(tv -> {
+            TableRow<AuditDb.AuditRecord> row = new TableRow<>();
+            row.setOnMouseClicked(ev -> {
+                if (ev.getClickCount() == 2 && !row.isEmpty()) handleExportPdf();
+            });
+            return row;
+        });
+        // Enter key on selected row → export PDF
+        tblAuditHistory.setOnKeyPressed(ev -> {
+            if (ev.getCode() == KeyCode.ENTER && tblAuditHistory.getSelectionModel().getSelectedItem() != null) {
+                handleExportPdf();
+            }
+        });
+
         cardTable.getChildren().addAll(toolbar, tblAuditHistory);
 
         rootContainer.getChildren().addAll(titleBox, cardTable);
@@ -148,16 +177,29 @@ public class AuditView {
             return;
         }
 
-        String pdfPath = CertificateGenerator.generateCertificate(selected);
-        if (pdfPath != null) {
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("PDF Exported",
-                    "Certificate generated at: " + pdfPath, com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
-            showAlert(Alert.AlertType.INFORMATION, "PDF Certificate Exported",
-                    "Sanitization Proof Certificate created successfully:\n" + pdfPath);
-        } else {
+        // Run on background thread – keeps UI responsive during PDF generation
+        Task<String> pdfTask = new Task<>() {
+            @Override
+            protected String call() {
+                return CertificateGenerator.generateCertificate(selected);
+            }
+        };
+        pdfTask.setOnSucceeded(ev -> {
+            String pdfPath = pdfTask.getValue();
+            if (pdfPath != null) {
+                com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("PDF Exported",
+                        "Certificate generated at: " + pdfPath, com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
+                showAlert(Alert.AlertType.INFORMATION, "PDF Certificate Exported",
+                        "Sanitization Proof Certificate created successfully:\n" + pdfPath);
+            } else {
+                com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Export Error",
+                        "Failed to generate PDF Certificate.", com.sanitizer.gui.components.ToastNotification.ToastType.ERROR);
+            }
+        });
+        pdfTask.setOnFailed(ev ->
             com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Export Error",
-                    "Failed to generate PDF Certificate.", com.sanitizer.gui.components.ToastNotification.ToastType.ERROR);
-        }
+                    pdfTask.getException().getMessage(), com.sanitizer.gui.components.ToastNotification.ToastType.ERROR));
+        new Thread(pdfTask, "audit-pdf-export-thread").start();
     }
 
     private void handleVerifySignature() {
@@ -189,6 +231,9 @@ public class AuditView {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(content);
+        // Auto-focus OK button so Enter/Space dismisses the dialog
+        alert.getDialogPane().setOnShown(ev ->
+            alert.getDialogPane().lookupButton(ButtonType.OK) instanceof Button ok && ok.requestFocus());
         alert.showAndWait();
     }
 }

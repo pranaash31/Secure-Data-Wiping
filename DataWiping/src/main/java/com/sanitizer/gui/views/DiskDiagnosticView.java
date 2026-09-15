@@ -1,6 +1,7 @@
 package com.sanitizer.gui.views;
 
 import com.sanitizer.detector.UsbDetector;
+import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -8,12 +9,14 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 
 import java.util.List;
 
 public class DiskDiagnosticView {
 
+    private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(24);
 
     private ComboBox<UsbDetector.UsbDriveInfo> cmbDrives;
@@ -45,16 +48,31 @@ public class DiskDiagnosticView {
     public DiskDiagnosticView() {
         buildUi();
         refreshDriveList();
-        UsbDetector.registerListener(drives -> updateDriveList(drives));
+        UsbDetector.registerListener(drives -> Platform.runLater(() -> updateDriveList(drives)));
     }
 
     public Parent getRoot() {
-        return rootContainer;
+        return scrollRoot;
     }
 
     @SuppressWarnings("unchecked")
     private void buildUi() {
+        scrollRoot.setFitToWidth(true);
+        scrollRoot.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollRoot.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollRoot.setContent(rootContainer);
+        scrollRoot.getStyleClass().add("edge-to-edge");
+
         rootContainer.setPadding(new Insets(28));
+
+        // F5 = rescan drives
+        rootContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                newScene.setOnKeyPressed(ev -> {
+                    if (ev.getCode() == KeyCode.F5) refreshDriveList();
+                });
+            }
+        });
 
         // ── Header ──────────────────────────────────────────────────────
         HBox header = new HBox(16);
@@ -70,9 +88,10 @@ public class DiskDiagnosticView {
         Region hSpacer = new Region();
         HBox.setHgrow(hSpacer, Priority.ALWAYS);
 
-        btnScan = new Button("Scan All Drives");
+        btnScan = new Button("Scan All Drives (F5)");
         btnScan.getStyleClass().add("button-primary");
         btnScan.setOnAction(e -> refreshDriveList());
+        btnScan.setTooltip(new Tooltip("Rescan all connected hardware drives (F5)"));
 
         header.getChildren().addAll(titleBox, hSpacer, btnScan);
 
@@ -102,10 +121,18 @@ public class DiskDiagnosticView {
         });
         cmbDrives.setButtonCell(cmbDrives.getCellFactory().call(null));
         cmbDrives.setOnAction(e -> loadSelectedDriveDiagnostics());
+        // Enter key on combobox triggers load
+        cmbDrives.setOnKeyPressed(ev -> {
+            if (ev.getCode() == KeyCode.ENTER) loadSelectedDriveDiagnostics();
+        });
 
         btnLoad = new Button("Load Diagnostics");
         btnLoad.getStyleClass().add("button-primary");
         btnLoad.setOnAction(e -> loadSelectedDriveDiagnostics());
+        btnLoad.setTooltip(new Tooltip("Load SMART data for the selected drive"));
+        btnLoad.setOnKeyPressed(ev -> {
+            if (ev.getCode() == KeyCode.ENTER) loadSelectedDriveDiagnostics();
+        });
 
         selectorRow.getChildren().addAll(selectorLabel, cmbDrives, btnLoad);
 

@@ -3,6 +3,7 @@ package com.sanitizer.gui.navigation;
 import com.sanitizer.gui.views.*;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
+import javafx.scene.input.KeyCode;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
@@ -84,6 +85,19 @@ public class NavigationManager {
         mainLayout = new MainLayout(this);
         scene = new Scene(mainLayout.getRoot(), bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
+
+        // Global Keyboard Shortcuts (Cmd/Ctrl + Key)
+        scene.setOnKeyPressed(event -> {
+            if (event.isControlDown() || event.isMetaDown()) {
+                if (event.getCode() == KeyCode.D) navigateTo("dashboard");
+                else if (event.getCode() == KeyCode.W) navigateTo("wiping");
+                else if (event.getCode() == KeyCode.B) navigateTo("batchWipe");
+                else if (event.getCode() == KeyCode.K) navigateTo("keyvault");
+                else if (event.getCode() == KeyCode.A) navigateTo("audit");
+                else if (event.getCode() == KeyCode.COMMA) navigateTo("settings");
+            }
+        });
+
         primaryStage.setTitle("SecureErase Pro — Enterprise Suite | " + officerName);
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);

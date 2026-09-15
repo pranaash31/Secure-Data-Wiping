@@ -7,6 +7,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 
@@ -18,6 +19,7 @@ import java.util.Optional;
 
 public class SettingsView {
 
+    private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(24);
 
     public SettingsView() {
@@ -25,10 +27,16 @@ public class SettingsView {
     }
 
     public Parent getRoot() {
-        return rootContainer;
+        return scrollRoot;
     }
 
     private void buildUi() {
+        scrollRoot.setFitToWidth(true);
+        scrollRoot.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollRoot.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollRoot.setContent(rootContainer);
+        scrollRoot.getStyleClass().add("edge-to-edge");
+
         rootContainer.setPadding(new Insets(28));
 
         // ── Header ──────────────────────────────────────────────────────
@@ -112,11 +120,15 @@ public class SettingsView {
         HBox dbActions = new HBox(12);
         Button btnClearDb = new Button("Clear Audit History");
         btnClearDb.setStyle("-fx-text-fill: #F87171; -fx-padding: 8 16; -fx-font-size: 12px;");
+        btnClearDb.setTooltip(new Tooltip("Permanently clear all sanitization audit records from SQLite"));
         btnClearDb.setOnAction(e -> handleClearHistory());
+        btnClearDb.setOnKeyPressed(ev -> { if (ev.getCode() == KeyCode.ENTER) handleClearHistory(); });
 
         Button btnExportDb = new Button("Export Database Backup");
         btnExportDb.setStyle("-fx-padding: 8 16; -fx-font-size: 12px;");
+        btnExportDb.setTooltip(new Tooltip("Save a copy of sanitizer_history.db to a chosen location"));
         btnExportDb.setOnAction(e -> handleExportDbBackup());
+        btnExportDb.setOnKeyPressed(ev -> { if (ev.getCode() == KeyCode.ENTER) handleExportDbBackup(); });
 
         dbActions.getChildren().addAll(btnClearDb, btnExportDb);
         cardDb.getChildren().addAll(dbHeader, new Separator(), dbFields, dbActions);

@@ -15,6 +15,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 
 import java.util.List;
@@ -210,18 +211,30 @@ public class SanitizerController {
         Label lblHistoryTitle = new Label("SQLite Tamper-Evident Audit Trail");
         lblHistoryTitle.getStyleClass().add("card-title");
 
-        Button btnRefresh = new Button("Refresh Log");
+        Button btnRefresh = new Button("Refresh Log (F5)");
+        btnRefresh.setTooltip(new Tooltip("Reload audit records from SQLite (F5)"));
         btnRefresh.setOnAction(e -> loadAuditHistory());
 
         Button btnExportPdf = new Button("Export PDF Certificate");
         btnExportPdf.getStyleClass().add("button-primary");
+        btnExportPdf.setTooltip(new Tooltip("Generate a PDF sanitization certificate for the selected record"));
         btnExportPdf.setOnAction(e -> handleExportPdf());
 
         Button btnVerify = new Button("Verify RSA Signature");
+        btnVerify.setTooltip(new Tooltip("Verify the RSA-SHA256 digital signature for the selected record"));
         btnVerify.setOnAction(e -> handleVerifySignature());
 
         toolbar.getChildren().addAll(lblHistoryTitle, new Region(), btnRefresh, btnExportPdf, btnVerify);
         HBox.setHgrow(toolbar.getChildren().get(1), Priority.ALWAYS);
+
+        // F5 to refresh audit log
+        toolbar.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                newScene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, ev -> {
+                    if (ev.getCode() == KeyCode.F5) loadAuditHistory();
+                });
+            }
+        });
 
         // Table View
         tblAuditHistory = new TableView<>();
@@ -267,6 +280,23 @@ public class SanitizerController {
 
         auditData = FXCollections.observableArrayList();
         tblAuditHistory.setItems(auditData);
+
+        // Double-click row → export PDF instantly
+        tblAuditHistory.setRowFactory(tv -> {
+            TableRow<AuditDb.AuditRecord> row = new TableRow<>();
+            row.setOnMouseClicked(ev -> {
+                if (ev.getClickCount() == 2 && !row.isEmpty()) {
+                    handleExportPdf();
+                }
+            });
+            return row;
+        });
+        // Enter key on focused row also triggers PDF export
+        tblAuditHistory.setOnKeyPressed(ev -> {
+            if (ev.getCode() == KeyCode.ENTER && tblAuditHistory.getSelectionModel().getSelectedItem() != null) {
+                handleExportPdf();
+            }
+        });
 
         container.getChildren().addAll(toolbar, tblAuditHistory);
         return container;
@@ -431,12 +461,26 @@ public class SanitizerController {
             return;
         }
 
-        String pdfPath = CertificateGenerator.generateCertificate(selected);
-        if (pdfPath != null) {
-            showAlert(Alert.AlertType.INFORMATION, "PDF Generated", "Sanitization Certificate exported successfully:\n" + pdfPath);
-        } else {
-            showAlert(Alert.AlertType.ERROR, "PDF Generation Failed", "Could not generate PDF certificate.");
-        }
+        // Run PDF generation on a background thread to avoid freezing the UI
+        Task<String> pdfTask = new Task<>() {
+            @Override
+            protected String call() {
+                return CertificateGenerator.generateCertificate(selected);
+            }
+        };
+        pdfTask.setOnSucceeded(ev -> {
+            String pdfPath = pdfTask.getValue();
+            if (pdfPath != null) {
+                showAlert(Alert.AlertType.INFORMATION, "PDF Generated",
+                        "Sanitization Certificate exported successfully:\n" + pdfPath);
+            } else {
+                showAlert(Alert.AlertType.ERROR, "PDF Generation Failed",
+                        "Could not generate PDF certificate. Check logs for details.");
+            }
+        });
+        pdfTask.setOnFailed(ev -> showAlert(Alert.AlertType.ERROR, "PDF Task Error",
+                pdfTask.getException().getMessage()));
+        new Thread(pdfTask, "pdf-export-thread").start();
     }
 
     private void handleVerifySignature() {
@@ -463,6 +507,9 @@ public class SanitizerController {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(content);
+        // Focus default button immediately so user can press Enter/Space to dismiss
+        alert.getDialogPane().setOnShown(ev ->
+            alert.getDialogPane().lookupButton(ButtonType.OK) instanceof Button ok && ok.requestFocus());
         alert.showAndWait();
     }
 }

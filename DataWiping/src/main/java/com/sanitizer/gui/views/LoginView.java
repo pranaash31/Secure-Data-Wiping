@@ -137,11 +137,15 @@ public class LoginView {
         cmbClearance.getSelectionModel().select(0);
         cmbClearance.setMaxWidth(Double.MAX_VALUE);
 
+        txtUser.setOnAction(e -> navManager.loginSuccess(txtUser.getText(), txtAgency.getText()));
+        txtPass.setOnAction(e -> navManager.loginSuccess(txtUser.getText(), txtAgency.getText()));
+
         formFields.getChildren().addAll(lblAgency, txtAgency, lblUser, txtUser, lblPass, txtPass, lblClearance, cmbClearance);
 
         // Buttons
         Button btnLogin = new Button("AUTHENTICATE & ACCESS SUITE");
         btnLogin.getStyleClass().addAll("button-primary");
+        btnLogin.setDefaultButton(true);
         btnLogin.setMaxWidth(Double.MAX_VALUE);
         btnLogin.setStyle("-fx-font-size: 14px; -fx-padding: 14 20;");
         btnLogin.setOnAction(e -> navManager.loginSuccess(txtUser.getText(), txtAgency.getText()));

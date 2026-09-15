@@ -14,6 +14,7 @@ import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.PieChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 
 import java.util.HashMap;
@@ -22,6 +23,7 @@ import java.util.Map;
 
 public class DashboardView {
 
+    private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(20);
 
     public DashboardView() {
@@ -29,12 +31,30 @@ public class DashboardView {
     }
 
     public Parent getRoot() {
-        return rootContainer;
+        return scrollRoot;
     }
 
     @SuppressWarnings("unchecked")
     private void buildUi() {
+        scrollRoot.setFitToWidth(true);
+        scrollRoot.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollRoot.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollRoot.setContent(rootContainer);
+        scrollRoot.getStyleClass().add("edge-to-edge");
+
         rootContainer.setPadding(new Insets(28));
+
+        // F5 = refresh metrics
+        rootContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                newScene.setOnKeyPressed(ev -> {
+                    if (ev.getCode() == KeyCode.F5) {
+                        rootContainer.getChildren().clear();
+                        buildUi();
+                    }
+                });
+            }
+        });
 
         // Header Title
         HBox headerRow = new HBox(16);
@@ -47,8 +67,9 @@ public class DashboardView {
         titleBox.getChildren().addAll(lblTitle, lblSub);
         Region hSpacer = new Region();
         HBox.setHgrow(hSpacer, Priority.ALWAYS);
-        Button btnRefresh = new Button("Refresh Metrics");
+        Button btnRefresh = new Button("Refresh Metrics (F5)");
         btnRefresh.getStyleClass().add("button-primary");
+        btnRefresh.setTooltip(new Tooltip("Reload all KPI metrics and charts (F5)"));
         btnRefresh.setOnAction(e -> { rootContainer.getChildren().clear(); buildUi(); });
         headerRow.getChildren().addAll(titleBox, hSpacer, btnRefresh);
 

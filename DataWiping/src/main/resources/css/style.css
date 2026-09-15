@@ -593,3 +593,35 @@
 .dark-theme .dialog-pane .header-panel { -fx-background-color: #0D1117; }
 .dark-theme .dialog-pane .label { -fx-text-fill: #F1F5F9; }
 
+/* ─── SCROLL PANE — EDGE-TO-EDGE (no border / background) ─────────────── */
+.edge-to-edge {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+.edge-to-edge > .viewport {
+    -fx-background-color: transparent;
+}
+.edge-to-edge .scroll-bar:vertical .track { -fx-background-color: transparent; }
+.edge-to-edge .scroll-bar:vertical .thumb {
+    -fx-background-color: rgba(148,163,184,0.35);
+    -fx-background-radius: 6px;
+}
+.dark-theme .edge-to-edge .scroll-bar:vertical .thumb {
+    -fx-background-color: rgba(51,65,85,0.6);
+}
+
+/* ─── TOOLTIP ERGONOMICS ───────────────────────────────────────────────── */
+.tooltip {
+    -fx-background-color: #1E293B;
+    -fx-text-fill: #F1F5F9;
+    -fx-font-size: 11px;
+    -fx-padding: 5 10;
+    -fx-background-radius: 6px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.25), 8, 0, 0, 2);
+}
+.dark-theme .tooltip {
+    -fx-background-color: #0D1117;
+    -fx-border-color: #334155;
+    -fx-border-radius: 6px;
+}
