@@ -6,12 +6,23 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
 
 public class WipeEngine {
 
     private static final String MODULE = "WipeEngine";
     private static final long TEST_CAP_BYTES = 1L * 1024 * 1024 * 1024; // 1 GB cap in bytes
+
+    private static final ExecutorService batchExecutor = Executors.newFixedThreadPool(4, r -> {
+        Thread t = new Thread(r, "WipeEngine-Worker");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private static final Map<String, Future<Boolean>> activeWipeTasks = new ConcurrentHashMap<>();
+    private static final Map<String, Process> activeDdProcesses = new ConcurrentHashMap<>();
 
     public enum WipeStandard {
         NIST_800_88_CLEAR, // 1 Pass (0x00 Zero Fill)
@@ -59,6 +70,69 @@ public class WipeEngine {
         }
     }
 
+    /**
+     * Submits an asynchronous concurrent wiping task to the batch executor queue.
+     */
+    public static Future<Boolean> submitBatchWipeTask(
+            String systemPath,
+            long totalBytes,
+            WipeStandard standard,
+            boolean isTestMode,
+            Consumer<Double> progressCallback,
+            Consumer<String> logCallback,
+            Consumer<Boolean> completionCallback
+    ) {
+        Future<Boolean> future = batchExecutor.submit(() -> {
+            boolean success = false;
+            try {
+                success = executeWipe(systemPath, totalBytes, standard, isTestMode, progressCallback, logCallback);
+            } catch (Exception e) {
+                AppLogger.error(MODULE, "Batch wipe error on " + systemPath, e);
+            } finally {
+                activeWipeTasks.remove(systemPath);
+                if (completionCallback != null) {
+                    completionCallback.accept(success);
+                }
+            }
+            return success;
+        });
+
+        activeWipeTasks.put(systemPath, future);
+        return future;
+    }
+
+    /**
+     * Cancels an active concurrent wiping task for a specific drive path.
+     */
+    public static boolean cancelWipeTask(String systemPath) {
+        Future<Boolean> future = activeWipeTasks.remove(systemPath);
+        Process proc = activeDdProcesses.remove(systemPath);
+
+        boolean cancelled = false;
+
+        if (proc != null && proc.isAlive()) {
+            AppLogger.info(MODULE, "Terminating active dd process for " + systemPath);
+            proc.destroyForcibly();
+            cancelled = true;
+        }
+
+        if (future != null && !future.isDone()) {
+            future.cancel(true);
+            cancelled = true;
+        }
+
+        return cancelled;
+    }
+
+    public static int getActiveTaskCount() {
+        return activeWipeTasks.size();
+    }
+
+    public static boolean isTaskRunning(String systemPath) {
+        Future<Boolean> future = activeWipeTasks.get(systemPath);
+        return future != null && !future.isDone();
+    }
+
     private static void log(Consumer<String> logCallback, String msg) {
         AppLogger.info(MODULE, msg);
         if (logCallback != null) logCallback.accept(msg);
@@ -84,9 +158,16 @@ public class WipeEngine {
             pb.redirectErrorStream(true);
             Process process = pb.start();
 
+            activeDdProcesses.put(systemPath, process);
+
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        process.destroyForcibly();
+                        return false;
+                    }
+
                     if (logCallback != null) logCallback.accept(line);
                     if (line.contains("bytes")) {
                         try {
@@ -102,6 +183,8 @@ public class WipeEngine {
                         } catch (Exception ignored) {}
                     }
                 }
+            } finally {
+                activeDdProcesses.remove(systemPath);
             }
 
             return process.waitFor() == 0;
