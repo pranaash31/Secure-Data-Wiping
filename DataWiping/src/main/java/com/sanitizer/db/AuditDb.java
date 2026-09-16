@@ -9,7 +9,7 @@ import java.util.List;
 public class AuditDb {
 
     private static final String MODULE = "AuditDb";
-    private static final String DB_URL = "jdbc:sqlite:sanitizer_history.db";
+    private static String dbUrl = System.getProperty("sanitizer.db.url", "jdbc:sqlite:sanitizer_history.db");
 
     public record AuditRecord(
             int id,
@@ -27,15 +27,24 @@ public class AuditDb {
         seedInitialDataIfEmpty();
     }
 
+    public static synchronized void setDbUrlForTesting(String customDbUrl) {
+        dbUrl = customDbUrl;
+        initDatabase();
+    }
+
+    public static String getDbUrl() {
+        return dbUrl;
+    }
+
     private static synchronized Connection getConnection() throws SQLException {
-        Connection conn = DriverManager.getConnection(DB_URL);
+        Connection conn = DriverManager.getConnection(dbUrl);
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("PRAGMA journal_mode=WAL;");
         }
         return conn;
     }
 
-    private static void initDatabase() {
+    public static void initDatabase() {
         String sql = """
             CREATE TABLE IF NOT EXISTS wipe_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

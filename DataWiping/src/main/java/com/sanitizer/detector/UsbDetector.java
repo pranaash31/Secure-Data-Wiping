@@ -19,39 +19,60 @@ public class UsbDetector {
 
     public record UsbDriveInfo(String model, String serial, long sizeBytes, String formattedSize, String systemPath) {}
 
+    private static List<UsbDriveInfo> mockDrivesOverride = null;
+
+    public static synchronized void setMockDrivesOverride(List<UsbDriveInfo> mockDrives) {
+        mockDrivesOverride = mockDrives;
+    }
+
+    public static synchronized void clearMockDrivesOverride() {
+        mockDrivesOverride = null;
+    }
+
+    public static boolean isSystemOrSsdDisk(String name, String model, String serial) {
+        if (name == null) name = "";
+        if (model == null) model = "";
+        if (serial == null) serial = "";
+
+        String n = name.toLowerCase();
+        String m = model.toLowerCase();
+        String s = serial.toLowerCase();
+
+        return n.contains("disk0")
+                || m.contains("apple")
+                || m.contains("internal")
+                || m.contains("ssd")
+                || m.contains("nvme")
+                || m.contains("sata")
+                || m.contains("apfs")
+                || s.contains("ssd")
+                || s.contains("nvme");
+    }
+
+    public static boolean isValidPenDriveSize(long sizeBytes) {
+        long minPenDriveSizeBytes = 1L * 1024 * 1024 * 1024; // 1 GB
+        long maxPenDriveSizeBytes = 128L * 1024 * 1024 * 1024; // 128 GB
+        return sizeBytes >= minPenDriveSizeBytes && sizeBytes <= maxPenDriveSizeBytes;
+    }
+
     public static List<UsbDriveInfo> getConnectedUsbDrives() {
+        if (mockDrivesOverride != null) {
+            return new ArrayList<>(mockDrivesOverride);
+        }
+
         List<UsbDriveInfo> drives = new ArrayList<>();
         HardwareAbstractionLayer hal = new SystemInfo().getHardware();
 
         for (HWDiskStore disk : hal.getDiskStores()) {
-            String model = disk.getModel().toLowerCase();
-            String serial = disk.getSerial().toLowerCase();
-            String name = disk.getName().toLowerCase();
-            long sizeBytes = disk.getSize();
-
-            // SAFETY SHIELD: Ignore primary macOS drive & internal SSDs
-            boolean isSsdOrSystem = name.contains("disk0")
-                    || model.contains("apple")
-                    || model.contains("internal")
-                    || model.contains("ssd")
-                    || model.contains("nvme")
-                    || model.contains("sata")
-                    || model.contains("apfs")
-                    || serial.contains("ssd")
-                    || serial.contains("nvme");
+            boolean isSsdOrSystem = isSystemOrSsdDisk(disk.getName(), disk.getModel(), disk.getSerial());
 
             if (isSsdOrSystem) {
                 AppLogger.shield(MODULE, "Blocked Non-Pen Drive / System Disk: " + disk.getModel());
                 continue;
             }
 
-            // PEN DRIVE FILTER (1 GB to 128 GB)
-            long minPenDriveSizeBytes = 1L * 1024 * 1024 * 1024;
-            long maxPenDriveSizeBytes = 128L * 1024 * 1024 * 1024;
-
-            boolean isValidPenDriveSize = sizeBytes >= minPenDriveSizeBytes && sizeBytes <= maxPenDriveSizeBytes;
-
-            if (isValidPenDriveSize) {
+            if (isValidPenDriveSize(disk.getSize())) {
+                long sizeBytes = disk.getSize();
                 long sizeGb = sizeBytes / (1024 * 1024 * 1024);
                 String formattedSize = sizeGb > 0 ? sizeGb + " GB" : (sizeBytes / (1024 * 1024)) + " MB";
 
@@ -95,7 +116,7 @@ public class UsbDetector {
                 try {
                     List<UsbDriveInfo> drives = getConnectedUsbDrives();
                     for (var l : listeners) {
-                        javafx.application.Platform.runLater(() -> l.accept(drives));
+                        notifyListener(l, drives);
                     }
                 } catch (Exception e) {
                     AppLogger.error(MODULE, "Polling Error", e);
@@ -104,6 +125,22 @@ public class UsbDetector {
 
             // Shutdown hook to clean up thread pool on app exit
             Runtime.getRuntime().addShutdownHook(new Thread(UsbDetector::shutdown));
+        }
+    }
+
+    public static void notifyListenersNow() {
+        List<UsbDriveInfo> drives = getConnectedUsbDrives();
+        for (var l : listeners) {
+            notifyListener(l, drives);
+        }
+    }
+
+    private static void notifyListener(Consumer<List<UsbDriveInfo>> listener, List<UsbDriveInfo> drives) {
+        try {
+            javafx.application.Platform.runLater(() -> listener.accept(drives));
+        } catch (IllegalStateException e) {
+            // JavaFX Platform not initialized (e.g. headless unit tests) -> invoke directly
+            listener.accept(drives);
         }
     }
 
