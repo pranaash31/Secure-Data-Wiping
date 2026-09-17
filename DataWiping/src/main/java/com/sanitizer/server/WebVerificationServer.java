@@ -2,6 +2,7 @@ package com.sanitizer.server;
 
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
+import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.util.AppLogger;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -156,8 +157,11 @@ public class WebVerificationServer {
             String payload = model + "|" + serial + "|" + cap + "|" + std + "|" + status;
             boolean isValid = !sig.isBlank() && CryptoSigner.verifySignature(payload, sig);
 
+            EsgCalculator.EsgMetrics esg = EsgCalculator.calculate(cap);
+
             String json = String.format(
-                    "{\"valid\":%b,\"certId\":\"%s\",\"model\":\"%s\",\"serial\":\"%s\",\"capacity\":\"%s\",\"standard\":\"%s\",\"status\":\"%s\",\"algorithm\":\"SHA256withRSA\",\"message\":\"%s\"}",
+                    java.util.Locale.US,
+                    "{\"valid\":%b,\"certId\":\"%s\",\"model\":\"%s\",\"serial\":\"%s\",\"capacity\":\"%s\",\"standard\":\"%s\",\"status\":\"%s\",\"algorithm\":\"SHA256withRSA\",\"message\":\"%s\",\"esg\":{\"eWasteDivertedKg\":%.1f,\"co2EmissionsSavedKg\":%.1f,\"treesEquivalent\":%.2f,\"energySavedKwh\":%.1f,\"impactStatement\":\"%s\"}}",
                     isValid,
                     escapeJson(certId),
                     escapeJson(model),
@@ -165,7 +169,12 @@ public class WebVerificationServer {
                     escapeJson(cap),
                     escapeJson(std),
                     escapeJson(status),
-                    isValid ? "Cryptographically Authenticated" : "Invalid Signature"
+                    isValid ? "Cryptographically Authenticated" : "Invalid Signature",
+                    esg.eWasteDivertedKg(),
+                    esg.co2EmissionsSavedKg(),
+                    esg.treesEquivalent(),
+                    esg.energySavedKwh(),
+                    escapeJson(esg.impactStatement())
             );
 
             byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
@@ -192,6 +201,7 @@ public class WebVerificationServer {
                 : "The cryptographic digital seal on this certificate does not match the payload, indicating potential tampering.";
 
         String sigSnippet = (sig != null && sig.length() > 40) ? sig.substring(0, 40) + "..." : sig;
+        EsgCalculator.EsgMetrics esg = EsgCalculator.calculate(cap);
 
         return """
                 <!DOCTYPE html>
@@ -214,7 +224,7 @@ public class WebVerificationServer {
                         .cell { background: #0F172A; padding: 12px 14px; border-radius: 8px; border: 1px solid #1E293B; }
                         .cell-label { font-size: 10px; text-transform: uppercase; color: #64748B; font-weight: bold; margin-bottom: 4px; }
                         .cell-value { font-size: 13px; font-weight: bold; color: #F1F5F9; word-break: break-word; }
-                        .esg-box { background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 95, 70, 0.15)); border: 1px solid #059669; border-radius: 10px; padding: 14px; margin-bottom: 20px; font-size: 12px; color: #34D399; }
+                        .esg-box { background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 95, 70, 0.15)); border: 1px solid #059669; border-radius: 10px; padding: 14px; margin-bottom: 20px; font-size: 12px; color: #34D399; line-height: 1.5; }
                         .sig-box { background: #0F172A; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; color: #94A3B8; word-break: break-all; margin-bottom: 20px; }
                         .footer { text-align: center; font-size: 11px; color: #64748B; border-top: 1px solid #334155; padding-top: 16px; }
                     </style>
@@ -259,7 +269,8 @@ public class WebVerificationServer {
                         </div>
 
                         <div class="esg-box">
-                            🌱 <strong>ESG Sustainability Impact:</strong> Sanitizing this %s storage drive diverted <strong>~1.4 kg of e-waste</strong> and avoided <strong>~12.6 kg of CO₂</strong> compared to physical destruction.
+                            🌱 <strong>ESG Sustainability Impact:</strong> %s
+                            <br><small style="color: #6EE7B7; opacity: 0.9;">Scope 3 GHG / ISO 14064 Compliant | ~%.2f tree seedlings equivalent | ~%.1f kWh conserved</small>
                         </div>
 
                         <div class="sig-box">
@@ -287,7 +298,9 @@ public class WebVerificationServer {
                 serial,
                 cap,
                 badgeColor, status,
-                cap,
+                esg.impactStatement(),
+                esg.treesEquivalent(),
+                esg.energySavedKwh(),
                 sigSnippet
         );
     }

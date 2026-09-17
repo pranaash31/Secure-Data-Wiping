@@ -5,6 +5,7 @@ import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
 import com.sanitizer.engine.WipeMetrics;
+import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.navigation.NavigationManager;
@@ -46,6 +47,8 @@ public class BatchWipeView {
     private Label lblVolumeSub;
     private Label lblMasterEta;
     private Label lblEtaSub;
+    private Label lblBatchEsg;
+    private Label lblEsgSub;
 
     // Map of active futures by drive system path for granular abort control
     private final Map<String, Future<Boolean>> activeTasks = new ConcurrentHashMap<>();
@@ -187,7 +190,12 @@ public class BatchWipeView {
         lblMasterEta = (Label) cardEta.getChildren().get(1);
         lblEtaSub = (Label) cardEta.getChildren().get(2);
 
-        dashboard.getChildren().addAll(cardSpeed, cardConcurrency, cardVolume, cardEta);
+        // Card 5: Batch ESG Offset
+        VBox cardEsg = createTelemetryCard("🌱 BATCH ESG OFFSET", "0.0 kg e-Waste", "#059669", "#ECFDF5", "Scope 3 GHG / Circular Reuse");
+        lblBatchEsg = (Label) cardEsg.getChildren().get(1);
+        lblEsgSub = (Label) cardEsg.getChildren().get(2);
+
+        dashboard.getChildren().addAll(cardSpeed, cardConcurrency, cardVolume, cardEta, cardEsg);
         return dashboard;
     }
 
@@ -352,6 +360,19 @@ public class BatchWipeView {
             } else {
                 lblMasterEta.setText("--:--");
                 lblEtaSub.setText("All worker threads idle");
+            }
+        }
+
+        // 5. Batch ESG Offset
+        if (lblBatchEsg != null) {
+            double totalQueueGb = totalQueueSizeBytes / (1024.0 * 1024.0 * 1024.0);
+            if (totalQueueGb > 0) {
+                EsgCalculator.EsgMetrics esg = EsgCalculator.calculateFromGb(totalQueueGb);
+                lblBatchEsg.setText(String.format(java.util.Locale.US, "%.1f kg e-Waste", esg.eWasteDivertedKg()));
+                lblEsgSub.setText(String.format(java.util.Locale.US, "%.1f kg CO₂e | %.2f trees saved", esg.co2EmissionsSavedKg(), esg.treesEquivalent()));
+            } else {
+                lblBatchEsg.setText("0.0 kg e-Waste");
+                lblEsgSub.setText("Scope 3 GHG / Circular Reuse");
             }
         }
     }

@@ -2,6 +2,7 @@ package com.sanitizer.gui.views;
 
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
+import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.server.WebVerificationServer;
 import javafx.geometry.Insets;
@@ -245,6 +246,10 @@ public class VerificationPortalView {
         lblMethod.setText(result.wipeStandard() != null ? result.wipeStandard() : "N/A");
         lblStatus.setText(result.status() != null ? result.status() : "N/A");
 
+        EsgCalculator.EsgMetrics esg = EsgCalculator.calculate(result.capacity());
+        lblEsgFootprint.setText("🌱 ESG Sustainability Proof: Diverted ~" + String.format(java.util.Locale.US, "%.1f", esg.eWasteDivertedKg()) +
+                " kg e-waste | Avoided ~" + String.format(java.util.Locale.US, "%.1f", esg.co2EmissionsSavedKg()) + " kg CO₂ (Scope 3 GHG)");
+
         txtSignature.setText(result.digitalSignature() != null ? result.digitalSignature() : "No signature found");
 
         AuditDb.AuditRecord mockRec = new AuditDb.AuditRecord(
@@ -297,6 +302,11 @@ public class VerificationPortalView {
             lblMethod.setText(std);
             lblStatus.setText(status);
             txtSignature.setText(sig);
+
+            EsgCalculator.EsgMetrics esg = EsgCalculator.calculate(cap);
+            lblEsgFootprint.setText("🌱 ESG Sustainability Proof: Diverted ~" + String.format(java.util.Locale.US, "%.1f", esg.eWasteDivertedKg()) +
+                    " kg e-waste | Avoided ~" + String.format(java.util.Locale.US, "%.1f", esg.co2EmissionsSavedKg()) + " kg CO₂ (Scope 3 GHG)");
+
             currentVerifyUrl = input;
             btnOpenWebPortal.setDisable(false);
         } else {

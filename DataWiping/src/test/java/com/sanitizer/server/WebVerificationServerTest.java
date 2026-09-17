@@ -97,5 +97,7 @@ class WebVerificationServerTest {
         assertThat(response.body()).contains("\"valid\":true");
         assertThat(response.body()).contains("\"model\":\"Samsung BAR Plus\"");
         assertThat(response.body()).contains("\"algorithm\":\"SHA256withRSA\"");
+        assertThat(response.body()).contains("\"esg\":{");
+        assertThat(response.body()).contains("\"eWasteDivertedKg\":");
     }
 }

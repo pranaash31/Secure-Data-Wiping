@@ -1,6 +1,7 @@
 package com.sanitizer.gui.views;
 
 import com.sanitizer.db.AuditDb;
+import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.util.AppLogger;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -35,6 +36,12 @@ public class DashboardView {
     private Label lblValSignatures;
     private Label lblValActiveDrives;
     private Label lblBadgeActiveDrives;
+
+    // ESG Dynamic Controls
+    private Label lblValEsgEWaste;
+    private Label lblValEsgCo2;
+    private Label lblValEsgTrees;
+    private Label lblEsgStatement;
 
     private final ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
     private final XYChart.Series<String, Number> barSeries = new XYChart.Series<>();
@@ -119,6 +126,49 @@ public class DashboardView {
             kpiGrid.getColumnConstraints().add(cc);
         }
 
+        // --- ESG Corporate Sustainability & Circular Economy Bar ---
+        VBox esgCard = new VBox(12);
+        esgCard.setStyle("-fx-background-color: linear-gradient(to right, rgba(6, 78, 59, 0.4), rgba(15, 23, 42, 0.7)); -fx-border-color: #059669; -fx-border-radius: 12px; -fx-background-radius: 12px; -fx-padding: 18;");
+
+        HBox esgHeader = new HBox(12);
+        esgHeader.setAlignment(Pos.CENTER_LEFT);
+        Label lblEsgTitle = new Label("🌱 ENTERPRISE ESG SUSTAINABILITY & CIRCULAR ECONOMY (SCOPE 3 GHG MITIGATION)");
+        lblEsgTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #34D399; -fx-letter-spacing: 0.5px;");
+        Region esgSpacer = new Region();
+        HBox.setHgrow(esgSpacer, Priority.ALWAYS);
+        Label lblEsgBadge = new Label("ISO 14064 / GHG Protocol");
+        lblEsgBadge.setStyle("-fx-background-color: #065F46; -fx-text-fill: #A7F3D0; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 3 8; -fx-background-radius: 6px;");
+        esgHeader.getChildren().addAll(lblEsgTitle, esgSpacer, lblEsgBadge);
+
+        GridPane esgGrid = new GridPane();
+        esgGrid.setHgap(16);
+        esgGrid.setVgap(8);
+
+        lblValEsgEWaste = new Label("0.0 kg");
+        lblValEsgEWaste.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #F0FDF4;");
+
+        lblValEsgCo2 = new Label("0.0 kg CO₂");
+        lblValEsgCo2.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #F0FDF4;");
+
+        lblValEsgTrees = new Label("0.0 Trees");
+        lblValEsgTrees.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #F0FDF4;");
+
+        esgGrid.add(createEsgSubCard("E-WASTE DIVERTED FROM LANDFILLS", lblValEsgEWaste, "100% Circular Reuse"), 0, 0);
+        esgGrid.add(createEsgSubCard("SCOPE 3 GHG CO₂ MITIGATED", lblValEsgCo2, "Vs Physical Shredding"), 1, 0);
+        esgGrid.add(createEsgSubCard("ECOLOGICAL EQUIVALENCY", lblValEsgTrees, "10-Yr Tree Seedlings"), 2, 0);
+
+        for (int i = 0; i < 3; i++) {
+            ColumnConstraints cc = new ColumnConstraints();
+            cc.setPercentWidth(33.33);
+            esgGrid.getColumnConstraints().add(cc);
+        }
+
+        lblEsgStatement = new Label("Calculating organization-wide ESG sustainability proof...");
+        lblEsgStatement.setStyle("-fx-font-size: 11px; -fx-text-fill: #94A3B8; -fx-font-style: italic;");
+        lblEsgStatement.setWrapText(true);
+
+        esgCard.getChildren().addAll(esgHeader, esgGrid, lblEsgStatement);
+
         // --- Interactive Charts Row ---
         HBox chartRow = new HBox(16);
 
@@ -198,7 +248,7 @@ public class DashboardView {
 
         tableCard.getChildren().addAll(lblTableTitle, tblRecent);
 
-        rootContainer.getChildren().addAll(headerRow, kpiGrid, chartRow, tableCard);
+        rootContainer.getChildren().addAll(headerRow, kpiGrid, esgCard, chartRow, tableCard);
     }
 
     /** Efficient in-place metrics refresh — zero scene graph thrashing. */
@@ -224,6 +274,13 @@ public class DashboardView {
             lblBadgeActiveDrives.setText("Scanning...");
             lblBadgeActiveDrives.getStyleClass().setAll("badge-warning");
         }
+
+        // ESG Aggregate Metrics Computation
+        EsgCalculator.EsgMetrics esg = EsgCalculator.calculateAggregate(records);
+        lblValEsgEWaste.setText(String.format(java.util.Locale.US, "%.1f kg", esg.eWasteDivertedKg()));
+        lblValEsgCo2.setText(String.format(java.util.Locale.US, "%.1f kg CO₂e", esg.co2EmissionsSavedKg()));
+        lblValEsgTrees.setText(String.format(java.util.Locale.US, "%.2f Trees", esg.treesEquivalent()));
+        lblEsgStatement.setText(esg.impactStatement());
 
         // Standard distribution computation
         Map<String, Integer> stdCounts = new HashMap<>();
@@ -270,6 +327,20 @@ public class DashboardView {
         topBox.getChildren().addAll(lblL, r, badgeLabel);
 
         card.getChildren().addAll(topBox, valueLabel);
+        return card;
+    }
+
+    private VBox createEsgSubCard(String title, Label valueLabel, String subtext) {
+        VBox card = new VBox(6);
+        card.setStyle("-fx-background-color: rgba(15, 23, 42, 0.6); -fx-border-color: #065F46; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 12;");
+
+        Label lblT = new Label(title);
+        lblT.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #6EE7B7; -fx-letter-spacing: 0.5px;");
+
+        Label lblSub = new Label(subtext);
+        lblSub.setStyle("-fx-font-size: 10px; -fx-text-fill: #94A3B8;");
+
+        card.getChildren().addAll(lblT, valueLabel, lblSub);
         return card;
     }
 }

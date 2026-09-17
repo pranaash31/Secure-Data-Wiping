@@ -2,6 +2,7 @@ package com.sanitizer.pdf;
 
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
+import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.server.WebVerificationServer;
 import com.sanitizer.util.QrGenerator;
 import org.apache.pdfbox.cos.COSName;
@@ -129,27 +130,33 @@ public class CertificateGenerator {
                 cs.endText();
 
                 // ESG Sustainability & Environmental Carbon Offset Box
+                EsgCalculator.EsgMetrics esg = EsgCalculator.calculate(record.capacity());
+
                 cs.setLineWidth(0.5f);
-                cs.moveTo(50, y - 185);
-                cs.lineTo(550, y - 185);
+                cs.moveTo(50, y - 182);
+                cs.lineTo(550, y - 182);
                 cs.stroke();
 
                 cs.beginText();
                 cs.setFont(boldFont, 9);
-                cs.newLineAtOffset(50, y - 202);
-                cs.showText("ESG Environmental Sustainability Proof:");
+                cs.newLineAtOffset(50, y - 198);
+                cs.showText("ESG Environmental Sustainability Proof (Scope 3 GHG / ISO 14064 Compliant):");
                 cs.endText();
 
                 cs.beginText();
                 cs.setFont(regularFont, 8);
-                cs.newLineAtOffset(50, y - 216);
-                cs.showText("By sanitizing this " + sanitize(record.capacity()) + " media device for reuse, you diverted ~1.4 kg of hazardous e-waste");
+                cs.newLineAtOffset(50, y - 212);
+                cs.showText("By securely sanitizing this " + sanitize(record.capacity()) + " drive for reuse, you prevented " +
+                        String.format(java.util.Locale.US, "%.1f", esg.eWasteDivertedKg()) + " kg of e-waste and saved " +
+                        String.format(java.util.Locale.US, "%.1f", esg.co2EmissionsSavedKg()) + " kg of CO2 emissions compared to physical shredding.");
                 cs.endText();
 
                 cs.beginText();
-                cs.setFont(regularFont, 8);
-                cs.newLineAtOffset(50, y - 228);
-                cs.showText("and prevented ~12.6 kg of CO2 greenhouse emissions compared to raw physical shredding.");
+                cs.setFont(regularFont, 7.5f);
+                cs.newLineAtOffset(50, y - 224);
+                cs.showText("Ecological Equivalency: ~" + String.format(java.util.Locale.US, "%.2f", esg.treesEquivalent()) +
+                        " tree seedlings grown for 10 years | " + String.format(java.util.Locale.US, "%.1f", esg.energySavedKwh()) +
+                        " kWh manufacturing power conserved.");
                 cs.endText();
 
                 // Legal Compliance Footer

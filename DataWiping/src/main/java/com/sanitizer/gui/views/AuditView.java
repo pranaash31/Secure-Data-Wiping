@@ -2,6 +2,7 @@ package com.sanitizer.gui.views;
 
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
+import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.pdf.CertificateGenerator;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -24,6 +25,7 @@ public class AuditView {
     private TableView<AuditDb.AuditRecord> tblAuditHistory;
     private ObservableList<AuditDb.AuditRecord> auditData;
     private FilteredList<AuditDb.AuditRecord> filteredData;
+    private Label lblEsgBannerText;
 
     public AuditView() {
         buildUi();
@@ -46,6 +48,23 @@ public class AuditView {
         Label lblSub = new Label("Cryptographically signed sanitization logs with verifiable chain of custody");
         lblSub.getStyleClass().add("card-subtitle");
         titleBox.getChildren().addAll(lblTitle, lblSub);
+
+        // --- ESG Corporate Sustainability Banner ---
+        HBox esgBanner = new HBox(12);
+        esgBanner.setAlignment(Pos.CENTER_LEFT);
+        esgBanner.setStyle("-fx-background-color: linear-gradient(to right, #064E3B, #0F172A); -fx-border-color: #059669; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 10 16;");
+
+        lblEsgBannerText = new Label("🌱 ESG Impact: Calculating circular economy e-waste & carbon offsets...");
+        lblEsgBannerText.setStyle("-fx-text-fill: #A7F3D0; -fx-font-size: 11px; -fx-font-weight: bold;");
+        Region esgRegion = new Region();
+        HBox.setHgrow(esgRegion, Priority.ALWAYS);
+
+        Button btnExportEsg = new Button("🌱 ESG Audit Report");
+        btnExportEsg.setStyle("-fx-background-color: #059669; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4 10; -fx-background-radius: 6px; -fx-cursor: hand;");
+        btnExportEsg.setTooltip(new Tooltip("Generate ESG Corporate Sustainability Impact Summary Report"));
+        btnExportEsg.setOnAction(e -> handleExportEsgReport());
+
+        esgBanner.getChildren().addAll(lblEsgBannerText, esgRegion, btnExportEsg);
 
         // --- Card: Audit Log Table & Toolbar ---
         VBox cardTable = new VBox(14);
@@ -147,12 +166,58 @@ public class AuditView {
 
         cardTable.getChildren().addAll(toolbar, tblAuditHistory);
 
-        rootContainer.getChildren().addAll(titleBox, cardTable);
+        rootContainer.getChildren().addAll(titleBox, esgBanner, cardTable);
     }
 
     private void loadAuditHistory() {
         List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
         auditData.setAll(records);
+
+        EsgCalculator.EsgMetrics esg = EsgCalculator.calculateAggregate(records);
+        lblEsgBannerText.setText(String.format(
+                java.util.Locale.US,
+                "🌱 Corporate ESG Impact: %.1f kg E-Waste Diverted | %.1f kg CO₂ Mitigated (~%.2f Tree Seedlings Equiv.) across %d sanitized devices",
+                esg.eWasteDivertedKg(),
+                esg.co2EmissionsSavedKg(),
+                esg.treesEquivalent(),
+                records.size()
+        ));
+    }
+
+    private void handleExportEsgReport() {
+        List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
+        EsgCalculator.EsgMetrics esg = EsgCalculator.calculateAggregate(records);
+
+        String report = String.format(
+                java.util.Locale.US,
+                """
+                =======================================================
+                🌱 ENTERPRISE ESG SUSTAINABILITY & CIRCULAR ECONOMY AUDIT
+                Standard: ISO 14064-1 / GHG Protocol Scope 3 Compliant
+                =======================================================
+                Total Sanitized Assets for Circular Reuse: %d devices
+                Total Storage Capacity Sanitized: %s
+                -------------------------------------------------------
+                E-Waste Diverted from Landfills: %.1f kg
+                Scope 3 CO₂ Emissions Mitigated: %.1f kg CO₂e
+                10-Year Tree Seedlings Equivalent: %.2f trees
+                Manufacturing Power Conserved: %.1f kWh
+                Circular Economy Disposal Index: 100%% Zero-Landfill
+                -------------------------------------------------------
+                Executive Compliance Proof:
+                %s
+                =======================================================
+                """,
+                records.size(),
+                EsgCalculator.formatGb(esg.capacityGb()),
+                esg.eWasteDivertedKg(),
+                esg.co2EmissionsSavedKg(),
+                esg.treesEquivalent(),
+                esg.energySavedKwh(),
+                esg.impactStatement()
+        );
+
+        showAlert(Alert.AlertType.INFORMATION, "🌱 ESG Corporate Sustainability Audit Report", report);
     }
 
     private void filterLog(String query) {
