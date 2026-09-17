@@ -9,6 +9,7 @@ import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.pdf.CertificateGenerator;
+import com.sanitizer.util.SoundManager;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -34,6 +35,7 @@ public class BatchWipeView {
     private ComboBox<WipeEngine.WipeStandard> cmbGlobalStandard;
     private Button btnRunAll;
     private Button btnStopAll;
+    private Button btnAudioToggle;
 
     // Map of active futures by drive system path for granular abort control
     private final Map<String, Future<Boolean>> activeTasks = new ConcurrentHashMap<>();
@@ -61,7 +63,7 @@ public class BatchWipeView {
         VBox titleBox = new VBox(4);
         Label lblTitle = new Label("Parallel Multi-Drive Simultaneous Batch Wiping Engine");
         lblTitle.getStyleClass().add("section-label");
-        Label lblSub = new Label("Real-time dynamic sector block heatmap visualizer with 8+ concurrent worker threads & granular safety abort");
+        Label lblSub = new Label("High-concurrency sanitization with dynamic sector heatmap visualizer, sound engine & granular safety abort");
         lblSub.getStyleClass().add("section-sublabel");
         titleBox.getChildren().addAll(lblTitle, lblSub);
 
@@ -104,13 +106,21 @@ public class BatchWipeView {
         btnStopAll.getStyleClass().add("button-danger");
         btnStopAll.setOnAction(e -> handleEmergencyStopAll());
 
+        btnAudioToggle = new Button(SoundManager.isMuted() ? "🔇 Sound: OFF" : "🔊 Sound: ON");
+        btnAudioToggle.getStyleClass().add("button-secondary");
+        btnAudioToggle.setStyle("-fx-font-size: 11px; -fx-padding: 6 12;");
+        btnAudioToggle.setOnAction(e -> {
+            boolean isMuted = SoundManager.toggleMute();
+            btnAudioToggle.setText(isMuted ? "🔇 Sound: OFF" : "🔊 Sound: ON");
+        });
+
         queueStatusLabel = new Label("Queue Status: Scanning hardware...");
         queueStatusLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748B; -fx-font-weight: bold;");
 
         Region ctrlSpacer = new Region();
         HBox.setHgrow(ctrlSpacer, Priority.ALWAYS);
 
-        controlBar.getChildren().addAll(btnRefresh, lblStandard, cmbGlobalStandard, btnRunAll, btnStopAll, ctrlSpacer, queueStatusLabel);
+        controlBar.getChildren().addAll(btnRefresh, lblStandard, cmbGlobalStandard, btnRunAll, btnStopAll, btnAudioToggle, ctrlSpacer, queueStatusLabel);
 
         // ── Drive Cards Queue Grid ─────────────────────────────────────────────
         HBox queueHeader = new HBox(12);
@@ -138,10 +148,36 @@ public class BatchWipeView {
     }
 
     private void refreshQueue() {
+        List<UsbDetector.UsbDriveInfo> drives = UsbDetector.getConnectedUsbDrives();
+
+        // Check for premature disconnection while a wipe is active
+        Set<String> connectedPaths = new HashSet<>();
+        for (UsbDetector.UsbDriveInfo d : drives) {
+            connectedPaths.add(d.systemPath());
+        }
+
+        for (String activePath : new HashSet<>(activeTasks.keySet())) {
+            if (!connectedPaths.contains(activePath)) {
+                // Drive pulled out prematurely mid-sanitization!
+                SoundManager.playAlertSound();
+                WipeEngine.cancelWipeTask(activePath);
+                activeTasks.remove(activePath);
+
+                DriveCardController controller = driveControllers.get(activePath);
+                if (controller != null) {
+                    controller.handleAbortLocal("Premature Physical Disconnect");
+                }
+
+                NavigationManager.getInstance().showNotification(
+                        "CRITICAL: DRIVE DISCONNECTED MID-WIPE",
+                        "Target device (" + activePath + ") was disconnected prematurely during active sector sanitization!",
+                        ToastNotification.ToastType.ERROR
+                );
+            }
+        }
+
         driveQueueContainer.getChildren().clear();
         driveControllers.clear();
-
-        List<UsbDetector.UsbDriveInfo> drives = UsbDetector.getConnectedUsbDrives();
 
         statusBadge.setText(drives.size() + " DRIVES DETECTED");
         statusBadge.getStyleClass().setAll(drives.isEmpty() ? "badge-warning" : "badge-success");
@@ -201,6 +237,7 @@ public class BatchWipeView {
         Optional<ButtonType> res = confirm.showAndWait();
         if (res.isEmpty() || res.get() != ButtonType.OK) return;
 
+        SoundManager.playStartTone();
         NavigationManager.getInstance().showNotification("Batch Sanitization Dispatched",
                 "Spawning parallel wiping threads for " + drives.size() + " drives.", ToastNotification.ToastType.INFO);
 
@@ -218,6 +255,7 @@ public class BatchWipeView {
     private void handleEmergencyStopAll() {
         if (activeTasks.isEmpty()) return;
 
+        SoundManager.playAbortTone();
         int stopped = activeTasks.size();
         for (String path : new HashSet<>(activeTasks.keySet())) {
             WipeEngine.cancelWipeTask(path);
@@ -341,7 +379,10 @@ public class BatchWipeView {
             btnStart = new Button("▶ Start Wipe");
             btnStart.getStyleClass().add("button-primary");
             btnStart.setStyle("-fx-padding: 6 16; -fx-font-size: 11px;");
-            btnStart.setOnAction(e -> startWipe());
+            btnStart.setOnAction(e -> {
+                SoundManager.playStartTone();
+                startWipe();
+            });
 
             btnAbort = new Button("⏹ Granular Abort");
             btnAbort.getStyleClass().add("button-danger");
@@ -400,6 +441,7 @@ public class BatchWipeView {
 
         private void handleGranularAbort() {
             btnAbort.setDisable(true);
+            SoundManager.playAbortTone();
             boolean cancelled = WipeEngine.cancelWipeTask(drive.systemPath());
             activeTasks.remove(drive.systemPath());
 
@@ -435,6 +477,7 @@ public class BatchWipeView {
             activeTasks.remove(drive.systemPath());
 
             if (success) {
+                SoundManager.playSuccessChime();
                 progressBar.setProgress(1.0);
                 pctLabel.setText("100.0% — Pass Verified");
                 speedLabel.setText("⚡ Speed: Done");
@@ -458,6 +501,7 @@ public class BatchWipeView {
                 NavigationManager.getInstance().showNotification("Drive Sanitized",
                         drive.model() + " successfully sanitized & certified.", ToastNotification.ToastType.SUCCESS);
             } else {
+                SoundManager.playAlertSound();
                 statusBadge.setText("FAILED");
                 statusBadge.getStyleClass().setAll("badge-danger");
                 passBadge.setText("Wipe Failed");

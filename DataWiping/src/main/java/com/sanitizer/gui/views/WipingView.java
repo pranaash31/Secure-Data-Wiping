@@ -275,6 +275,7 @@ public class WipingView {
         sectorMatrix.reset(target.sizeBytes());
         txtLogOutput.clear();
         appendLog("[SYSTEM] Launching low-level block sanitization background task...");
+        com.sanitizer.util.SoundManager.playStartTone();
 
         Task<Boolean> task = new Task<>() {
             @Override
@@ -300,6 +301,7 @@ public class WipingView {
         task.setOnSucceeded(e -> {
             boolean success = task.getValue();
             if (success) {
+                com.sanitizer.util.SoundManager.playSuccessChime();
                 lblStatusMessage.setText("Sanitization completed! Issuing digital seal...");
                 appendLog("\n[SUCCESS] Sanitization operation completed successfully.");
                 sectorMatrix.setCompleted();
@@ -332,6 +334,7 @@ public class WipingView {
                     }
                 }
             } else {
+                com.sanitizer.util.SoundManager.playAlertSound();
                 lblStatusMessage.setText("Sanitization failed!");
                 appendLog("\n[ERROR] Sector wiping failed. Please check drive permissions.");
                 sectorMatrix.setAborted();
@@ -341,6 +344,7 @@ public class WipingView {
         });
 
         task.setOnFailed(e -> {
+            com.sanitizer.util.SoundManager.playAlertSound();
             lblStatusMessage.setText("Task error occurred!");
             appendLog("\n[CRITICAL ERROR] Task failed: " + task.getException().getMessage());
             sectorMatrix.setAborted();
