@@ -198,4 +198,22 @@ class WipeEngineBatchTest {
         assertThat(metricsNist.formattedProgress()).isEqualTo("100.0%");
         assertThat(metricsNist.formattedPassSummary()).isEqualTo("Pass 1/1: Zero Fill (0x00)");
     }
+
+    @Test
+    @DisplayName("Verify ambient aggregate bandwidth and cumulative batch volume summation across multiple drives")
+    void testAggregateTelemetryCalculations() {
+        List<WipeMetrics> activeStreams = List.of(
+                new WipeMetrics("/dev/rdisk1", 50.0, 1, 1, "Zero Fill", 500_000_000L, 1_000_000_000L, 52.4, 10),
+                new WipeMetrics("/dev/rdisk2", 30.0, 1, 1, "Zero Fill", 300_000_000L, 1_000_000_000L, 48.6, 15),
+                new WipeMetrics("/dev/rdisk3", 80.0, 1, 1, "Zero Fill", 800_000_000L, 1_000_000_000L, 65.0, 3)
+        );
+
+        double aggregateSpeed = activeStreams.stream().mapToDouble(WipeMetrics::speedMBs).sum();
+        long aggregateBytesProcessed = activeStreams.stream().mapToLong(WipeMetrics::bytesProcessedInPass).sum();
+        long maxEta = activeStreams.stream().mapToLong(WipeMetrics::etaSeconds).max().orElse(0);
+
+        assertThat(aggregateSpeed).isEqualTo(166.0);
+        assertThat(aggregateBytesProcessed).isEqualTo(1_600_000_000L);
+        assertThat(maxEta).isEqualTo(15);
+    }
 }

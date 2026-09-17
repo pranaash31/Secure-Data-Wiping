@@ -26,7 +26,7 @@ import java.util.concurrent.Future;
 
 public class BatchWipeView {
 
-    private final VBox rootContainer = new VBox(20);
+    private final VBox rootContainer = new VBox(18);
     private VBox driveQueueContainer;
     private Label statusBadge;
     private Label queueStatusLabel;
@@ -37,11 +37,24 @@ public class BatchWipeView {
     private Button btnStopAll;
     private Button btnAudioToggle;
 
+    // Ambient Live Telemetry Dashboard Labels
+    private Label lblTotalSpeed;
+    private Label lblSpeedSub;
+    private Label lblConcurrency;
+    private Label lblConcurrencySub;
+    private Label lblDataVolume;
+    private Label lblVolumeSub;
+    private Label lblMasterEta;
+    private Label lblEtaSub;
+
     // Map of active futures by drive system path for granular abort control
     private final Map<String, Future<Boolean>> activeTasks = new ConcurrentHashMap<>();
 
     // Map of per-drive UI controllers to update live metrics cleanly
     private final Map<String, DriveCardController> driveControllers = new ConcurrentHashMap<>();
+
+    // Real-time telemetry snapshot per drive
+    private final Map<String, WipeMetrics> liveMetricsMap = new ConcurrentHashMap<>();
 
     public BatchWipeView() {
         buildUi();
@@ -63,7 +76,7 @@ public class BatchWipeView {
         VBox titleBox = new VBox(4);
         Label lblTitle = new Label("Parallel Multi-Drive Simultaneous Batch Wiping Engine");
         lblTitle.getStyleClass().add("section-label");
-        Label lblSub = new Label("High-concurrency sanitization with dynamic sector heatmap visualizer, sound engine & granular safety abort");
+        Label lblSub = new Label("Real-time dynamic sector matrix visualizer with ambient aggregate telemetry & granular safety abort");
         lblSub.getStyleClass().add("section-sublabel");
         titleBox.getChildren().addAll(lblTitle, lblSub);
 
@@ -122,6 +135,9 @@ public class BatchWipeView {
 
         controlBar.getChildren().addAll(btnRefresh, lblStandard, cmbGlobalStandard, btnRunAll, btnStopAll, btnAudioToggle, ctrlSpacer, queueStatusLabel);
 
+        // ── Ambient Live Telemetry Dashboard (4 Metric Cards) ─────────────────
+        HBox telemetryDashboard = createAmbientTelemetryDashboard();
+
         // ── Drive Cards Queue Grid ─────────────────────────────────────────────
         HBox queueHeader = new HBox(12);
         queueHeader.setAlignment(Pos.CENTER_LEFT);
@@ -144,7 +160,54 @@ public class BatchWipeView {
         scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
-        rootContainer.getChildren().addAll(header, controlBar, queueHeader, scrollPane);
+        rootContainer.getChildren().addAll(header, controlBar, telemetryDashboard, queueHeader, scrollPane);
+    }
+
+    private HBox createAmbientTelemetryDashboard() {
+        HBox dashboard = new HBox(14);
+        dashboard.setAlignment(Pos.CENTER);
+
+        // Card 1: Total Batch Throughput
+        VBox cardSpeed = createTelemetryCard("⚡ AGGREGATE BANDWIDTH", "0.0 MB/s", "#2563EB", "#EFF6FF", "Idle | 0 active stream(s)");
+        lblTotalSpeed = (Label) cardSpeed.getChildren().get(1);
+        lblSpeedSub = (Label) cardSpeed.getChildren().get(2);
+
+        // Card 2: Worker Pool Concurrency
+        VBox cardConcurrency = createTelemetryCard("🔄 THREAD POOL UTILIZATION", "0 / " + WipeEngine.getThreadPoolCapacity() + " ACTIVE", "#059669", "#ECFDF5", "Ready for concurrent dispatch");
+        lblConcurrency = (Label) cardConcurrency.getChildren().get(1);
+        lblConcurrencySub = (Label) cardConcurrency.getChildren().get(2);
+
+        // Card 3: Cumulative Batch Volume
+        VBox cardVolume = createTelemetryCard("💾 SESSION DATA VOLUME", "0.0 GB Processed", "#7C3AED", "#F5F3FF", "0.0% of batch queue");
+        lblDataVolume = (Label) cardVolume.getChildren().get(1);
+        lblVolumeSub = (Label) cardVolume.getChildren().get(2);
+
+        // Card 4: Master Batch ETA
+        VBox cardEta = createTelemetryCard("⏱ MASTER BATCH ETA", "--:--", "#D97706", "#FFFBEB", "All threads synchronized");
+        lblMasterEta = (Label) cardEta.getChildren().get(1);
+        lblEtaSub = (Label) cardEta.getChildren().get(2);
+
+        dashboard.getChildren().addAll(cardSpeed, cardConcurrency, cardVolume, cardEta);
+        return dashboard;
+    }
+
+    private VBox createTelemetryCard(String headerText, String initialVal, String textColor, String bgColor, String initialSub) {
+        VBox card = new VBox(4);
+        card.getStyleClass().add("card");
+        card.setPadding(new Insets(12, 16, 12, 16));
+        HBox.setHgrow(card, Priority.ALWAYS);
+
+        Label title = new Label(headerText);
+        title.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #64748B;");
+
+        Label value = new Label(initialVal);
+        value.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: " + textColor + ";");
+
+        Label sub = new Label(initialSub);
+        sub.setStyle("-fx-font-size: 10px; -fx-text-fill: #94A3B8;");
+
+        card.getChildren().addAll(title, value, sub);
+        return card;
     }
 
     private void refreshQueue() {
@@ -162,6 +225,7 @@ public class BatchWipeView {
                 SoundManager.playAlertSound();
                 WipeEngine.cancelWipeTask(activePath);
                 activeTasks.remove(activePath);
+                liveMetricsMap.remove(activePath);
 
                 DriveCardController controller = driveControllers.get(activePath);
                 if (controller != null) {
@@ -200,6 +264,7 @@ public class BatchWipeView {
 
             emptyCard.getChildren().addAll(emptyTitle, emptySub);
             driveQueueContainer.getChildren().add(emptyCard);
+            updateAmbientDashboard();
             return;
         }
 
@@ -212,6 +277,7 @@ public class BatchWipeView {
             driveControllers.put(drive.systemPath(), controller);
             driveQueueContainer.getChildren().add(controller.cardRoot);
         }
+        updateAmbientDashboard();
     }
 
     private void updateSummaryStatus() {
@@ -220,6 +286,74 @@ public class BatchWipeView {
         int completed = AuditDb.getAllRecords().size();
         queueStatusLabel.setText(String.format("Queue: %d total  |  %d active wiping  |  %d completed records", total, active, completed));
         btnStopAll.setDisable(activeTasks.isEmpty());
+    }
+
+    /**
+     * Recalculates ambient aggregate bandwidth, session data volume, pool utilization, and master ETA.
+     */
+    private void updateAmbientDashboard() {
+        int activeCount = activeTasks.size();
+        int poolCap = WipeEngine.getThreadPoolCapacity();
+
+        double totalSpeedMBs = 0.0;
+        long totalBytesProcessed = 0;
+        long maxEtaSeconds = 0;
+
+        for (WipeMetrics m : liveMetricsMap.values()) {
+            totalSpeedMBs += Math.max(0.0, m.speedMBs());
+            totalBytesProcessed += m.bytesProcessedInPass();
+            if (m.etaSeconds() > maxEtaSeconds) {
+                maxEtaSeconds = m.etaSeconds();
+            }
+        }
+
+        long totalQueueSizeBytes = 0;
+        for (DriveCardController c : driveControllers.values()) {
+            totalQueueSizeBytes += c.drive.sizeBytes();
+        }
+
+        // 1. Bandwidth Counter
+        if (lblTotalSpeed != null) {
+            if (activeCount > 0) {
+                lblTotalSpeed.setText(String.format("%.1f MB/s", totalSpeedMBs));
+                lblSpeedSub.setText(String.format("⚡ %d active stream(s) writing", activeCount));
+            } else {
+                lblTotalSpeed.setText("0.0 MB/s");
+                lblSpeedSub.setText("Idle | 0 active streams");
+            }
+        }
+
+        // 2. Concurrency Utilization
+        if (lblConcurrency != null) {
+            int pct = (int) Math.round(((double) activeCount / poolCap) * 100);
+            lblConcurrency.setText(activeCount + " / " + poolCap + " SLOTS");
+            lblConcurrencySub.setText(pct > 0 ? pct + "% Concurrency Utilization" : "Pool ready for dispatch");
+        }
+
+        // 3. Volume
+        if (lblDataVolume != null) {
+            double processedGb = totalBytesProcessed / (1024.0 * 1024.0 * 1024.0);
+            double totalGb = totalQueueSizeBytes / (1024.0 * 1024.0 * 1024.0);
+            double volPct = totalGb > 0 ? (processedGb / totalGb) * 100 : 0.0;
+            lblDataVolume.setText(String.format("%.2f GB / %.1f GB", processedGb, totalGb));
+            lblVolumeSub.setText(String.format("%.1f%% of queued storage", volPct));
+        }
+
+        // 4. Master ETA
+        if (lblMasterEta != null) {
+            if (activeCount > 0 && maxEtaSeconds > 0) {
+                long mins = maxEtaSeconds / 60;
+                long secs = maxEtaSeconds % 60;
+                lblMasterEta.setText(mins > 0 ? String.format("%02dm %02ds", mins, secs) : String.format("%02ds", secs));
+                lblEtaSub.setText("Estimated batch completion");
+            } else if (activeCount > 0) {
+                lblMasterEta.setText("Calculating...");
+                lblEtaSub.setText("Synchronizing write streams");
+            } else {
+                lblMasterEta.setText("--:--");
+                lblEtaSub.setText("All worker threads idle");
+            }
+        }
     }
 
     private void handleRunAllWipes() {
@@ -265,6 +399,7 @@ public class BatchWipeView {
             }
         }
         activeTasks.clear();
+        liveMetricsMap.clear();
 
         btnRunAll.setDisable(false);
         btnStopAll.setDisable(true);
@@ -272,6 +407,7 @@ public class BatchWipeView {
         NavigationManager.getInstance().showNotification("EMERGENCY STOP EXECUTED",
                 "Successfully halted " + stopped + " active background wipe operation(s).", ToastNotification.ToastType.WARNING);
         updateSummaryStatus();
+        updateAmbientDashboard();
     }
 
     /**
@@ -427,16 +563,21 @@ public class BatchWipeView {
 
             activeTasks.put(drive.systemPath(), future);
             updateSummaryStatus();
+            updateAmbientDashboard();
         }
 
         private void updateMetricsUi(WipeMetrics metrics) {
             this.lastMetrics = metrics;
+            liveMetricsMap.put(metrics.systemPath(), metrics);
+
             progressBar.setProgress(metrics.overallPercent() / 100.0);
             pctLabel.setText(metrics.formattedProgress() + " Completed");
             speedLabel.setText("⚡ Speed: " + metrics.formattedSpeed());
             etaLabel.setText("⏱ ETA: " + metrics.formattedEta());
             passBadge.setText(metrics.formattedPassSummary());
             heatmap.updateProgress(metrics);
+
+            updateAmbientDashboard();
         }
 
         private void handleGranularAbort() {
@@ -444,6 +585,7 @@ public class BatchWipeView {
             SoundManager.playAbortTone();
             boolean cancelled = WipeEngine.cancelWipeTask(drive.systemPath());
             activeTasks.remove(drive.systemPath());
+            liveMetricsMap.remove(drive.systemPath());
 
             handleAbortLocal("User Abort Action");
 
@@ -453,6 +595,7 @@ public class BatchWipeView {
                     ToastNotification.ToastType.WARNING
             );
             updateSummaryStatus();
+            updateAmbientDashboard();
         }
 
         public void handleAbortLocal(String reason) {
@@ -475,6 +618,7 @@ public class BatchWipeView {
 
         private void handleCompletion(boolean success, WipeEngine.WipeStandard standard) {
             activeTasks.remove(drive.systemPath());
+            liveMetricsMap.remove(drive.systemPath());
 
             if (success) {
                 SoundManager.playSuccessChime();
@@ -521,6 +665,7 @@ public class BatchWipeView {
             cmbStandard.setDisable(false);
 
             updateSummaryStatus();
+            updateAmbientDashboard();
             if (activeTasks.isEmpty()) {
                 btnRunAll.setDisable(false);
             }
