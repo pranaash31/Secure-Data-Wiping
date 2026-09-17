@@ -15,7 +15,9 @@ public class WipeEngine {
     private static final String MODULE = "WipeEngine";
     private static final long TEST_CAP_BYTES = 1L * 1024 * 1024 * 1024; // 1 GB cap in bytes
 
-    private static final ExecutorService batchExecutor = Executors.newFixedThreadPool(4, r -> {
+    // Concurrent multi-threaded pool supporting 8+ simultaneous drive wiping operations
+    private static final int THREAD_POOL_SIZE = Math.max(8, Runtime.getRuntime().availableProcessors() * 2);
+    private static final ExecutorService batchExecutor = Executors.newFixedThreadPool(THREAD_POOL_SIZE, r -> {
         Thread t = new Thread(r, "WipeEngine-Worker");
         t.setDaemon(true);
         return t;
@@ -34,7 +36,16 @@ public class WipeEngine {
     }
 
     public static boolean executeWipe(String systemPath, long totalBytes, WipeStandard standard, boolean isTestMode,
-                                     Consumer<Double> progressCallback, Consumer<String> logCallback) {
+                                      Consumer<Double> progressCallback, Consumer<String> logCallback) {
+        Consumer<WipeMetrics> metricsCallback = null;
+        if (progressCallback != null) {
+            metricsCallback = metrics -> progressCallback.accept(metrics.overallPercent());
+        }
+        return executeWipeWithMetrics(systemPath, totalBytes, standard, isTestMode, metricsCallback, logCallback);
+    }
+
+    public static boolean executeWipeWithMetrics(String systemPath, long totalBytes, WipeStandard standard, boolean isTestMode,
+                                                Consumer<WipeMetrics> metricsCallback, Consumer<String> logCallback) {
         // HARD SAFETY GUARDRAIL: Block primary system disk
         if (systemPath.contains("disk0") || systemPath.contains("rdisk0")) {
             String err = "CRITICAL SAFETY SHIELD: Primary system drive (" + systemPath + ") blocked from wiping!";
@@ -52,26 +63,38 @@ public class WipeEngine {
 
             // Pass 1: Zero Fill
             log(logCallback, "DoD Pass 1/3: Overwriting with 0x00...");
-            if (!runDdCommand(systemPath, "/dev/zero", targetBytes, isTestMode, progressCallback, logCallback, 0.0, 33.3)) return false;
+            if (!runDdCommand(systemPath, "/dev/zero", targetBytes, isTestMode, 1, 3, "Zero Fill (0x00)",
+                    metricsCallback, logCallback, 0.0, 33.3)) return false;
 
             // Pass 2: Cryptographic Random / Pattern Overwrite
             log(logCallback, "DoD Pass 2/3: Overwriting with Cryptographic Pseudo-Random Data...");
-            if (!runDdCommand(systemPath, "/dev/urandom", targetBytes, isTestMode, progressCallback, logCallback, 33.3, 66.6)) return false;
+            if (!runDdCommand(systemPath, "/dev/urandom", targetBytes, isTestMode, 2, 3, "Cryptographic Random",
+                    metricsCallback, logCallback, 33.3, 66.6)) return false;
 
             // Pass 3: Final Zero Verification Pass
             log(logCallback, "DoD Pass 3/3: Final Zero Verification Pass...");
-            if (!runDdCommand(systemPath, "/dev/zero", targetBytes, isTestMode, progressCallback, logCallback, 66.6, 100.0)) return false;
+            if (!runDdCommand(systemPath, "/dev/zero", targetBytes, isTestMode, 3, 3, "Verification Pass (0x00)",
+                    metricsCallback, logCallback, 66.6, 100.0)) return false;
 
+            // Final completion metric notification
+            if (metricsCallback != null) {
+                metricsCallback.accept(new WipeMetrics(systemPath, 100.0, 3, 3, "Completed", targetBytes, targetBytes, 0.0, 0));
+            }
             return true;
         } else {
             // Standard NIST SP 800-88 Clear (Single Pass 0x00)
             log(logCallback, "Starting NIST SP 800-88 Clear (Single Pass Zero-Fill) on " + systemPath + (isTestMode ? " [TEST MODE: 1GB CAP]" : " [FULL WIPE]"));
-            return runDdCommand(systemPath, "/dev/zero", targetBytes, isTestMode, progressCallback, logCallback, 0.0, 100.0);
+            boolean success = runDdCommand(systemPath, "/dev/zero", targetBytes, isTestMode, 1, 1, "Zero Fill (0x00)",
+                    metricsCallback, logCallback, 0.0, 100.0);
+            if (success && metricsCallback != null) {
+                metricsCallback.accept(new WipeMetrics(systemPath, 100.0, 1, 1, "Completed", targetBytes, targetBytes, 0.0, 0));
+            }
+            return success;
         }
     }
 
     /**
-     * Submits an asynchronous concurrent wiping task to the batch executor queue.
+     * Submits an asynchronous concurrent wiping task to the batch executor queue with double progress callback.
      */
     public static Future<Boolean> submitBatchWipeTask(
             String systemPath,
@@ -82,10 +105,29 @@ public class WipeEngine {
             Consumer<String> logCallback,
             Consumer<Boolean> completionCallback
     ) {
+        Consumer<WipeMetrics> metricsCallback = null;
+        if (progressCallback != null) {
+            metricsCallback = metrics -> progressCallback.accept(metrics.overallPercent());
+        }
+        return submitBatchWipeTaskWithMetrics(systemPath, totalBytes, standard, isTestMode, metricsCallback, logCallback, completionCallback);
+    }
+
+    /**
+     * Submits an asynchronous concurrent wiping task to the batch executor queue with rich WipeMetrics callback.
+     */
+    public static Future<Boolean> submitBatchWipeTaskWithMetrics(
+            String systemPath,
+            long totalBytes,
+            WipeStandard standard,
+            boolean isTestMode,
+            Consumer<WipeMetrics> metricsCallback,
+            Consumer<String> logCallback,
+            Consumer<Boolean> completionCallback
+    ) {
         Future<Boolean> future = batchExecutor.submit(() -> {
             boolean success = false;
             try {
-                success = executeWipe(systemPath, totalBytes, standard, isTestMode, progressCallback, logCallback);
+                success = executeWipeWithMetrics(systemPath, totalBytes, standard, isTestMode, metricsCallback, logCallback);
             } catch (Exception e) {
                 AppLogger.error(MODULE, "Batch wipe error on " + systemPath, e);
             } finally {
@@ -102,7 +144,7 @@ public class WipeEngine {
     }
 
     /**
-     * Cancels an active concurrent wiping task for a specific drive path.
+     * Cancels an active concurrent wiping task for a specific drive path (Granular Safety Abort).
      */
     public static boolean cancelWipeTask(String systemPath) {
         Future<Boolean> future = activeWipeTasks.remove(systemPath);
@@ -128,6 +170,10 @@ public class WipeEngine {
         return activeWipeTasks.size();
     }
 
+    public static int getThreadPoolCapacity() {
+        return THREAD_POOL_SIZE;
+    }
+
     public static boolean isTaskRunning(String systemPath) {
         Future<Boolean> future = activeWipeTasks.get(systemPath);
         return future != null && !future.isDone();
@@ -139,7 +185,8 @@ public class WipeEngine {
     }
 
     private static boolean runDdCommand(String systemPath, String sourcePath, long targetBytes, boolean isTestMode,
-                                        Consumer<Double> progressCallback, Consumer<String> logCallback,
+                                        int currentPass, int totalPasses, String passName,
+                                        Consumer<WipeMetrics> metricsCallback, Consumer<String> logCallback,
                                         double startPct, double endPct) {
         List<String> command = new ArrayList<>();
         command.add("dd");
@@ -152,6 +199,9 @@ public class WipeEngine {
         }
 
         command.add("status=progress");
+
+        long startNanoTime = System.nanoTime();
+        long totalWipeTargetBytes = targetBytes * totalPasses;
 
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
@@ -172,13 +222,31 @@ public class WipeEngine {
                     if (line.contains("bytes")) {
                         try {
                             String[] parts = line.trim().split("\\s+");
-                            long bytesWritten = Long.parseLong(parts[0]);
-                            double passPercent = ((double) bytesWritten / targetBytes);
+                            long bytesWrittenInPass = Long.parseLong(parts[0]);
+                            double passPercent = Math.min(1.0, ((double) bytesWrittenInPass / targetBytes));
                             double overallPercent = startPct + (passPercent * (endPct - startPct));
                             if (overallPercent > endPct) overallPercent = endPct;
 
-                            if (progressCallback != null) {
-                                progressCallback.accept(overallPercent);
+                            double elapsedSec = Math.max(0.001, (System.nanoTime() - startNanoTime) / 1_000_000_000.0);
+                            double speedMBs = (bytesWrittenInPass / (1024.0 * 1024.0)) / elapsedSec;
+
+                            long totalBytesProcessedOverall = ((long) (currentPass - 1) * targetBytes) + bytesWrittenInPass;
+                            long totalRemainingBytes = Math.max(0, totalWipeTargetBytes - totalBytesProcessedOverall);
+                            long etaSeconds = speedMBs > 0.05 ? (long) (totalRemainingBytes / (speedMBs * 1024.0 * 1024.0)) : 0;
+
+                            if (metricsCallback != null) {
+                                WipeMetrics metrics = new WipeMetrics(
+                                        systemPath,
+                                        overallPercent,
+                                        currentPass,
+                                        totalPasses,
+                                        passName,
+                                        bytesWrittenInPass,
+                                        targetBytes,
+                                        speedMBs,
+                                        etaSeconds
+                                );
+                                metricsCallback.accept(metrics);
                             }
                         } catch (Exception ignored) {}
                     }

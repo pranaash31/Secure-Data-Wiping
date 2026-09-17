@@ -4,6 +4,7 @@ import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
+import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.pdf.CertificateGenerator;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -36,6 +37,7 @@ public class WipingView {
     private ProgressBar progressBar;
     private Label lblProgressPercent;
     private Label lblStatusMessage;
+    private SectorHeatmapComponent sectorMatrix;
     private TextArea txtLogOutput;
 
     public WipingView() {
@@ -73,7 +75,7 @@ public class WipingView {
         Label lblTitle = new Label("Hardware Data Sanitization Workplace");
         lblTitle.getStyleClass().add("card-title");
         lblTitle.setStyle("-fx-font-size: 22px;");
-        Label lblSub = new Label("Direct low-level raw sector sanitization with hardware protection shield");
+        Label lblSub = new Label("Direct low-level raw sector sanitization with real-time sector block visualizer & hardware protection shield");
         lblSub.getStyleClass().add("card-subtitle");
         titleBox.getChildren().addAll(lblTitle, lblSub);
 
@@ -114,7 +116,6 @@ public class WipingView {
         btnRefreshDrives = new Button("Refresh Drives (F5)");
         btnRefreshDrives.setOnAction(e -> refreshDriveList());
         btnRefreshDrives.setTooltip(new Tooltip("Rescan connected USB drives (F5)"));
-        // Also trigger load when drive selection changes via keyboard
         cmbDrives.setOnKeyPressed(ev -> {
             if (ev.getCode() == KeyCode.ENTER) updateSelectedDriveDetails();
         });
@@ -152,7 +153,7 @@ public class WipingView {
 
         topRow.getChildren().addAll(cardDrive, cardConfig);
 
-        // --- Card 3: Execution & Terminal ---
+        // --- Card 3: Execution, Live Sector Matrix & Terminal ---
         VBox cardExec = new VBox(14);
         cardExec.getStyleClass().add("card");
         VBox.setVgrow(cardExec, Priority.ALWAYS);
@@ -165,7 +166,6 @@ public class WipingView {
         btnExecuteWipe.setStyle("-fx-font-size: 14px; -fx-padding: 10 24;");
         btnExecuteWipe.setOnAction(e -> handleWipeExecution());
         btnExecuteWipe.setTooltip(new Tooltip("Begin low-level sector sanitization on the selected drive"));
-        // Allow Enter to trigger execute button when it holds focus
         btnExecuteWipe.setOnKeyPressed(ev -> {
             if (ev.getCode() == KeyCode.ENTER) handleWipeExecution();
         });
@@ -186,6 +186,9 @@ public class WipingView {
         progressBar = new ProgressBar(0.0);
         progressBar.setMaxWidth(Double.MAX_VALUE);
 
+        // Large 100-Block Sector Heatmap Visualizer
+        sectorMatrix = new SectorHeatmapComponent(100, 13, 16, 4, 4);
+
         Label lblLogTitle = new Label("Live System Execution Terminal Stream:");
         lblLogTitle.getStyleClass().add("card-subtitle");
 
@@ -193,9 +196,10 @@ public class WipingView {
         txtLogOutput.getStyleClass().add("terminal-area");
         txtLogOutput.setEditable(false);
         txtLogOutput.setPromptText("Low-level dd process logs will stream here during sanitization execution...");
+        txtLogOutput.setPrefRowCount(7);
         VBox.setVgrow(txtLogOutput, Priority.ALWAYS);
 
-        cardExec.getChildren().addAll(execHeader, progressBar, lblLogTitle, txtLogOutput);
+        cardExec.getChildren().addAll(execHeader, progressBar, sectorMatrix, lblLogTitle, txtLogOutput);
 
         rootContainer.getChildren().addAll(titleBox, topRow, cardExec);
     }
@@ -232,6 +236,7 @@ public class WipingView {
         if (target != null) {
             lblSelectedDriveInfo.setText(String.format("Model: %s | Serial: %s | Size: %s | Path: %s",
                     target.model(), target.serial(), target.formattedSize(), target.systemPath()));
+            sectorMatrix.reset(target.sizeBytes());
         } else {
             lblSelectedDriveInfo.setText("No drive selected.");
         }
@@ -267,21 +272,25 @@ public class WipingView {
         progressBar.setProgress(0.0);
         lblProgressPercent.setText("0.00%");
         lblStatusMessage.setText("Executing sanitization passes...");
+        sectorMatrix.reset(target.sizeBytes());
         txtLogOutput.clear();
         appendLog("[SYSTEM] Launching low-level block sanitization background task...");
 
         Task<Boolean> task = new Task<>() {
             @Override
             protected Boolean call() {
-                return WipeEngine.executeWipe(
+                return WipeEngine.executeWipeWithMetrics(
                         target.systemPath(),
                         target.sizeBytes(),
                         standard,
                         isTestMode,
-                        percent -> Platform.runLater(() -> {
-                            double p = percent / 100.0;
+                        metrics -> Platform.runLater(() -> {
+                            double p = metrics.overallPercent() / 100.0;
                             progressBar.setProgress(p);
-                            lblProgressPercent.setText(String.format("%.2f%%", percent));
+                            lblProgressPercent.setText(metrics.formattedProgress());
+                            lblStatusMessage.setText(String.format("Wiping: %s | %s | %s",
+                                    metrics.formattedPassSummary(), metrics.formattedSpeed(), metrics.formattedEta()));
+                            sectorMatrix.updateProgress(metrics);
                         }),
                         line -> Platform.runLater(() -> appendLog(line))
                 );
@@ -293,6 +302,7 @@ public class WipingView {
             if (success) {
                 lblStatusMessage.setText("Sanitization completed! Issuing digital seal...");
                 appendLog("\n[SUCCESS] Sanitization operation completed successfully.");
+                sectorMatrix.setCompleted();
 
                 String stdString = standard == WipeEngine.WipeStandard.DOD_5220_22_M ? "DoD 5220.22-M" : "NIST SP 800-88";
                 String auditPayload = target.model() + "|" + target.serial() + "|" + target.formattedSize() + "|" + stdString + "|SUCCESS";
@@ -316,14 +326,15 @@ public class WipingView {
                         if (pdfPath != null) {
                             appendLog("[PDF] Exported PDF Certificate: " + pdfPath);
                             showAlert(Alert.AlertType.INFORMATION, "Sanitization Complete",
-                                    "Data Wiping Finished Successfully!\n\nPDF Certificate Exported:\n" + pdfPath +
-                                    "\n\nRSA Signature: " + signature.substring(0, 30) + "...");
+                                     "Data Wiping Finished Successfully!\n\nPDF Certificate Exported:\n" + pdfPath +
+                                     "\n\nRSA Signature: " + signature.substring(0, 30) + "...");
                         }
                     }
                 }
             } else {
                 lblStatusMessage.setText("Sanitization failed!");
                 appendLog("\n[ERROR] Sector wiping failed. Please check drive permissions.");
+                sectorMatrix.setAborted();
                 showAlert(Alert.AlertType.ERROR, "Wipe Failed", "Low-level dd operation failed. Make sure you have administrator privileges.");
             }
             setUiControlsDisabled(false);
@@ -332,6 +343,7 @@ public class WipingView {
         task.setOnFailed(e -> {
             lblStatusMessage.setText("Task error occurred!");
             appendLog("\n[CRITICAL ERROR] Task failed: " + task.getException().getMessage());
+            sectorMatrix.setAborted();
             showAlert(Alert.AlertType.ERROR, "Task Error", task.getException().getMessage());
             setUiControlsDisabled(false);
         });
@@ -357,7 +369,6 @@ public class WipingView {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(content);
-        // Focus the default button immediately for keyboard accessibility
         alert.setOnShown(ev -> {
             Button ok = (Button) alert.getDialogPane().lookupButton(ButtonType.OK);
             if (ok != null) ok.requestFocus();
