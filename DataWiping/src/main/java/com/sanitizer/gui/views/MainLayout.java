@@ -107,6 +107,7 @@ public class MainLayout {
         Label compLabel = new Label("COMPLIANCE");
         compLabel.getStyleClass().add("sidebar-section-label");
         Button btnAudit     = createNavBtn("  Audit Trail", "audit");
+        Button btnVerify    = createNavBtn("  🛡️ Verify Certificate", "verify");
         Button btnSettings  = createNavBtn("  Settings", "settings");
 
         Region sidebarSpacer = new Region();
@@ -127,7 +128,7 @@ public class MainLayout {
                 mainLabel, btnDashboard,
                 opsLabel, btnWiping, btnBatch, btnDiag,
                 mgmtLabel, btnClients, btnKeyVault,
-                compLabel, btnAudit, btnSettings,
+                compLabel, btnAudit, btnVerify, btnSettings,
                 sidebarSpacer,
                 officerCard
         );

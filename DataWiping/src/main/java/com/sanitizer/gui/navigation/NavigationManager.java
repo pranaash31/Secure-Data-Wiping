@@ -144,9 +144,10 @@ public class NavigationManager {
             case "batchwipe"   -> new BatchWipeView().getRoot();
             case "diagnostics" -> new DiskDiagnosticView().getRoot();
             case "clients"     -> new ClientManagerView().getRoot();
-            case "keyvault"    -> new KeyVaultView().getRoot();
-            case "audit"       -> new AuditView().getRoot();
-            case "settings"    -> new SettingsView().getRoot();
+            case "keyvault"     -> new KeyVaultView().getRoot();
+            case "audit"        -> new AuditView().getRoot();
+            case "verify", "verification" -> new VerificationPortalView().getRoot();
+            case "settings"     -> new SettingsView().getRoot();
             default            -> new DashboardView().getRoot();
         };
     }
