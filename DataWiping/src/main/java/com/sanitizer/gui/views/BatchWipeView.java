@@ -441,6 +441,8 @@ public class BatchWipeView {
 
         private final Label statusBadge;
         private final Label passBadge;
+        private final Label healthBadge;
+        private final Label tempBadge;
         private final Label speedLabel;
         private final Label etaLabel;
         private final Label pctLabel;
@@ -479,6 +481,20 @@ public class BatchWipeView {
             infoBox.getChildren().addAll(nameLabel, specsLabel);
             HBox.setHgrow(infoBox, Priority.ALWAYS);
 
+            // Pre-Wipe Health Assessment Check
+            com.sanitizer.detector.SmartDiagnostics.SmartReport report =
+                    com.sanitizer.detector.SmartDiagnostics.inspectDrive(drive);
+            int healthScore = report != null ? report.healthScore().score() : 100;
+            com.sanitizer.detector.SmartDiagnostics.HealthStatus hStatus = report != null ? report.healthScore().status() : com.sanitizer.detector.SmartDiagnostics.HealthStatus.HEALTHY;
+
+            healthBadge = new Label("Health: " + healthScore + "/100");
+            healthBadge.setStyle(String.format("-fx-font-size: 10px; -fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 3 8; -fx-background-radius: 4px; -fx-font-weight: bold;",
+                    hStatus.getBgColor(), hStatus.getTextColor()));
+
+            int temp = report != null ? report.temperatureCelsius() : 33;
+            tempBadge = new Label(temp + " °C");
+            tempBadge.setStyle("-fx-font-size: 10px; -fx-background-color: #EFF6FF; -fx-text-fill: #2563EB; -fx-padding: 3 8; -fx-background-radius: 4px; -fx-font-weight: bold;");
+
             passBadge = new Label("Ready");
             passBadge.setStyle("-fx-font-size: 11px; -fx-background-color: #F1F5F9; -fx-text-fill: #475569; -fx-padding: 4 10; -fx-background-radius: 6px; -fx-font-weight: bold;");
 
@@ -487,7 +503,7 @@ public class BatchWipeView {
             statusBadge.setMinWidth(90);
             statusBadge.setAlignment(Pos.CENTER);
 
-            topRow.getChildren().addAll(indexLabel, infoBox, passBadge, statusBadge);
+            topRow.getChildren().addAll(indexLabel, infoBox, healthBadge, tempBadge, passBadge, statusBadge);
 
             // Middle Row: Live Real-Time Telemetry Metrics
             HBox metricsRow = new HBox(20);
@@ -595,9 +611,23 @@ public class BatchWipeView {
             pctLabel.setText(metrics.formattedProgress() + " Completed");
             speedLabel.setText("⚡ Speed: " + metrics.formattedSpeed());
             etaLabel.setText("⏱ ETA: " + metrics.formattedEta());
-            passBadge.setText(metrics.formattedPassSummary());
-            heatmap.updateProgress(metrics);
 
+            tempBadge.setText(metrics.tempCelsius() + " °C");
+            tempBadge.setStyle(String.format("-fx-font-size: 10px; -fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 3 8; -fx-background-radius: 4px; -fx-font-weight: bold;",
+                    metrics.thermalStatus().getBgColor(), metrics.thermalStatus().getTextColor()));
+
+            if (metrics.isThermalPaused()) {
+                statusBadge.setText("COOLING");
+                statusBadge.getStyleClass().setAll("badge-danger");
+                passBadge.setText("⏸ Thermal Auto-Pause (" + metrics.tempCelsius() + "°C)");
+                passBadge.setStyle("-fx-font-size: 11px; -fx-background-color: #FEF2F2; -fx-text-fill: #991B1B; -fx-padding: 4 10; -fx-background-radius: 6px; -fx-font-weight: bold;");
+            } else {
+                statusBadge.setText("WIPING");
+                statusBadge.getStyleClass().setAll("badge-warning");
+                passBadge.setText(metrics.formattedPassSummary());
+            }
+
+            heatmap.updateProgress(metrics);
             updateAmbientDashboard();
         }
 

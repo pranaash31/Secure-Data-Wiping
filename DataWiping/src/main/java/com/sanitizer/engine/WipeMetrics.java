@@ -1,7 +1,9 @@
 package com.sanitizer.engine;
 
+import com.sanitizer.detector.SmartDiagnostics;
+
 /**
- * Encapsulates real-time telemetry and progress metrics for an ongoing storage drive wipe operation.
+ * Encapsulates real-time telemetry, thermal status, and progress metrics for an ongoing storage drive wipe operation.
  */
 public record WipeMetrics(
         String systemPath,
@@ -12,8 +14,27 @@ public record WipeMetrics(
         long bytesProcessedInPass,
         long totalTargetBytesInPass,
         double speedMBs,
-        long etaSeconds
+        long etaSeconds,
+        int tempCelsius,
+        SmartDiagnostics.ThermalStatus thermalStatus,
+        boolean isThermalPaused
 ) {
+    public WipeMetrics(
+            String systemPath,
+            double overallPercent,
+            int currentPass,
+            int totalPasses,
+            String passName,
+            long bytesProcessedInPass,
+            long totalTargetBytesInPass,
+            double speedMBs,
+            long etaSeconds
+    ) {
+        this(systemPath, overallPercent, currentPass, totalPasses, passName,
+             bytesProcessedInPass, totalTargetBytesInPass, speedMBs, etaSeconds,
+             35, SmartDiagnostics.ThermalStatus.NORMAL, false);
+    }
+
     /**
      * Returns a human-friendly string for the live throughput speed (e.g. "45.2 MB/s").
      */
@@ -55,5 +76,9 @@ public record WipeMetrics(
             return "Pass 1/1: " + passName;
         }
         return String.format("Pass %d/%d: %s", currentPass, totalPasses, passName);
+    }
+
+    public String formattedTemp() {
+        return tempCelsius + " °C";
     }
 }

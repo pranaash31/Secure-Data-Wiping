@@ -128,12 +128,12 @@ public class WipingView {
 
         cardDrive.getChildren().addAll(driveTitleBox, driveActionBox, lblSelectedDriveInfo);
 
-        // --- Card 2: Configuration ---
+        // --- Card 2: Configuration & Pre-Wipe Health Assessment ---
         VBox cardConfig = new VBox(12);
         cardConfig.getStyleClass().add("card");
         HBox.setHgrow(cardConfig, Priority.ALWAYS);
 
-        Label lblConfigTitle = new Label("Sanitization Standard & Execution Mode");
+        Label lblConfigTitle = new Label("Sanitization Standard & Health Safeguards");
         lblConfigTitle.getStyleClass().add("card-title");
 
         ToggleGroup group = new ToggleGroup();
@@ -149,7 +149,17 @@ public class WipingView {
         chkTestMode = new CheckBox("Fast Test Mode (Cap wipe to 1 GB for evaluation)");
         chkTestMode.setSelected(true);
 
-        cardConfig.getChildren().addAll(lblConfigTitle, radioBox, new Separator(), chkTestMode);
+        // Pre-Wipe S.M.A.R.T. Health Score Mini-Banner
+        lblPreWipeHealthBadge = new Label("Health Score: --/100");
+        lblPreWipeHealthBadge.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-padding: 4 10; -fx-background-radius: 4px;");
+
+        lblLiveTempBadge = new Label("Temp: -- °C");
+        lblLiveTempBadge.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: #EFF6FF; -fx-text-fill: #2563EB; -fx-padding: 4 10; -fx-background-radius: 4px;");
+
+        HBox healthSummaryRow = new HBox(10, lblPreWipeHealthBadge, lblLiveTempBadge);
+        healthSummaryRow.setAlignment(Pos.CENTER_LEFT);
+
+        cardConfig.getChildren().addAll(lblConfigTitle, radioBox, new Separator(), chkTestMode, healthSummaryRow);
 
         topRow.getChildren().addAll(cardDrive, cardConfig);
 
@@ -204,6 +214,9 @@ public class WipingView {
         rootContainer.getChildren().addAll(titleBox, topRow, cardExec);
     }
 
+    private Label lblPreWipeHealthBadge;
+    private Label lblLiveTempBadge;
+
     private void refreshDriveList() {
         updateDriveList(UsbDetector.getConnectedUsbDrives());
     }
@@ -216,6 +229,8 @@ public class WipingView {
             lblDriveBadge.setText("0 Target Drives");
             lblDriveBadge.getStyleClass().setAll("badge-warning");
             lblSelectedDriveInfo.setText("Scanning... Insert a USB drive to begin.");
+            if (lblPreWipeHealthBadge != null) lblPreWipeHealthBadge.setText("Health Score: --/100");
+            if (lblLiveTempBadge != null) lblLiveTempBadge.setText("Temp: -- °C");
             btnExecuteWipe.setDisable(true);
         } else {
             lblDriveBadge.setText(drives.size() + " Pen Drive(s) Auto-Detected");
@@ -237,6 +252,27 @@ public class WipingView {
             lblSelectedDriveInfo.setText(String.format("Model: %s | Serial: %s | Size: %s | Path: %s",
                     target.model(), target.serial(), target.formattedSize(), target.systemPath()));
             sectorMatrix.reset(target.sizeBytes());
+
+            // Automated Pre-Wipe Health Assessment Check
+            com.sanitizer.detector.SmartDiagnostics.SmartReport report =
+                    com.sanitizer.detector.SmartDiagnostics.inspectDrive(target);
+            if (report != null) {
+                com.sanitizer.detector.SmartDiagnostics.HealthScoreResult health = report.healthScore();
+                if (lblPreWipeHealthBadge != null) {
+                    lblPreWipeHealthBadge.setText(String.format("Health Score: %d/100 (%s)", health.score(), health.status().name()));
+                    lblPreWipeHealthBadge.setStyle(String.format(
+                            "-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 4 10; -fx-background-radius: 4px;",
+                            health.status().getBgColor(), health.status().getTextColor()
+                    ));
+                }
+                if (lblLiveTempBadge != null) {
+                    lblLiveTempBadge.setText(String.format("Temp: %d °C (%s)", report.temperatureCelsius(), report.thermalStatus().name()));
+                    lblLiveTempBadge.setStyle(String.format(
+                            "-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 4 10; -fx-background-radius: 4px;",
+                            report.thermalStatus().getBgColor(), report.thermalStatus().getTextColor()
+                    ));
+                }
+            }
         } else {
             lblSelectedDriveInfo.setText("No drive selected.");
         }
@@ -247,6 +283,23 @@ public class WipingView {
         if (target == null) {
             showAlert(Alert.AlertType.WARNING, "No Target Selected", "Please select a USB drive from the dropdown first.");
             return;
+        }
+
+        // Automated Pre-Wipe Health Check Gate
+        com.sanitizer.detector.SmartDiagnostics.SmartReport report =
+                com.sanitizer.detector.SmartDiagnostics.inspectDrive(target);
+        if (report != null && !report.healthScore().isWipePermittedWithoutOverride()) {
+            Alert healthAlert = new Alert(Alert.AlertType.WARNING);
+            healthAlert.setTitle("PRE-WIPE HEALTH SAFEGUARD WARNING");
+            healthAlert.setHeaderText("DRIVE HEALTH DEFECTS DETECTED (Score: " + report.healthScore().score() + "/100)");
+            healthAlert.setContentText("The automated pre-wipe diagnostics detected critical hardware defects:\n\n" +
+                    String.join("\n• ", report.healthScore().warnings()) +
+                    "\n\nHigh risk of sector write failure or drive lockup during wiping. Do you wish to override and proceed?");
+            Optional<ButtonType> opt = healthAlert.showAndWait();
+            if (opt.isEmpty() || opt.get() != ButtonType.OK) {
+                appendLog("[HEALTH SHIELD] Sanitization aborted by user due to low drive health score (" + report.healthScore().score() + "/100).");
+                return;
+            }
         }
 
         WipeEngine.WipeStandard standard = rdoDod.isSelected() ? WipeEngine.WipeStandard.DOD_5220_22_M : WipeEngine.WipeStandard.NIST_800_88_CLEAR;
@@ -289,8 +342,23 @@ public class WipingView {
                             double p = metrics.overallPercent() / 100.0;
                             progressBar.setProgress(p);
                             lblProgressPercent.setText(metrics.formattedProgress());
-                            lblStatusMessage.setText(String.format("Wiping: %s | %s | %s",
-                                    metrics.formattedPassSummary(), metrics.formattedSpeed(), metrics.formattedEta()));
+
+                            if (metrics.isThermalPaused()) {
+                                lblStatusMessage.setText("⏸ THERMAL PAUSE: Cooling down drive (" + metrics.tempCelsius() + "°C)...");
+                                lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #EF4444;");
+                            } else {
+                                lblStatusMessage.setText(String.format("Wiping: %s | %s | %s | %d°C",
+                                        metrics.formattedPassSummary(), metrics.formattedSpeed(), metrics.formattedEta(), metrics.tempCelsius()));
+                                lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #1E293B;");
+                            }
+
+                            if (lblLiveTempBadge != null) {
+                                lblLiveTempBadge.setText(String.format("Temp: %d °C (%s)", metrics.tempCelsius(), metrics.thermalStatus().name()));
+                                lblLiveTempBadge.setStyle(String.format(
+                                        "-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 4 10; -fx-background-radius: 4px;",
+                                        metrics.thermalStatus().getBgColor(), metrics.thermalStatus().getTextColor()
+                                ));
+                            }
                             sectorMatrix.updateProgress(metrics);
                         }),
                         line -> Platform.runLater(() -> appendLog(line))

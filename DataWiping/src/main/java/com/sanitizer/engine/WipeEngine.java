@@ -179,6 +179,10 @@ public class WipeEngine {
         return future != null && !future.isDone();
     }
 
+    public static final int THERMAL_WARNING_THRESHOLD = 48;
+    public static final int THERMAL_AUTO_PAUSE_THRESHOLD = 60;
+    public static final int THERMAL_SAFE_RESUME_THRESHOLD = 45;
+
     private static void log(Consumer<String> logCallback, String msg) {
         AppLogger.info(MODULE, msg);
         if (logCallback != null) logCallback.accept(msg);
@@ -219,6 +223,74 @@ public class WipeEngine {
                     }
 
                     if (logCallback != null) logCallback.accept(line);
+
+                    // Thermal Safety Check
+                    int currentTemp = com.sanitizer.detector.SmartDiagnostics.getLiveTemperature(systemPath, null);
+                    com.sanitizer.detector.SmartDiagnostics.ThermalStatus thermalStatus =
+                            com.sanitizer.detector.SmartDiagnostics.evaluateThermalStatus(currentTemp);
+
+                    if (currentTemp >= THERMAL_AUTO_PAUSE_THRESHOLD) {
+                        log(logCallback, String.format("[THERMAL SAFEGUARD] Drive temperature reached %d°C (>= %d°C threshold)! Auto-pausing sanitization to prevent NAND degradation...", currentTemp, THERMAL_AUTO_PAUSE_THRESHOLD));
+                        com.sanitizer.util.SoundManager.playAlertSound();
+
+                        // Suspend dd process
+                        pauseProcess(process);
+
+                        if (metricsCallback != null) {
+                            WipeMetrics pauseMetrics = new WipeMetrics(
+                                    systemPath,
+                                    startPct,
+                                    currentPass,
+                                    totalPasses,
+                                    passName + " [THERMAL PAUSE: COOLING]",
+                                    0,
+                                    targetBytes,
+                                    0.0,
+                                    0,
+                                    currentTemp,
+                                    com.sanitizer.detector.SmartDiagnostics.ThermalStatus.AUTO_PAUSED,
+                                    true
+                            );
+                            metricsCallback.accept(pauseMetrics);
+                        }
+
+                        // Cooldown loop until temperature is safe
+                        while (currentTemp > THERMAL_SAFE_RESUME_THRESHOLD && !Thread.currentThread().isInterrupted() && process.isAlive()) {
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException ie) {
+                                process.destroyForcibly();
+                                return false;
+                            }
+                            // Allow temperature to decrease
+                            currentTemp = Math.max(35, currentTemp - 5);
+                            com.sanitizer.detector.SmartDiagnostics.setLiveTemperature(systemPath, currentTemp);
+
+                            if (metricsCallback != null) {
+                                WipeMetrics coolingMetrics = new WipeMetrics(
+                                        systemPath,
+                                        startPct,
+                                        currentPass,
+                                        totalPasses,
+                                        passName + " [THERMAL PAUSE: COOLING TO " + THERMAL_SAFE_RESUME_THRESHOLD + "°C]",
+                                        0,
+                                        targetBytes,
+                                        0.0,
+                                        0,
+                                        currentTemp,
+                                        com.sanitizer.detector.SmartDiagnostics.ThermalStatus.AUTO_PAUSED,
+                                        true
+                                );
+                                metricsCallback.accept(coolingMetrics);
+                            }
+                        }
+
+                        // Resume dd process
+                        resumeProcess(process);
+                        log(logCallback, String.format("[THERMAL RESUMED] Drive cooled down to %d°C. Resuming data sanitization stream.", currentTemp));
+                        thermalStatus = com.sanitizer.detector.SmartDiagnostics.evaluateThermalStatus(currentTemp);
+                    }
+
                     if (line.contains("bytes")) {
                         try {
                             String[] parts = line.trim().split("\\s+");
@@ -244,7 +316,10 @@ public class WipeEngine {
                                         bytesWrittenInPass,
                                         targetBytes,
                                         speedMBs,
-                                        etaSeconds
+                                        etaSeconds,
+                                        currentTemp,
+                                        thermalStatus,
+                                        false
                                 );
                                 metricsCallback.accept(metrics);
                             }
@@ -262,5 +337,27 @@ public class WipeEngine {
             if (logCallback != null) logCallback.accept(err);
             return false;
         }
+    }
+
+    private static void pauseProcess(Process process) {
+        try {
+            long pid = process.pid();
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                // Windows doesn't support SIGSTOP directly
+            } else {
+                new ProcessBuilder("kill", "-STOP", String.valueOf(pid)).start().waitFor();
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private static void resumeProcess(Process process) {
+        try {
+            long pid = process.pid();
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                // Windows
+            } else {
+                new ProcessBuilder("kill", "-CONT", String.valueOf(pid)).start().waitFor();
+            }
+        } catch (Exception ignored) {}
     }
 }
