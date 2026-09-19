@@ -52,6 +52,35 @@ public class SmartDiagnostics {
         public String getBgColor() { return bgColor; }
     }
 
+    public enum InterfaceSeverity {
+        OPTIMAL("Optimal", "#10B981", "#ECFDF5"),
+        WARNING("Degraded Link (Port/Cable)", "#D97706", "#FFFBEB"),
+        CRITICAL("Critical Interface Flaw", "#EF4444", "#FEF2F2");
+
+        private final String label;
+        private final String textColor;
+        private final String bgColor;
+
+        InterfaceSeverity(String label, String textColor, String bgColor) {
+            this.label = label;
+            this.textColor = textColor;
+            this.bgColor = bgColor;
+        }
+
+        public String getLabel() { return label; }
+        public String getTextColor() { return textColor; }
+        public String getBgColor() { return bgColor; }
+    }
+
+    public record InterfaceAnomalyResult(
+            boolean isDegraded,
+            InterfaceSeverity severity,
+            int crcErrors,
+            int commandTimeouts,
+            String rootCauseDiagnosis,
+            String userPrompt
+    ) {}
+
     public record SmartAttribute(
             int id,
             String name,
@@ -82,8 +111,10 @@ public class SmartDiagnostics {
             int powerCycleCount,
             int rawReadErrors,
             int crcErrors,
+            int commandTimeouts,
             HealthScoreResult healthScore,
             ThermalStatus thermalStatus,
+            InterfaceAnomalyResult interfaceAnomaly,
             List<SmartAttribute> attributes,
             boolean isHardwareSmartSupported
     ) {}
@@ -100,6 +131,7 @@ public class SmartDiagnostics {
             int temperatureCelsius,
             int rawReadErrors,
             int crcErrors,
+            int commandTimeouts,
             long timestampMillis
     ) {}
 
@@ -187,6 +219,7 @@ public class SmartDiagnostics {
                 report.temperatureCelsius(),
                 report.rawReadErrors(),
                 report.crcErrors(),
+                report.commandTimeouts(),
                 System.currentTimeMillis()
         );
     }
@@ -221,6 +254,43 @@ public class SmartDiagnostics {
     }
 
     /**
+     * Evaluates port degradation and bus integrity by correlating UDMA CRC Errors (ID 199)
+     * and Command Timeouts (ID 188), distinguishing interface issues from physical flash/platter failures.
+     */
+    public static InterfaceAnomalyResult evaluateInterfaceHealth(
+            int crcErrors, int commandTimeouts, int badBlocks, int reallocatedSectors
+    ) {
+        if (crcErrors >= 5 || commandTimeouts >= 3) {
+            String rootCause;
+            if (badBlocks == 0 && reallocatedSectors == 0) {
+                rootCause = "FAULTY USB CABLE / PORT DEGRADATION: Media flash surface is intact (0 bad blocks), but bus transmission error rate is critical.";
+            } else {
+                rootCause = "COMPOUNDED FAILURE: Simultaneous storage media defects and USB interface transmission link failures detected.";
+            }
+            String prompt = "High CRC errors detected — check cable connection or switch USB port.";
+            return new InterfaceAnomalyResult(true, InterfaceSeverity.CRITICAL, crcErrors, commandTimeouts, rootCause, prompt);
+        } else if (crcErrors > 0 || commandTimeouts > 0) {
+            String rootCause;
+            if (badBlocks == 0 && reallocatedSectors == 0) {
+                rootCause = "INTERMITTENT PORT JITTER / CABLE ANOMALY: Minor bus communication retries recorded. Storage media is healthy.";
+            } else {
+                rootCause = "DEGRADED BUS LINK: Minor interface CRC retries recorded alongside media wear.";
+            }
+            String prompt = "Interface communication retries detected — inspect USB cable and avoid unpowered USB hubs.";
+            return new InterfaceAnomalyResult(true, InterfaceSeverity.WARNING, crcErrors, commandTimeouts, rootCause, prompt);
+        } else {
+            return new InterfaceAnomalyResult(
+                    false,
+                    InterfaceSeverity.OPTIMAL,
+                    0,
+                    0,
+                    "INTERFACE SIGNAL OPTIMAL: 0 CRC transfer errors and 0 bus command timeouts. Cable and USB port connection stable.",
+                    "Connection stable. No interface anomalies detected."
+            );
+        }
+    }
+
+    /**
      * Calculates automated Pre-Wipe Drive Health Score (0 - 100).
      */
     public static HealthScoreResult calculateHealthScore(
@@ -232,7 +302,7 @@ public class SmartDiagnostics {
             int crcErrors,
             int tempCelsius
     ) {
-        return calculateHealthScore(reallocatedSectors, wearLevelingPercent, badBlocks, powerOnHours, rawReadErrors, crcErrors, tempCelsius, DeviceType.USB_FLASH);
+        return calculateHealthScore(reallocatedSectors, wearLevelingPercent, badBlocks, powerOnHours, rawReadErrors, crcErrors, 0, tempCelsius, DeviceType.USB_FLASH);
     }
 
     public static HealthScoreResult calculateHealthScore(
@@ -242,6 +312,20 @@ public class SmartDiagnostics {
             long powerOnHours,
             int rawReadErrors,
             int crcErrors,
+            int tempCelsius,
+            DeviceType deviceType
+    ) {
+        return calculateHealthScore(reallocatedSectors, wearLevelingPercent, badBlocks, powerOnHours, rawReadErrors, crcErrors, 0, tempCelsius, deviceType);
+    }
+
+    public static HealthScoreResult calculateHealthScore(
+            int reallocatedSectors,
+            int wearLevelingPercent,
+            int badBlocks,
+            long powerOnHours,
+            int rawReadErrors,
+            int crcErrors,
+            int commandTimeouts,
             int tempCelsius,
             DeviceType deviceType
     ) {
@@ -281,12 +365,15 @@ public class SmartDiagnostics {
             warnings.add(String.format("High Age: %d Power-On Hours (-%d pts)", powerOnHours, penalty));
         }
 
-        // 5. CRC & Read Errors
-        if (crcErrors > 0) {
-            int penalty = Math.min(10, crcErrors * 2);
+        // 5. Interface Anomaly & Port Degradation (Correlating ID 199 CRC Errors & ID 188 Command Timeouts)
+        InterfaceAnomalyResult ifaceResult = evaluateInterfaceHealth(crcErrors, commandTimeouts, badBlocks, reallocatedSectors);
+        if (ifaceResult.isDegraded()) {
+            int penalty = Math.min(15, (crcErrors * 2) + (commandTimeouts * 3));
             score -= penalty;
-            warnings.add(String.format("Interface CRC Errors: %d detected (-%d pts)", crcErrors, penalty));
+            warnings.add(String.format("Interface Anomaly (%s): CRC Errors=%d, Timeouts=%d. %s (-%d pts)",
+                    ifaceResult.severity().getLabel(), crcErrors, commandTimeouts, ifaceResult.userPrompt(), penalty));
         }
+
         if (rawReadErrors > 0) {
             int penalty = Math.min(15, rawReadErrors * 3);
             score -= penalty;
@@ -322,7 +409,7 @@ public class SmartDiagnostics {
         } else {
             status = HealthStatus.CRITICAL;
             permittedWithoutOverride = false;
-            recommendation = "CRITICAL HARDWARE FAILURE RISK: Drive has significant bad sectors/wear. Pre-wipe administrative override required.";
+            recommendation = "CRITICAL HARDWARE FAILURE RISK: Drive has significant defects or interface degradation. Pre-wipe administrative override required.";
         }
 
         return new HealthScoreResult(score, status, warnings, permittedWithoutOverride, recommendation);
@@ -377,6 +464,7 @@ public class SmartDiagnostics {
         int powerCycles = 50;
         int rawReadErrors = 0;
         int crcErrors = 0;
+        int commandTimeouts = 0;
 
         List<SmartAttribute> attributes = new ArrayList<>();
         boolean inAttributesSection = false;
@@ -421,6 +509,10 @@ public class SmartDiagnostics {
                             case 232: // Available Reserved Space
                                 wearLeveling = Math.max(0, Math.min(100, (int) rawNum));
                                 break;
+                            case 188: // Command Timeout
+                                commandTimeouts = (int) rawNum;
+                                if (commandTimeouts > 0) status = "WARNING";
+                                break;
                             case 194: // Temperature
                                 temp = (int) rawNum;
                                 break;
@@ -434,6 +526,7 @@ public class SmartDiagnostics {
                                 break;
                             case 199: // UDMA CRC Error Count
                                 crcErrors = (int) rawNum;
+                                if (crcErrors > 0) status = "WARNING";
                                 break;
                         }
 
@@ -448,8 +541,9 @@ public class SmartDiagnostics {
         }
 
         DeviceType deviceType = DeviceType.fromDrive(model, systemPath, sizeBytes);
-        HealthScoreResult healthScore = calculateHealthScore(reallocated, wearLeveling, badBlocks, powerHours, rawReadErrors, crcErrors, temp, deviceType);
+        HealthScoreResult healthScore = calculateHealthScore(reallocated, wearLeveling, badBlocks, powerHours, rawReadErrors, crcErrors, commandTimeouts, temp, deviceType);
         ThermalStatus thermalStatus = evaluateThermalStatus(temp, deviceType);
+        InterfaceAnomalyResult interfaceAnomaly = evaluateInterfaceHealth(crcErrors, commandTimeouts, badBlocks, reallocated);
 
         return new SmartReport(
                 systemPath,
@@ -463,8 +557,10 @@ public class SmartDiagnostics {
                 powerCycles,
                 rawReadErrors,
                 crcErrors,
+                commandTimeouts,
                 healthScore,
                 thermalStatus,
+                interfaceAnomaly,
                 attributes,
                 true
         );
@@ -483,6 +579,7 @@ public class SmartDiagnostics {
         int badBlocks = (hash % 100 == 0) ? 1 : 0;
         int rawReadErrors = (hash % 75 == 0) ? 1 : 0;
         int crcErrors = (hash % 80 == 0) ? 1 : 0;
+        int commandTimeouts = (hash % 120 == 0) ? 1 : 0;
 
         List<SmartAttribute> attributes = new ArrayList<>();
         attributes.add(new SmartAttribute(1, "Raw_Read_Error_Rate", "100", "100", "051", String.valueOf(rawReadErrors), rawReadErrors > 0 ? "WARNING" : "OK (PASS)"));
@@ -490,6 +587,7 @@ public class SmartDiagnostics {
         attributes.add(new SmartAttribute(9, "Power_On_Hours", "098", "098", "000", String.valueOf(powerHours), "OK (PASS)"));
         attributes.add(new SmartAttribute(12, "Power_Cycle_Count", "100", "100", "000", String.valueOf(powerCycles), "OK (PASS)"));
         attributes.add(new SmartAttribute(173, "Wear_Leveling_Count", String.valueOf(wearLeveling), "100", "000", String.valueOf(wearLeveling) + "%", wearLeveling < 50 ? "WARNING" : "OK (PASS)"));
+        attributes.add(new SmartAttribute(188, "Command_Timeout", "100", "100", "000", String.valueOf(commandTimeouts), commandTimeouts > 0 ? "WARNING" : "OK (PASS)"));
         attributes.add(new SmartAttribute(194, "Temperature_Celsius", String.valueOf(temp), "060", "000", temp + " C", temp >= 60 ? "CRITICAL" : (temp >= 48 ? "WARNING" : "OK (PASS)")));
         attributes.add(new SmartAttribute(197, "Current_Pending_Sector", "100", "100", "000", String.valueOf(badBlocks), badBlocks > 0 ? "CRITICAL" : "OK (PASS)"));
         attributes.add(new SmartAttribute(198, "Offline_Uncorrectable", "100", "100", "000", String.valueOf(badBlocks), badBlocks > 0 ? "CRITICAL" : "OK (PASS)"));
@@ -497,8 +595,9 @@ public class SmartDiagnostics {
         attributes.add(new SmartAttribute(232, "Available_Reserved_Space", String.valueOf(wearLeveling), "100", "010", wearLeveling + "%", "OK (PASS)"));
 
         DeviceType deviceType = DeviceType.fromDrive(model, systemPath, sizeBytes);
-        HealthScoreResult healthScore = calculateHealthScore(reallocated, wearLeveling, badBlocks, powerHours, rawReadErrors, crcErrors, temp, deviceType);
+        HealthScoreResult healthScore = calculateHealthScore(reallocated, wearLeveling, badBlocks, powerHours, rawReadErrors, crcErrors, commandTimeouts, temp, deviceType);
         ThermalStatus thermalStatus = evaluateThermalStatus(temp, deviceType);
+        InterfaceAnomalyResult interfaceAnomaly = evaluateInterfaceHealth(crcErrors, commandTimeouts, badBlocks, reallocated);
 
         return new SmartReport(
                 systemPath,
@@ -512,8 +611,10 @@ public class SmartDiagnostics {
                 powerCycles,
                 rawReadErrors,
                 crcErrors,
+                commandTimeouts,
                 healthScore,
                 thermalStatus,
+                interfaceAnomaly,
                 attributes,
                 false
         );

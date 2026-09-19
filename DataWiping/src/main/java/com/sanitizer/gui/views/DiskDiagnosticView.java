@@ -2,6 +2,9 @@ package com.sanitizer.gui.views;
 
 import com.sanitizer.detector.SmartDiagnostics;
 import com.sanitizer.detector.UsbDetector;
+import com.sanitizer.detector.ThermalPolicy;
+import com.sanitizer.detector.ThermalPolicyManager;
+import com.sanitizer.gui.components.ThermalGraphComponent;
 import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.navigation.NavigationManager;
 import javafx.application.Platform;
@@ -27,6 +30,9 @@ public class DiskDiagnosticView {
     private Button btnLoad;
     private Button btnSelfTest;
 
+    // Thermal Graph Component
+    private ThermalGraphComponent thermalGraph;
+
     // Stat card value labels
     private Label lblHealthValue;
     private Label lblHealthScoreBadge;
@@ -50,6 +56,12 @@ public class DiskDiagnosticView {
     private HBox preWipeAssessmentBox;
     private Label lblPreWipeVerdict;
     private Label lblPreWipeDetails;
+
+    // Interface Anomaly & Port Degradation Banner
+    private HBox interfaceAnomalyBox;
+    private Label lblAnomalyTitle;
+    private Label lblAnomalyDiagnosis;
+    private Label lblAnomalyPrompt;
 
     // Spec Labels
     private Label lblModelValue;
@@ -343,7 +355,33 @@ public class DiskDiagnosticView {
 
         specsRow.getChildren().addAll(specsCard, smartCard);
 
-        rootContainer.getChildren().addAll(header, selectorRow, preWipeAssessmentBox, healthRow, specsRow);
+        thermalGraph = new ThermalGraphComponent();
+
+        // ── Interface Anomaly & Port Degradation Banner ──────────────────
+        interfaceAnomalyBox = new HBox(16);
+        interfaceAnomalyBox.setAlignment(Pos.CENTER_LEFT);
+        interfaceAnomalyBox.getStyleClass().add("card");
+        interfaceAnomalyBox.setStyle("-fx-background-color: #FFF7ED; -fx-border-color: #FED7AA; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 14 20;");
+        interfaceAnomalyBox.setManaged(false);
+        interfaceAnomalyBox.setVisible(false);
+
+        Label anomalyIcon = new Label("⚠️");
+        anomalyIcon.setStyle("-fx-font-size: 22px;");
+
+        VBox anomalyContent = new VBox(3);
+        lblAnomalyTitle = new Label("INTERFACE ANOMALY DETECTED — USB PORT / CABLE DEGRADATION");
+        lblAnomalyTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #92400E;");
+        lblAnomalyDiagnosis = new Label("");
+        lblAnomalyDiagnosis.setStyle("-fx-font-size: 11px; -fx-text-fill: #B45309;");
+        lblAnomalyDiagnosis.setWrapText(true);
+        lblAnomalyPrompt = new Label("");
+        lblAnomalyPrompt.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #C2410C;");
+        anomalyContent.getChildren().addAll(lblAnomalyTitle, lblAnomalyDiagnosis, lblAnomalyPrompt);
+        HBox.setHgrow(anomalyContent, Priority.ALWAYS);
+
+        interfaceAnomalyBox.getChildren().addAll(anomalyIcon, anomalyContent);
+
+        rootContainer.getChildren().addAll(header, selectorRow, preWipeAssessmentBox, interfaceAnomalyBox, healthRow, thermalGraph, specsRow);
     }
 
     private Label createSpecLabel(String text) {
@@ -396,6 +434,7 @@ public class DiskDiagnosticView {
             lblTotalBlocksValue.setText("--");
             lblPathValue.setText("--");
             smartData.clear();
+            if (thermalGraph != null) thermalGraph.reset();
         } else {
             if (current != null && drives.contains(current)) {
                 cmbDrives.getSelectionModel().select(current);
@@ -421,6 +460,13 @@ public class DiskDiagnosticView {
 
         // Perform Deep SMART Diagnostics Inspection
         SmartDiagnostics.SmartReport report = SmartDiagnostics.inspectDrive(drive);
+
+        // Update Thermal Graph Policy and Feed Live Sample
+        if (thermalGraph != null && report != null) {
+            ThermalPolicy policy = ThermalPolicyManager.getInstance().getPolicyForDrive(drive.model(), drive.systemPath(), drive.sizeBytes());
+            thermalGraph.setPolicy(policy);
+            thermalGraph.addSample(report.temperatureCelsius());
+        }
 
         // Health Score & Status
         SmartDiagnostics.HealthScoreResult health = report.healthScore();
@@ -489,6 +535,35 @@ public class DiskDiagnosticView {
             lblPreWipeDetails.setText(String.join(" | ", health.warnings()) + ". " + health.recommendation());
         }
 
+        // Interface Anomaly & Port Degradation Banner
+        SmartDiagnostics.InterfaceAnomalyResult iface = report.interfaceAnomaly();
+        if (iface != null && iface.isDegraded()) {
+            String severityLabel = iface.severity().getLabel();
+            String titleSuffix = iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL
+                    ? " — USB PORT / CABLE DEGRADATION ["+severityLabel+"]"
+                    : " — INTERMITTENT LINK ANOMALY ["+severityLabel+"]";
+            String borderColor = iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL ? "#FCA5A5" : "#FED7AA";
+            String bgColor    = iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL ? "#FEF2F2" : "#FFF7ED";
+            String titleColor = iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL ? "#991B1B" : "#92400E";
+            String diagColor  = iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL ? "#DC2626" : "#B45309";
+            String promptColor= iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL ? "#B91C1C" : "#C2410C";
+
+            interfaceAnomalyBox.setStyle("-fx-background-color: "+bgColor+"; -fx-border-color: "+borderColor+"; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 14 20;");
+            lblAnomalyTitle.setText("⚠️  INTERFACE ANOMALY DETECTED" + titleSuffix);
+            lblAnomalyTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: "+titleColor+";");
+            lblAnomalyDiagnosis.setText(
+                    String.format("CRC Errors (ID 199): %d  |  Command Timeouts (ID 188): %d  —  %s",
+                            iface.crcErrors(), iface.commandTimeouts(), iface.rootCauseDiagnosis()));
+            lblAnomalyDiagnosis.setStyle("-fx-font-size: 11px; -fx-text-fill: "+diagColor+";");
+            lblAnomalyPrompt.setText("→  " + iface.userPrompt());
+            lblAnomalyPrompt.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: "+promptColor+";");
+            interfaceAnomalyBox.setVisible(true);
+            interfaceAnomalyBox.setManaged(true);
+        } else {
+            interfaceAnomalyBox.setVisible(false);
+            interfaceAnomalyBox.setManaged(false);
+        }
+
         // SMART Table Data
         smartData.clear();
         smartData.addAll(report.attributes());
@@ -505,6 +580,15 @@ public class DiskDiagnosticView {
         );
 
         loadSelectedDriveDiagnostics();
+
+        // Simulate a mini diagnostic telemetry check into the thermal graph
+        if (thermalGraph != null) {
+            int base = SmartDiagnostics.getLiveTemperature(drive.systemPath(), drive.serial());
+            thermalGraph.addSample(base);
+            thermalGraph.addSample(base + 1);
+            thermalGraph.addSample(base + 2);
+            thermalGraph.addSample(base);
+        }
     }
 }
 

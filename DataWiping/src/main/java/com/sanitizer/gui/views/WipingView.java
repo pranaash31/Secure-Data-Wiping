@@ -2,9 +2,12 @@ package com.sanitizer.gui.views;
 
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
+import com.sanitizer.detector.ThermalPolicy;
+import com.sanitizer.detector.ThermalPolicyManager;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
+import com.sanitizer.gui.components.ThermalGraphComponent;
 import com.sanitizer.pdf.CertificateGenerator;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -38,6 +41,7 @@ public class WipingView {
     private Label lblProgressPercent;
     private Label lblStatusMessage;
     private SectorHeatmapComponent sectorMatrix;
+    private ThermalGraphComponent thermalGraph;
     private TextArea txtLogOutput;
 
     public WipingView() {
@@ -199,6 +203,9 @@ public class WipingView {
         // Large 100-Block Sector Heatmap Visualizer
         sectorMatrix = new SectorHeatmapComponent(100, 13, 16, 4, 4);
 
+        // Real-Time Thermal Sparkline & Temperature Graph
+        thermalGraph = new ThermalGraphComponent();
+
         Label lblLogTitle = new Label("Live System Execution Terminal Stream:");
         lblLogTitle.getStyleClass().add("card-subtitle");
 
@@ -209,7 +216,7 @@ public class WipingView {
         txtLogOutput.setPrefRowCount(7);
         VBox.setVgrow(txtLogOutput, Priority.ALWAYS);
 
-        cardExec.getChildren().addAll(execHeader, progressBar, sectorMatrix, lblLogTitle, txtLogOutput);
+        cardExec.getChildren().addAll(execHeader, progressBar, sectorMatrix, thermalGraph, lblLogTitle, txtLogOutput);
 
         rootContainer.getChildren().addAll(titleBox, topRow, cardExec);
     }
@@ -231,6 +238,7 @@ public class WipingView {
             lblSelectedDriveInfo.setText("Scanning... Insert a USB drive to begin.");
             if (lblPreWipeHealthBadge != null) lblPreWipeHealthBadge.setText("Health Score: --/100");
             if (lblLiveTempBadge != null) lblLiveTempBadge.setText("Temp: -- °C");
+            if (thermalGraph != null) thermalGraph.reset();
             btnExecuteWipe.setDisable(true);
         } else {
             lblDriveBadge.setText(drives.size() + " Pen Drive(s) Auto-Detected");
@@ -272,9 +280,17 @@ public class WipingView {
                             report.thermalStatus().getBgColor(), report.thermalStatus().getTextColor()
                     ));
                 }
+
+                // Update Thermal Graph Policy & Initial Sample
+                if (thermalGraph != null) {
+                    ThermalPolicy policy = ThermalPolicyManager.getInstance().getPolicyForDrive(target.model(), target.systemPath(), target.sizeBytes());
+                    thermalGraph.setPolicy(policy);
+                    thermalGraph.addSample(report.temperatureCelsius());
+                }
             }
         } else {
             lblSelectedDriveInfo.setText("No drive selected.");
+            if (thermalGraph != null) thermalGraph.reset();
         }
     }
 
@@ -302,6 +318,35 @@ public class WipingView {
             }
         }
 
+        // Interface Anomaly Advisory — Port/Cable Degradation Detection (SMART ID 188 & 199)
+        if (report != null && report.interfaceAnomaly() != null && report.interfaceAnomaly().isDegraded()) {
+            com.sanitizer.detector.SmartDiagnostics.InterfaceAnomalyResult iface = report.interfaceAnomaly();
+            String severityLabel = iface.severity().getLabel();
+            Alert ifaceAlert = new Alert(Alert.AlertType.WARNING);
+            ifaceAlert.setTitle("⚠️ INTERFACE ANOMALY — PORT / CABLE DEGRADATION DETECTED");
+            ifaceAlert.setHeaderText(
+                    String.format("USB Bus Communication Errors Detected [%s]", severityLabel));
+            ifaceAlert.setContentText(
+                    String.format(
+                            "SMART Attribute Analysis:\n" +
+                            "  • CRC Errors (ID 199):       %d\n" +
+                            "  • Command Timeouts (ID 188): %d\n\n" +
+                            "Root Cause Diagnosis:\n  %s\n\n" +
+                            "⚠️  %s\n\n" +
+                            "Proceed with wipe? Interface errors may cause write failures on degraded USB ports.",
+                            iface.crcErrors(), iface.commandTimeouts(),
+                            iface.rootCauseDiagnosis(), iface.userPrompt()));
+            ifaceAlert.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+            Optional<ButtonType> ifaceOpt = ifaceAlert.showAndWait();
+            if (ifaceOpt.isEmpty() || ifaceOpt.get() != ButtonType.OK) {
+                appendLog("[INTERFACE SHIELD] Sanitization aborted by operator due to interface anomaly: CRC=" +
+                        iface.crcErrors() + ", Timeouts=" + iface.commandTimeouts() + " [" + severityLabel + "].");
+                return;
+            }
+            appendLog("[INTERFACE WARN] Operator acknowledged interface anomaly. Proceeding with caution. " +
+                    "CRC=" + iface.crcErrors() + ", Timeouts=" + iface.commandTimeouts() + ".");
+        }
+
         WipeEngine.WipeStandard standard = rdoDod.isSelected() ? WipeEngine.WipeStandard.DOD_5220_22_M : WipeEngine.WipeStandard.NIST_800_88_CLEAR;
         boolean isTestMode = chkTestMode.isSelected();
 
@@ -326,12 +371,18 @@ public class WipingView {
         lblProgressPercent.setText("0.00%");
         lblStatusMessage.setText("Executing sanitization passes...");
         sectorMatrix.reset(target.sizeBytes());
+        if (thermalGraph != null) {
+            thermalGraph.reset();
+            thermalGraph.setPolicy(ThermalPolicyManager.getInstance().getPolicyForDrive(target.model(), target.systemPath(), target.sizeBytes()));
+        }
         txtLogOutput.clear();
         appendLog("[SYSTEM] Launching low-level block sanitization background task...");
         com.sanitizer.util.SoundManager.playStartTone();
 
         final com.sanitizer.detector.SmartDiagnostics.SmartSnapshot preWipeSnapshot =
                 com.sanitizer.detector.SmartDiagnostics.captureSnapshot(target);
+
+        final boolean[] wasThermalPaused = {false};
 
         Task<Boolean> task = new Task<>() {
             @Override
@@ -349,10 +400,28 @@ public class WipingView {
                             if (metrics.isThermalPaused()) {
                                 lblStatusMessage.setText("⏸ THERMAL PAUSE: Cooling down drive (" + metrics.tempCelsius() + "°C)...");
                                 lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #EF4444;");
+
+                                if (!wasThermalPaused[0]) {
+                                    wasThermalPaused[0] = true;
+                                    if (thermalGraph != null) {
+                                        thermalGraph.recordEvent(metrics.tempCelsius(), "AUTO_PAUSE", "Auto-Pause Safeguard");
+                                    }
+                                } else if (thermalGraph != null) {
+                                    thermalGraph.addSample(metrics.tempCelsius());
+                                }
                             } else {
                                 lblStatusMessage.setText(String.format("Wiping: %s | %s | %s | %d°C",
                                         metrics.formattedPassSummary(), metrics.formattedSpeed(), metrics.formattedEta(), metrics.tempCelsius()));
                                 lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #1E293B;");
+
+                                if (wasThermalPaused[0]) {
+                                    wasThermalPaused[0] = false;
+                                    if (thermalGraph != null) {
+                                        thermalGraph.recordEvent(metrics.tempCelsius(), "RESUME", "Resumed Sanitization");
+                                    }
+                                } else if (thermalGraph != null) {
+                                    thermalGraph.addSample(metrics.tempCelsius());
+                                }
                             }
 
                             if (lblLiveTempBadge != null) {
