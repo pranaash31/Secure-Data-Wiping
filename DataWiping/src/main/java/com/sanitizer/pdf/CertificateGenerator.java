@@ -87,11 +87,81 @@ public class CertificateGenerator {
                 drawField(cs, boldFont, regularFont, "Post-Wipe Health:", record.postHealthScore() + " / 100 (Integrity Certified)", 50, y -= leading);
                 drawField(cs, boldFont, regularFont, "Wear & Defect Delta:", record.smartDeltaSummary(), 50, y -= leading);
 
-                // Horizontal Line
+                // ── Section A: Thermal Telemetry Attestation ──────────────────────────
                 cs.setLineWidth(0.5f);
-                cs.moveTo(50, y - 12);
-                cs.lineTo(550, y - 12);
+                cs.moveTo(50, y - 10);
+                cs.lineTo(550, y - 10);
                 cs.stroke();
+                y -= 22;
+
+                cs.beginText();
+                cs.setFont(boldFont, 8.5f);
+                cs.newLineAtOffset(50, y);
+                cs.showText("THERMAL TELEMETRY ATTESTATION (Real-Time Monitoring During Sanitization):");
+                cs.endText();
+                y -= 13;
+
+                String peakTempStr = record.peakTempCelsius() > 0
+                        ? record.peakTempCelsius() + " \u00b0C"
+                        : "Not Recorded (Test Mode / No Thermal Events)";
+                drawFieldSmall(cs, boldFont, regularFont, "Peak Temperature During Wipe:", peakTempStr, 50, y);
+                y -= 12;
+                drawFieldSmall(cs, boldFont, regularFont, "Thermal Auto-Pause Events:", String.valueOf(record.thermalPauseCount()), 50, y);
+                y -= 12;
+                String thermalStatus = deriveThermalStatus(record.peakTempCelsius(), record.thermalPauseCount());
+                drawFieldSmall(cs, boldFont, regularFont, "Thermal Status:", thermalStatus, 50, y);
+                y -= 12;
+
+                // ── Section B: Interface Signal Integrity ─────────────────────────────
+                cs.setLineWidth(0.5f);
+                cs.moveTo(50, y - 6);
+                cs.lineTo(550, y - 6);
+                cs.stroke();
+                y -= 18;
+
+                cs.beginText();
+                cs.setFont(boldFont, 8.5f);
+                cs.newLineAtOffset(50, y);
+                cs.showText("INTERFACE SIGNAL INTEGRITY (SMART ID 199 & ID 188 Bus Correlation):");
+                cs.endText();
+                y -= 13;
+
+                drawFieldSmall(cs, boldFont, regularFont, "UDMA CRC Errors (ID 199):", String.valueOf(record.crcErrors()), 50, y);
+                y -= 12;
+                String ifaceSummary = sanitize(record.interfaceAnomalySummary());
+                String busStatus = deriveInterfaceStatus(record.crcErrors(), ifaceSummary);
+                drawFieldSmall(cs, boldFont, regularFont, "Bus Integrity Status:", busStatus, 50, y);
+                y -= 12;
+                // Root-cause on up to 2 lines
+                String rootCause = ifaceSummary.length() > 80 ? ifaceSummary.substring(0, 80) + "..." : ifaceSummary;
+                drawFieldSmall(cs, boldFont, regularFont, "Root-Cause Attestation:", rootCause, 50, y);
+                y -= 12;
+
+                // ── Section C: Drive Risk Classification ──────────────────────────────
+                cs.setLineWidth(0.5f);
+                cs.moveTo(50, y - 6);
+                cs.lineTo(550, y - 6);
+                cs.stroke();
+                y -= 18;
+
+                String riskLabel = deriveRiskClassification(
+                        record.preHealthScore(), record.postHealthScore(),
+                        record.crcErrors(), record.thermalPauseCount(), ifaceSummary);
+                cs.beginText();
+                cs.setFont(boldFont, 9f);
+                cs.newLineAtOffset(50, y);
+                cs.showText("DRIVE RISK CLASSIFICATION:   " + riskLabel);
+                cs.endText();
+                y -= 18;
+
+                // Horizontal Line before QR block
+                cs.setLineWidth(1.0f);
+                cs.moveTo(50, y - 8);
+                cs.lineTo(550, y - 8);
+                cs.stroke();
+                y -= 14;
+
+
 
                 // QR Code Generation & Embedding (Embeds live Web Verification URL)
                 BufferedImage qrImage = QrGenerator.generateQrCodeImage(verifyUrl, 120, 120);
@@ -187,6 +257,14 @@ public class CertificateGenerator {
             info.setCustomMetadataValue("DigitalSignature", signature);
             info.setCustomMetadataValue("CertificateID", "SAN-CERT-" + record.id());
             info.setCustomMetadataValue("VerificationUrl", verifyUrl);
+            info.setCustomMetadataValue("PeakTempCelsius", String.valueOf(record.peakTempCelsius()));
+            info.setCustomMetadataValue("ThermalPauseCount", String.valueOf(record.thermalPauseCount()));
+            info.setCustomMetadataValue("CrcErrors", String.valueOf(record.crcErrors()));
+            info.setCustomMetadataValue("InterfaceAnomalySummary", record.interfaceAnomalySummary());
+            info.setCustomMetadataValue("RiskClassification", deriveRiskClassification(
+                    record.preHealthScore(), record.postHealthScore(),
+                    record.crcErrors(), record.thermalPauseCount(),
+                    record.interfaceAnomalySummary()));
 
             document.save(new File(fileName));
             System.out.println("PDF Sanitization Certificate Generated: " + fileName);
@@ -214,6 +292,21 @@ public class CertificateGenerator {
         cs.endText();
     }
 
+    private static void drawFieldSmall(PDPageContentStream cs, PDType1Font bold, PDType1Font regular,
+                                       String label, String value, int x, int y) throws Exception {
+        cs.beginText();
+        cs.setFont(bold, 8f);
+        cs.newLineAtOffset(x, y);
+        cs.showText(sanitize(label));
+        cs.endText();
+
+        cs.beginText();
+        cs.setFont(regular, 8f);
+        cs.newLineAtOffset(x + 160, y);
+        cs.showText(sanitize(value));
+        cs.endText();
+    }
+
     private static String formatTimestamp(Object timestampObj) {
         if (timestampObj == null) return "N/A";
         try {
@@ -237,6 +330,50 @@ public class CertificateGenerator {
     private static String sanitize(String input) {
         if (input == null) return "";
         return input.replaceAll("[\\r\\n\\t]", " ").replaceAll("[^\\x20-\\x7E]", "");
+    }
+
+    /** Derives a human-readable thermal status label from peak temp and pause count. */
+    static String deriveThermalStatus(int peakTempCelsius, int pauseCount) {
+        if (pauseCount > 0) return "AUTO-PAUSED DURING WIPE (" + pauseCount + " cooldown event(s))";
+        if (peakTempCelsius >= 60) return "CRITICAL - Overheating Threshold Reached";
+        if (peakTempCelsius >= 48) return "ELEVATED - Operating Near Upper Thermal Limit";
+        if (peakTempCelsius > 0)   return "NORMAL - Within Safe Operating Range";
+        return "N/A - No Thermal Data Recorded";
+    }
+
+    /** Derives a bus integrity status label from CRC errors and interface anomaly summary string. */
+    static String deriveInterfaceStatus(int crcErrors, String anomalySummary) {
+        if (anomalySummary == null || anomalySummary.isBlank() || anomalySummary.toUpperCase().contains("OPTIMAL")) {
+            return "OPTIMAL - 0 CRC Errors, 0 Bus Timeouts";
+        }
+        if (anomalySummary.toUpperCase().contains("CRITICAL") || crcErrors >= 5) {
+            return "CRITICAL - Faulty Cable / Port Degradation Detected";
+        }
+        return "WARNING - Intermittent Bus Communication Retries";
+    }
+
+    /**
+     * Derives a 3-tier risk classification label for the certificate badge.
+     * LOW RISK:      health >= 80, interface OPTIMAL, no thermal pauses.
+     * MODERATE RISK: health 50-79, OR interface WARNING, OR thermal pauses occurred.
+     * HIGH RISK:     health < 50, OR interface CRITICAL.
+     */
+    static String deriveRiskClassification(int preScore, int postScore,
+                                            int crcErrors, int thermalPauseCount,
+                                            String anomalySummary) {
+        int minScore = Math.min(preScore, postScore);
+        boolean ifaceCritical = anomalySummary != null &&
+                (anomalySummary.toUpperCase().contains("CRITICAL") || crcErrors >= 5);
+        boolean ifaceWarning  = anomalySummary != null &&
+                anomalySummary.toUpperCase().contains("WARNING") && !ifaceCritical;
+
+        if (minScore < 50 || ifaceCritical) {
+            return "HIGH RISK -- OPERATOR OVERRIDE RECORDED (See Interface & Health Warnings)";
+        }
+        if (minScore < 80 || ifaceWarning || thermalPauseCount > 0) {
+            return "MODERATE RISK -- ANOMALIES LOGGED (Interface/Thermal Events Recorded)";
+        }
+        return "LOW RISK -- CERTIFIED CLEAN (All Signals Nominal)";
     }
 
     /**

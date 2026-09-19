@@ -24,8 +24,15 @@ public class AuditDb {
             int postHealthScore,
             int badBlocksDelta,
             int wearDeltaPercent,
-            String smartDeltaSummary
+            String smartDeltaSummary,
+            // Thermal Telemetry (Item 2)
+            int peakTempCelsius,
+            int thermalPauseCount,
+            // Interface Anomaly (Item 7)
+            int crcErrors,
+            String interfaceAnomalySummary
     ) {
+        /** Backward-compat 8-field constructor (legacy records / seeds). */
         public AuditRecord(
                 int id,
                 String timestamp,
@@ -37,7 +44,7 @@ public class AuditDb {
                 String digitalSignature
         ) {
             this(id, timestamp, driveModel, serialNumber, capacity, wipeStandard, status, digitalSignature,
-                 100, 100, 0, 0, "Integrity Verified: 0 Defects");
+                 100, 100, 0, 0, "Integrity Verified: 0 Defects", 0, 0, 0, "OPTIMAL");
         }
     }
 
@@ -91,6 +98,12 @@ public class AuditDb {
             try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN bad_blocks_delta INTEGER DEFAULT 0;"); } catch (Exception ignored) {}
             try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN wear_delta_percent INTEGER DEFAULT 0;"); } catch (Exception ignored) {}
             try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN smart_delta_summary TEXT DEFAULT 'Integrity Verified: 0 Defects';"); } catch (Exception ignored) {}
+            // Thermal telemetry columns (Item 2)
+            try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN peak_temp_celsius INTEGER DEFAULT 0;"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN thermal_pause_count INTEGER DEFAULT 0;"); } catch (Exception ignored) {}
+            // Interface anomaly columns (Item 7)
+            try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN crc_errors INTEGER DEFAULT 0;"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN interface_anomaly_summary TEXT DEFAULT 'OPTIMAL';"); } catch (Exception ignored) {}
         } catch (SQLException e) {
             AppLogger.error(MODULE, "SQLite Init Error", e);
         }
@@ -111,18 +124,32 @@ public class AuditDb {
     public static boolean saveRecord(String driveModel, String serialNumber, String capacity,
                                      String wipeStandard, String status, String signature) {
         return saveRecord(driveModel, serialNumber, capacity, wipeStandard, status, signature,
-                100, 100, 0, 0, "Integrity Verified: 0 Defects");
+                100, 100, 0, 0, "Integrity Verified: 0 Defects", 0, 0, 0, "OPTIMAL");
     }
 
     public static boolean saveRecord(String driveModel, String serialNumber, String capacity,
                                      String wipeStandard, String status, String signature,
                                      int preHealthScore, int postHealthScore,
                                      int badBlocksDelta, int wearDeltaPercent, String deltaSummary) {
+        return saveRecord(driveModel, serialNumber, capacity, wipeStandard, status, signature,
+                preHealthScore, postHealthScore, badBlocksDelta, wearDeltaPercent, deltaSummary,
+                0, 0, 0, "OPTIMAL");
+    }
+    /**
+     * Full-fidelity audit record save — includes thermal telemetry and interface anomaly data.
+     */
+    public static boolean saveRecord(String driveModel, String serialNumber, String capacity,
+                                     String wipeStandard, String status, String signature,
+                                     int preHealthScore, int postHealthScore,
+                                     int badBlocksDelta, int wearDeltaPercent, String deltaSummary,
+                                     int peakTempCelsius, int thermalPauseCount,
+                                     int crcErrors, String interfaceAnomalySummary) {
         String sql = """
             INSERT INTO wipe_logs(
                 drive_model, serial_number, capacity, wipe_standard, status, digital_signature,
-                pre_health_score, post_health_score, bad_blocks_delta, wear_delta_percent, smart_delta_summary
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                pre_health_score, post_health_score, bad_blocks_delta, wear_delta_percent, smart_delta_summary,
+                peak_temp_celsius, thermal_pause_count, crc_errors, interface_anomaly_summary
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """;
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -137,6 +164,10 @@ public class AuditDb {
             pstmt.setInt(9, badBlocksDelta);
             pstmt.setInt(10, wearDeltaPercent);
             pstmt.setString(11, deltaSummary != null ? deltaSummary : "Integrity Verified: 0 Defects");
+            pstmt.setInt(12, peakTempCelsius);
+            pstmt.setInt(13, thermalPauseCount);
+            pstmt.setInt(14, crcErrors);
+            pstmt.setString(15, interfaceAnomalySummary != null ? interfaceAnomalySummary : "OPTIMAL");
             pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
@@ -165,7 +196,12 @@ public class AuditDb {
                         rs.getInt("post_health_score"),
                         rs.getInt("bad_blocks_delta"),
                         rs.getInt("wear_delta_percent"),
-                        rs.getString("smart_delta_summary")
+                        rs.getString("smart_delta_summary"),
+                        rs.getInt("peak_temp_celsius"),
+                        rs.getInt("thermal_pause_count"),
+                        rs.getInt("crc_errors"),
+                        rs.getString("interface_anomaly_summary") != null
+                                ? rs.getString("interface_anomaly_summary") : "OPTIMAL"
                 ));
             }
         } catch (SQLException e) {

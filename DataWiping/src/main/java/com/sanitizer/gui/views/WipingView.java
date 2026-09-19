@@ -467,6 +467,16 @@ public class WipingView {
                 int wearDelta = smartDelta != null ? smartDelta.wearDeltaPercent() : 0;
                 String deltaSummary = smartDelta != null ? smartDelta.formattedSummary() : "Integrity Verified: 0 Defects";
 
+                // Capture Thermal & Interface Telemetry for Certificate
+                int peakTemp = (thermalGraph != null) ? thermalGraph.getPeakTemp() : 0;
+                int pauseCount = (thermalGraph != null) ? thermalGraph.getPauseCount() : 0;
+                int certCrcErrors = (preWipeSnapshot != null) ? preWipeSnapshot.crcErrors() : 0;
+                String ifaceSummary = "OPTIMAL";
+                if (report != null && report.interfaceAnomaly() != null) {
+                    com.sanitizer.detector.SmartDiagnostics.InterfaceAnomalyResult ia = report.interfaceAnomaly();
+                    ifaceSummary = ia.severity().getLabel() + ": " + ia.rootCauseDiagnosis();
+                }
+
                 boolean dbSaved = AuditDb.saveRecord(
                         target.model(),
                         target.serial(),
@@ -478,7 +488,11 @@ public class WipingView {
                         postScore,
                         badDelta,
                         wearDelta,
-                        deltaSummary
+                        deltaSummary,
+                        peakTemp,
+                        pauseCount,
+                        certCrcErrors,
+                        ifaceSummary
                 );
 
                 if (dbSaved) {
