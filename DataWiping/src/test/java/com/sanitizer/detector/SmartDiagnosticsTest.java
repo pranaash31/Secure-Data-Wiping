@@ -154,12 +154,12 @@ public class SmartDiagnosticsTest {
     public void testCaptureSnapshotAndCompareSnapshotsClean() {
         SmartDiagnostics.SmartSnapshot pre = new SmartDiagnostics.SmartSnapshot(
                 "/dev/rdisk2", "SER-CLEAN", 100, SmartDiagnostics.HealthStatus.HEALTHY,
-                0, 100, 0, 500, 32, 0, 0, System.currentTimeMillis()
+                0, 100, 0, 500L, 32, 0, 0, 0, System.currentTimeMillis()
         );
 
         SmartDiagnostics.SmartSnapshot post = new SmartDiagnostics.SmartSnapshot(
                 "/dev/rdisk2", "SER-CLEAN", 99, SmartDiagnostics.HealthStatus.HEALTHY,
-                0, 99, 0, 501, 38, 0, 0, System.currentTimeMillis() + 60000
+                0, 99, 0, 501L, 38, 0, 0, 0, System.currentTimeMillis() + 60000
         );
 
         SmartDiagnostics.SmartDelta delta = SmartDiagnostics.compareSnapshots(pre, post);
@@ -178,12 +178,12 @@ public class SmartDiagnosticsTest {
     public void testCompareSnapshotsDegradation() {
         SmartDiagnostics.SmartSnapshot pre = new SmartDiagnostics.SmartSnapshot(
                 "/dev/rdisk2", "SER-DEG", 90, SmartDiagnostics.HealthStatus.HEALTHY,
-                0, 95, 0, 12000, 35, 0, 0, System.currentTimeMillis()
+                0, 95, 0, 12000L, 35, 0, 0, 0, System.currentTimeMillis()
         );
 
         SmartDiagnostics.SmartSnapshot post = new SmartDiagnostics.SmartSnapshot(
                 "/dev/rdisk2", "SER-DEG", 55, SmartDiagnostics.HealthStatus.WARNING,
-                3, 90, 2, 12002, 52, 0, 0, System.currentTimeMillis() + 120000
+                3, 90, 2, 12002L, 52, 0, 0, 0, System.currentTimeMillis() + 120000
         );
 
         SmartDiagnostics.SmartDelta delta = SmartDiagnostics.compareSnapshots(pre, post);
