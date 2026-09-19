@@ -1,5 +1,6 @@
 package com.sanitizer.detector;
 
+import com.sanitizer.detector.UsbDetector;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -123,9 +124,21 @@ public class SmartDiagnosticsTest {
         assertEquals(SmartDiagnostics.ThermalStatus.NORMAL, SmartDiagnostics.evaluateThermalStatus(35));
         assertEquals(SmartDiagnostics.ThermalStatus.NORMAL, SmartDiagnostics.evaluateThermalStatus(44));
         assertEquals(SmartDiagnostics.ThermalStatus.ELEVATED, SmartDiagnostics.evaluateThermalStatus(48));
-        assertEquals(SmartDiagnostics.ThermalStatus.ELEVATED, SmartDiagnostics.evaluateThermalStatus(55));
+        assertEquals(SmartDiagnostics.ThermalStatus.ELEVATED, SmartDiagnostics.evaluateThermalStatus(52));
+        assertEquals(SmartDiagnostics.ThermalStatus.CRITICAL, SmartDiagnostics.evaluateThermalStatus(55)); // 55°C is default USB Auto-Pause threshold
         assertEquals(SmartDiagnostics.ThermalStatus.CRITICAL, SmartDiagnostics.evaluateThermalStatus(60));
         assertEquals(SmartDiagnostics.ThermalStatus.CRITICAL, SmartDiagnostics.evaluateThermalStatus(72));
+
+        // Test with explicit device types:
+        // NVMe SSD: 55°C is NORMAL, 62°C is ELEVATED, 70°C is CRITICAL
+        assertEquals(SmartDiagnostics.ThermalStatus.NORMAL, SmartDiagnostics.evaluateThermalStatus(55, DeviceType.NVME_SSD));
+        assertEquals(SmartDiagnostics.ThermalStatus.ELEVATED, SmartDiagnostics.evaluateThermalStatus(62, DeviceType.NVME_SSD));
+        assertEquals(SmartDiagnostics.ThermalStatus.CRITICAL, SmartDiagnostics.evaluateThermalStatus(70, DeviceType.NVME_SSD));
+
+        // Magnetic HDD: 42°C is NORMAL, 46°C is ELEVATED, 50°C is CRITICAL
+        assertEquals(SmartDiagnostics.ThermalStatus.NORMAL, SmartDiagnostics.evaluateThermalStatus(42, DeviceType.MAGNETIC_HDD));
+        assertEquals(SmartDiagnostics.ThermalStatus.ELEVATED, SmartDiagnostics.evaluateThermalStatus(46, DeviceType.MAGNETIC_HDD));
+        assertEquals(SmartDiagnostics.ThermalStatus.CRITICAL, SmartDiagnostics.evaluateThermalStatus(50, DeviceType.MAGNETIC_HDD));
     }
 
     @Test

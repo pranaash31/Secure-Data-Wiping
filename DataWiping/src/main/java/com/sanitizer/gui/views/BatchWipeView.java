@@ -725,15 +725,6 @@ public class BatchWipeView {
                 NavigationManager.getInstance().showNotification("Drive Sanitized",
                         drive.model() + " sanitized & certified. S.M.A.R.T. Delta: " + deltaSummary, ToastNotification.ToastType.SUCCESS);
             } else {
-
-                List<AuditDb.AuditRecord> recs = AuditDb.getAllRecords();
-                if (!recs.isEmpty()) {
-                    CertificateGenerator.generateCertificate(recs.get(0));
-                }
-
-                NavigationManager.getInstance().showNotification("Drive Sanitized",
-                        drive.model() + " successfully sanitized & certified.", ToastNotification.ToastType.SUCCESS);
-            } else {
                 SoundManager.playAlertSound();
                 statusBadge.setText("FAILED");
                 statusBadge.getStyleClass().setAll("badge-danger");

@@ -232,6 +232,19 @@ public class SmartDiagnostics {
             int crcErrors,
             int tempCelsius
     ) {
+        return calculateHealthScore(reallocatedSectors, wearLevelingPercent, badBlocks, powerOnHours, rawReadErrors, crcErrors, tempCelsius, DeviceType.USB_FLASH);
+    }
+
+    public static HealthScoreResult calculateHealthScore(
+            int reallocatedSectors,
+            int wearLevelingPercent,
+            int badBlocks,
+            long powerOnHours,
+            int rawReadErrors,
+            int crcErrors,
+            int tempCelsius,
+            DeviceType deviceType
+    ) {
         int score = 100;
         List<String> warnings = new ArrayList<>();
 
@@ -280,13 +293,16 @@ public class SmartDiagnostics {
             warnings.add(String.format("Raw Read Errors: %d recorded (-%d pts)", rawReadErrors, penalty));
         }
 
-        // 6. Thermal Penalty
-        if (tempCelsius >= 60) {
+        // 6. Device-Type Aware Thermal Penalty
+        ThermalPolicy policy = ThermalPolicyManager.getInstance().getPolicy(deviceType != null ? deviceType : DeviceType.USB_FLASH);
+        if (tempCelsius >= policy.autoPauseCelsius()) {
             score -= 15;
-            warnings.add(String.format("Thermal Overheat: Current temperature %d°C is critical (-15 pts)", tempCelsius));
-        } else if (tempCelsius >= 50) {
+            warnings.add(String.format("Thermal Overheat (%s): Current temperature %d°C is critical >= %d°C (-15 pts)",
+                    policy.deviceType().getDisplayName(), tempCelsius, policy.autoPauseCelsius()));
+        } else if (tempCelsius >= policy.warningCelsius()) {
             score -= 5;
-            warnings.add(String.format("Elevated Temperature: Current temperature %d°C (-5 pts)", tempCelsius));
+            warnings.add(String.format("Elevated Temperature (%s): Current temperature %d°C >= %d°C (-5 pts)",
+                    policy.deviceType().getDisplayName(), tempCelsius, policy.warningCelsius()));
         }
 
         score = Math.max(0, Math.min(100, score));
@@ -313,9 +329,14 @@ public class SmartDiagnostics {
     }
 
     public static ThermalStatus evaluateThermalStatus(int tempCelsius) {
-        if (tempCelsius >= 60) {
+        return evaluateThermalStatus(tempCelsius, DeviceType.USB_FLASH);
+    }
+
+    public static ThermalStatus evaluateThermalStatus(int tempCelsius, DeviceType deviceType) {
+        ThermalPolicy policy = ThermalPolicyManager.getInstance().getPolicy(deviceType != null ? deviceType : DeviceType.USB_FLASH);
+        if (tempCelsius >= policy.autoPauseCelsius()) {
             return ThermalStatus.CRITICAL;
-        } else if (tempCelsius >= 48) {
+        } else if (tempCelsius >= policy.warningCelsius()) {
             return ThermalStatus.ELEVATED;
         } else {
             return ThermalStatus.NORMAL;
@@ -426,8 +447,9 @@ public class SmartDiagnostics {
             return null;
         }
 
-        HealthScoreResult healthScore = calculateHealthScore(reallocated, wearLeveling, badBlocks, powerHours, rawReadErrors, crcErrors, temp);
-        ThermalStatus thermalStatus = evaluateThermalStatus(temp);
+        DeviceType deviceType = DeviceType.fromDrive(model, systemPath, sizeBytes);
+        HealthScoreResult healthScore = calculateHealthScore(reallocated, wearLeveling, badBlocks, powerHours, rawReadErrors, crcErrors, temp, deviceType);
+        ThermalStatus thermalStatus = evaluateThermalStatus(temp, deviceType);
 
         return new SmartReport(
                 systemPath,
@@ -474,8 +496,9 @@ public class SmartDiagnostics {
         attributes.add(new SmartAttribute(199, "UDMA_CRC_Error_Count", "200", "200", "000", String.valueOf(crcErrors), "OK (PASS)"));
         attributes.add(new SmartAttribute(232, "Available_Reserved_Space", String.valueOf(wearLeveling), "100", "010", wearLeveling + "%", "OK (PASS)"));
 
-        HealthScoreResult healthScore = calculateHealthScore(reallocated, wearLeveling, badBlocks, powerHours, rawReadErrors, crcErrors, temp);
-        ThermalStatus thermalStatus = evaluateThermalStatus(temp);
+        DeviceType deviceType = DeviceType.fromDrive(model, systemPath, sizeBytes);
+        HealthScoreResult healthScore = calculateHealthScore(reallocated, wearLeveling, badBlocks, powerHours, rawReadErrors, crcErrors, temp, deviceType);
+        ThermalStatus thermalStatus = evaluateThermalStatus(temp, deviceType);
 
         return new SmartReport(
                 systemPath,

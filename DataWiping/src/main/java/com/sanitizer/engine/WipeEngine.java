@@ -224,13 +224,18 @@ public class WipeEngine {
 
                     if (logCallback != null) logCallback.accept(line);
 
-                    // Thermal Safety Check
+                    // Device-Aware Thermal Safeguard Check
+                    com.sanitizer.detector.DeviceType deviceType = com.sanitizer.detector.DeviceType.fromDrive(null, systemPath, targetBytes);
+                    com.sanitizer.detector.ThermalPolicy policy = com.sanitizer.detector.ThermalPolicyManager.getInstance().getPolicy(deviceType);
+                    int autoPauseThreshold = policy.autoPauseCelsius();
+                    int resumeThreshold = policy.resumeCelsius();
+
                     int currentTemp = com.sanitizer.detector.SmartDiagnostics.getLiveTemperature(systemPath, null);
                     com.sanitizer.detector.SmartDiagnostics.ThermalStatus thermalStatus =
-                            com.sanitizer.detector.SmartDiagnostics.evaluateThermalStatus(currentTemp);
+                            com.sanitizer.detector.SmartDiagnostics.evaluateThermalStatus(currentTemp, deviceType);
 
-                    if (currentTemp >= THERMAL_AUTO_PAUSE_THRESHOLD) {
-                        log(logCallback, String.format("[THERMAL SAFEGUARD] Drive temperature reached %d°C (>= %d°C threshold)! Auto-pausing sanitization to prevent NAND degradation...", currentTemp, THERMAL_AUTO_PAUSE_THRESHOLD));
+                    if (currentTemp >= autoPauseThreshold) {
+                        log(logCallback, String.format("[THERMAL SAFEGUARD - %s] Drive temperature reached %d°C (>= %d°C threshold)! Auto-pausing sanitization to prevent NAND/media degradation...", deviceType.getDisplayName(), currentTemp, autoPauseThreshold));
                         com.sanitizer.util.SoundManager.playAlertSound();
 
                         // Suspend dd process
@@ -242,7 +247,7 @@ public class WipeEngine {
                                     startPct,
                                     currentPass,
                                     totalPasses,
-                                    passName + " [THERMAL PAUSE: COOLING]",
+                                    passName + " [THERMAL PAUSE: COOLING (" + deviceType.getShortBadge() + ")]",
                                     0,
                                     targetBytes,
                                     0.0,
@@ -255,7 +260,7 @@ public class WipeEngine {
                         }
 
                         // Cooldown loop until temperature is safe
-                        while (currentTemp > THERMAL_SAFE_RESUME_THRESHOLD && !Thread.currentThread().isInterrupted() && process.isAlive()) {
+                        while (currentTemp > resumeThreshold && !Thread.currentThread().isInterrupted() && process.isAlive()) {
                             try {
                                 Thread.sleep(1000);
                             } catch (InterruptedException ie) {
@@ -263,7 +268,7 @@ public class WipeEngine {
                                 return false;
                             }
                             // Allow temperature to decrease
-                            currentTemp = Math.max(35, currentTemp - 5);
+                            currentTemp = Math.max(30, currentTemp - 5);
                             com.sanitizer.detector.SmartDiagnostics.setLiveTemperature(systemPath, currentTemp);
 
                             if (metricsCallback != null) {
@@ -272,7 +277,7 @@ public class WipeEngine {
                                         startPct,
                                         currentPass,
                                         totalPasses,
-                                        passName + " [THERMAL PAUSE: COOLING TO " + THERMAL_SAFE_RESUME_THRESHOLD + "°C]",
+                                        passName + " [THERMAL PAUSE: COOLING TO " + resumeThreshold + "°C (" + deviceType.getShortBadge() + ")]",
                                         0,
                                         targetBytes,
                                         0.0,
@@ -287,8 +292,8 @@ public class WipeEngine {
 
                         // Resume dd process
                         resumeProcess(process);
-                        log(logCallback, String.format("[THERMAL RESUMED] Drive cooled down to %d°C. Resuming data sanitization stream.", currentTemp));
-                        thermalStatus = com.sanitizer.detector.SmartDiagnostics.evaluateThermalStatus(currentTemp);
+                        log(logCallback, String.format("[THERMAL RESUMED - %s] Drive cooled down to %d°C (<= %d°C). Resuming data sanitization stream.", deviceType.getDisplayName(), currentTemp, resumeThreshold));
+                        thermalStatus = com.sanitizer.detector.SmartDiagnostics.evaluateThermalStatus(currentTemp, deviceType);
                     }
 
                     if (line.contains("bytes")) {
