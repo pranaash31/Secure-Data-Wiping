@@ -455,6 +455,8 @@ public class BatchWipeView {
 
         private WipeMetrics lastMetrics;
         private com.sanitizer.detector.SmartDiagnostics.SmartSnapshot preWipeSnapshot;
+        private String preWipeIfaceSummary = "OPTIMAL"; // Populated from pre-wipe SMART report
+        private int preWipeCrcErrors = 0;
 
         public DriveCardController(int index, UsbDetector.UsbDriveInfo drive) {
             this.index = index;
@@ -487,6 +489,12 @@ public class BatchWipeView {
                     com.sanitizer.detector.SmartDiagnostics.inspectDrive(drive);
             int healthScore = report != null ? report.healthScore().score() : 100;
             com.sanitizer.detector.SmartDiagnostics.HealthStatus hStatus = report != null ? report.healthScore().status() : com.sanitizer.detector.SmartDiagnostics.HealthStatus.HEALTHY;
+            // Capture interface anomaly summary for certificate
+            if (report != null && report.interfaceAnomaly() != null) {
+                com.sanitizer.detector.SmartDiagnostics.InterfaceAnomalyResult ia = report.interfaceAnomaly();
+                preWipeIfaceSummary = ia.severity().getLabel() + ": " + ia.rootCauseDiagnosis();
+                preWipeCrcErrors = ia.crcErrors();
+            }
 
             healthBadge = new Label("Health: " + healthScore + "/100");
             healthBadge.setStyle(String.format("-fx-font-size: 10px; -fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 3 8; -fx-background-radius: 4px; -fx-font-weight: bold;",
@@ -703,6 +711,9 @@ public class BatchWipeView {
                 String payload = drive.model() + "|" + drive.serial() + "|" + drive.formattedSize() + "|" + standard.name() + "|SUCCESS";
                 String sig = CryptoSigner.signData(payload);
 
+                // Capture peak thermal data from last wipe metrics
+                int peakTemp = (lastMetrics != null) ? lastMetrics.tempCelsius() : 0;
+
                 AuditDb.saveRecord(
                         drive.model(),
                         drive.serial(),
@@ -714,7 +725,11 @@ public class BatchWipeView {
                         postScore,
                         badDelta,
                         wearDelta,
-                        deltaSummary
+                        deltaSummary,
+                        peakTemp,
+                        0, // Batch mode: no per-drive pause count tracked separately
+                        preWipeCrcErrors,
+                        preWipeIfaceSummary
                 );
 
                 List<AuditDb.AuditRecord> recs = AuditDb.getAllRecords();
