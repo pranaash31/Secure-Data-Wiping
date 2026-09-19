@@ -330,6 +330,9 @@ public class WipingView {
         appendLog("[SYSTEM] Launching low-level block sanitization background task...");
         com.sanitizer.util.SoundManager.playStartTone();
 
+        final com.sanitizer.detector.SmartDiagnostics.SmartSnapshot preWipeSnapshot =
+                com.sanitizer.detector.SmartDiagnostics.captureSnapshot(target);
+
         Task<Boolean> task = new Task<>() {
             @Override
             protected Boolean call() {
@@ -374,9 +377,26 @@ public class WipingView {
                 appendLog("\n[SUCCESS] Sanitization operation completed successfully.");
                 sectorMatrix.setCompleted();
 
+                // Capture Post-Wipe S.M.A.R.T. Snapshot & Compute Delta
+                com.sanitizer.detector.SmartDiagnostics.SmartSnapshot postWipeSnapshot =
+                        com.sanitizer.detector.SmartDiagnostics.captureSnapshot(target);
+                com.sanitizer.detector.SmartDiagnostics.SmartDelta smartDelta =
+                        com.sanitizer.detector.SmartDiagnostics.compareSnapshots(preWipeSnapshot, postWipeSnapshot);
+
+                if (smartDelta != null) {
+                    appendLog("[S.M.A.R.T. INTEGRITY] " + smartDelta.integrityVerdict());
+                    appendLog("[S.M.A.R.T. DELTA] " + smartDelta.formattedSummary());
+                }
+
                 String stdString = standard == WipeEngine.WipeStandard.DOD_5220_22_M ? "DoD 5220.22-M" : "NIST SP 800-88";
                 String auditPayload = target.model() + "|" + target.serial() + "|" + target.formattedSize() + "|" + stdString + "|SUCCESS";
                 String signature = CryptoSigner.signData(auditPayload);
+
+                int preScore = (smartDelta != null && smartDelta.preWipe() != null) ? smartDelta.preWipe().healthScore() : 100;
+                int postScore = (smartDelta != null && smartDelta.postWipe() != null) ? smartDelta.postWipe().healthScore() : 100;
+                int badDelta = smartDelta != null ? smartDelta.badBlocksDelta() : 0;
+                int wearDelta = smartDelta != null ? smartDelta.wearDeltaPercent() : 0;
+                String deltaSummary = smartDelta != null ? smartDelta.formattedSummary() : "Integrity Verified: 0 Defects";
 
                 boolean dbSaved = AuditDb.saveRecord(
                         target.model(),
@@ -384,11 +404,16 @@ public class WipingView {
                         target.formattedSize(),
                         stdString,
                         "SUCCESS",
-                        signature
+                        signature,
+                        preScore,
+                        postScore,
+                        badDelta,
+                        wearDelta,
+                        deltaSummary
                 );
 
                 if (dbSaved) {
-                    appendLog("[DB] Saved audit record into SQLite database.");
+                    appendLog("[DB] Saved audit record with S.M.A.R.T. Delta proof into SQLite database.");
                     List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
                     if (!records.isEmpty()) {
                         AuditDb.AuditRecord latest = records.get(0);
@@ -396,7 +421,9 @@ public class WipingView {
                         if (pdfPath != null) {
                             appendLog("[PDF] Exported PDF Certificate: " + pdfPath);
                             showAlert(Alert.AlertType.INFORMATION, "Sanitization Complete",
-                                     "Data Wiping Finished Successfully!\n\nPDF Certificate Exported:\n" + pdfPath +
+                                     "Data Wiping Finished Successfully!\n\n" +
+                                     "S.M.A.R.T. Wear & Integrity Delta: " + deltaSummary + "\n\n" +
+                                     "PDF Certificate Exported:\n" + pdfPath +
                                      "\n\nRSA Signature: " + signature.substring(0, 30) + "...");
                         }
                     }

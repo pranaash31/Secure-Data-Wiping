@@ -134,16 +134,23 @@ public class AuditView {
 
         TableColumn<AuditDb.AuditRecord, String> colStatus = new TableColumn<>("Status");
         colStatus.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().status()));
-        colStatus.setPrefWidth(90);
+        colStatus.setPrefWidth(85);
+
+        TableColumn<AuditDb.AuditRecord, String> colHealth = new TableColumn<>("S.M.A.R.T. Health Delta");
+        colHealth.setCellValueFactory(data -> {
+            AuditDb.AuditRecord r = data.getValue();
+            return new SimpleStringProperty(String.format("%d -> %d (%s)", r.preHealthScore(), r.postHealthScore(), r.smartDeltaSummary()));
+        });
+        colHealth.setPrefWidth(210);
 
         TableColumn<AuditDb.AuditRecord, String> colSig = new TableColumn<>("RSA Digital Signature");
         colSig.setCellValueFactory(data -> {
             String s = data.getValue().digitalSignature();
-            return new SimpleStringProperty(s.length() > 32 ? s.substring(0, 32) + "..." : s);
+            return new SimpleStringProperty(s.length() > 28 ? s.substring(0, 28) + "..." : s);
         });
-        colSig.setPrefWidth(220);
+        colSig.setPrefWidth(180);
 
-        tblAuditHistory.getColumns().addAll(colId, colTime, colModel, colSerial, colCapacity, colStandard, colStatus, colSig);
+        tblAuditHistory.getColumns().addAll(colId, colTime, colModel, colSerial, colCapacity, colStandard, colStatus, colHealth, colSig);
 
         auditData = FXCollections.observableArrayList();
         filteredData = new FilteredList<>(auditData, p -> true);

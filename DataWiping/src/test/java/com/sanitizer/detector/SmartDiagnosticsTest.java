@@ -136,4 +136,50 @@ public class SmartDiagnosticsTest {
         SmartDiagnostics.setLiveTemperature("/dev/rdisk5", 42);
         assertEquals(42, SmartDiagnostics.getLiveTemperature("/dev/rdisk5", "SER-123"));
     }
+
+    @Test
+    public void testCaptureSnapshotAndCompareSnapshotsClean() {
+        SmartDiagnostics.SmartSnapshot pre = new SmartDiagnostics.SmartSnapshot(
+                "/dev/rdisk2", "SER-CLEAN", 100, SmartDiagnostics.HealthStatus.HEALTHY,
+                0, 100, 0, 500, 32, 0, 0, System.currentTimeMillis()
+        );
+
+        SmartDiagnostics.SmartSnapshot post = new SmartDiagnostics.SmartSnapshot(
+                "/dev/rdisk2", "SER-CLEAN", 99, SmartDiagnostics.HealthStatus.HEALTHY,
+                0, 99, 0, 501, 38, 0, 0, System.currentTimeMillis() + 60000
+        );
+
+        SmartDiagnostics.SmartDelta delta = SmartDiagnostics.compareSnapshots(pre, post);
+        assertNotNull(delta);
+        assertEquals(-1, delta.healthScoreDelta());
+        assertEquals(0, delta.badBlocksDelta());
+        assertEquals(0, delta.reallocatedDelta());
+        assertEquals(1, delta.wearDeltaPercent());
+        assertEquals(6, delta.tempDeltaCelsius());
+        assertTrue(delta.isIntegrityMaintained());
+        assertTrue(delta.integrityVerdict().contains("INTEGRITY CERTIFIED"));
+        assertTrue(delta.formattedSummary().contains("Health: 100 -> 99"));
+    }
+
+    @Test
+    public void testCompareSnapshotsDegradation() {
+        SmartDiagnostics.SmartSnapshot pre = new SmartDiagnostics.SmartSnapshot(
+                "/dev/rdisk2", "SER-DEG", 90, SmartDiagnostics.HealthStatus.HEALTHY,
+                0, 95, 0, 12000, 35, 0, 0, System.currentTimeMillis()
+        );
+
+        SmartDiagnostics.SmartSnapshot post = new SmartDiagnostics.SmartSnapshot(
+                "/dev/rdisk2", "SER-DEG", 55, SmartDiagnostics.HealthStatus.WARNING,
+                3, 90, 2, 12002, 52, 0, 0, System.currentTimeMillis() + 120000
+        );
+
+        SmartDiagnostics.SmartDelta delta = SmartDiagnostics.compareSnapshots(pre, post);
+        assertNotNull(delta);
+        assertEquals(-35, delta.healthScoreDelta());
+        assertEquals(2, delta.badBlocksDelta());
+        assertEquals(3, delta.reallocatedDelta());
+        assertEquals(5, delta.wearDeltaPercent());
+        assertFalse(delta.isIntegrityMaintained());
+        assertTrue(delta.integrityVerdict().contains("DEGRADATION DETECTED"));
+    }
 }

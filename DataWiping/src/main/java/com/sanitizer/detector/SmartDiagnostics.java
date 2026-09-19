@@ -88,6 +88,34 @@ public class SmartDiagnostics {
             boolean isHardwareSmartSupported
     ) {}
 
+    public record SmartSnapshot(
+            String systemPath,
+            String serial,
+            int healthScore,
+            HealthStatus healthStatus,
+            int reallocatedSectors,
+            int wearLevelingPercent,
+            int badBlocks,
+            long powerOnHours,
+            int temperatureCelsius,
+            int rawReadErrors,
+            int crcErrors,
+            long timestampMillis
+    ) {}
+
+    public record SmartDelta(
+            SmartSnapshot preWipe,
+            SmartSnapshot postWipe,
+            int healthScoreDelta, // post - pre
+            int badBlocksDelta,   // post - pre
+            int reallocatedDelta, // post - pre
+            int wearDeltaPercent, // pre - post (wear consumed)
+            int tempDeltaCelsius, // post - pre
+            boolean isIntegrityMaintained,
+            String integrityVerdict,
+            String formattedSummary
+    ) {}
+
     // Mock/Override map for deterministic testing and diagnostics simulation
     private static final Map<String, SmartReport> mockReports = new ConcurrentHashMap<>();
     private static final Map<String, Integer> dynamicTemperatures = new ConcurrentHashMap<>();
@@ -134,6 +162,62 @@ public class SmartDiagnostics {
 
         // Fallback: Generate robust, hardware-keyed deep SMART telemetry
         return generateDeterministicReport(systemPath, model, serial, sizeBytes);
+    }
+
+    /**
+     * Captures a point-in-time S.M.A.R.T. health and defect snapshot.
+     */
+    public static SmartSnapshot captureSnapshot(UsbDetector.UsbDriveInfo drive) {
+        if (drive == null) return null;
+        return captureSnapshot(drive.systemPath(), drive.model(), drive.serial(), drive.sizeBytes());
+    }
+
+    public static SmartSnapshot captureSnapshot(String systemPath, String model, String serial, long sizeBytes) {
+        SmartReport report = inspectDrive(systemPath, model, serial, sizeBytes);
+        if (report == null) return null;
+        return new SmartSnapshot(
+                systemPath,
+                serial,
+                report.healthScore().score(),
+                report.healthScore().status(),
+                report.reallocatedSectors(),
+                report.wearLevelingPercent(),
+                report.badBlocks(),
+                report.powerOnHours(),
+                report.temperatureCelsius(),
+                report.rawReadErrors(),
+                report.crcErrors(),
+                System.currentTimeMillis()
+        );
+    }
+
+    /**
+     * Compares pre-wipe and post-wipe snapshots to compute S.M.A.R.T. wear delta and verify sanitization integrity.
+     */
+    public static SmartDelta compareSnapshots(SmartSnapshot pre, SmartSnapshot post) {
+        if (pre == null && post == null) return null;
+        if (pre == null) {
+            return new SmartDelta(null, post, 0, 0, 0, 0, 0, true, "Single Snapshot Captured", "Post-Wipe Health: " + post.healthScore() + "/100");
+        }
+        if (post == null) {
+            return new SmartDelta(pre, null, 0, 0, 0, 0, 0, true, "Pre-Wipe Snapshot Stored", "Pre-Wipe Health: " + pre.healthScore() + "/100");
+        }
+
+        int healthDelta = post.healthScore() - pre.healthScore();
+        int badBlocksDelta = Math.max(0, post.badBlocks() - pre.badBlocks());
+        int reallocatedDelta = Math.max(0, post.reallocatedSectors() - pre.reallocatedSectors());
+        int wearLoss = Math.max(0, pre.wearLevelingPercent() - post.wearLevelingPercent());
+        int tempDelta = post.temperatureCelsius() - pre.temperatureCelsius();
+
+        boolean integrityMaintained = (badBlocksDelta == 0 && reallocatedDelta == 0);
+        String verdict = integrityMaintained
+                ? "INTEGRITY CERTIFIED: 0 Defects Created (Media Surface Intact)"
+                : String.format("DEGRADATION DETECTED: +%d Bad Blocks, +%d Reallocated Sectors", badBlocksDelta, reallocatedDelta);
+
+        String summary = String.format("Health: %d -> %d (%+d) | Bad Blocks: %+d | Wear Delta: -%d%% | Temp: %+d°C",
+                pre.healthScore(), post.healthScore(), healthDelta, badBlocksDelta, wearLoss, tempDelta);
+
+        return new SmartDelta(pre, post, healthDelta, badBlocksDelta, reallocatedDelta, wearLoss, tempDelta, integrityMaintained, verdict, summary);
     }
 
     /**

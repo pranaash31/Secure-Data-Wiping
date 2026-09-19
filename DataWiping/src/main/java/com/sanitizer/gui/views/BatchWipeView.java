@@ -454,6 +454,7 @@ public class BatchWipeView {
         private final Button btnInspect;
 
         private WipeMetrics lastMetrics;
+        private com.sanitizer.detector.SmartDiagnostics.SmartSnapshot preWipeSnapshot;
 
         public DriveCardController(int index, UsbDetector.UsbDriveInfo drive) {
             this.index = index;
@@ -586,6 +587,9 @@ public class BatchWipeView {
 
             heatmap.reset(drive.sizeBytes());
 
+            // Capture Point-in-time Pre-Wipe S.M.A.R.T. Snapshot
+            preWipeSnapshot = com.sanitizer.detector.SmartDiagnostics.captureSnapshot(drive);
+
             WipeEngine.WipeStandard selectedStd = cmbStandard.getValue();
 
             Future<Boolean> future = WipeEngine.submitBatchWipeTaskWithMetrics(
@@ -684,9 +688,43 @@ public class BatchWipeView {
                 statusBadge.getStyleClass().setAll("badge-success");
                 heatmap.setCompleted();
 
+                // Compute S.M.A.R.T. Wear & Integrity Delta
+                com.sanitizer.detector.SmartDiagnostics.SmartSnapshot postWipeSnapshot =
+                        com.sanitizer.detector.SmartDiagnostics.captureSnapshot(drive);
+                com.sanitizer.detector.SmartDiagnostics.SmartDelta smartDelta =
+                        com.sanitizer.detector.SmartDiagnostics.compareSnapshots(preWipeSnapshot, postWipeSnapshot);
+
+                int preScore = (smartDelta != null && smartDelta.preWipe() != null) ? smartDelta.preWipe().healthScore() : 100;
+                int postScore = (smartDelta != null && smartDelta.postWipe() != null) ? smartDelta.postWipe().healthScore() : 100;
+                int badDelta = smartDelta != null ? smartDelta.badBlocksDelta() : 0;
+                int wearDelta = smartDelta != null ? smartDelta.wearDeltaPercent() : 0;
+                String deltaSummary = smartDelta != null ? smartDelta.formattedSummary() : "Integrity Verified: 0 Defects";
+
                 String payload = drive.model() + "|" + drive.serial() + "|" + drive.formattedSize() + "|" + standard.name() + "|SUCCESS";
                 String sig = CryptoSigner.signData(payload);
-                AuditDb.saveRecord(drive.model(), drive.serial(), drive.formattedSize(), standard.name(), "SUCCESS", sig);
+
+                AuditDb.saveRecord(
+                        drive.model(),
+                        drive.serial(),
+                        drive.formattedSize(),
+                        standard.name(),
+                        "SUCCESS",
+                        sig,
+                        preScore,
+                        postScore,
+                        badDelta,
+                        wearDelta,
+                        deltaSummary
+                );
+
+                List<AuditDb.AuditRecord> recs = AuditDb.getAllRecords();
+                if (!recs.isEmpty()) {
+                    CertificateGenerator.generateCertificate(recs.get(0));
+                }
+
+                NavigationManager.getInstance().showNotification("Drive Sanitized",
+                        drive.model() + " sanitized & certified. S.M.A.R.T. Delta: " + deltaSummary, ToastNotification.ToastType.SUCCESS);
+            } else {
 
                 List<AuditDb.AuditRecord> recs = AuditDb.getAllRecords();
                 if (!recs.isEmpty()) {

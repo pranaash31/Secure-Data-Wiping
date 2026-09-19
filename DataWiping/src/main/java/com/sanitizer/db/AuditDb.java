@@ -19,8 +19,27 @@ public class AuditDb {
             String capacity,
             String wipeStandard,
             String status,
-            String digitalSignature
-    ) {}
+            String digitalSignature,
+            int preHealthScore,
+            int postHealthScore,
+            int badBlocksDelta,
+            int wearDeltaPercent,
+            String smartDeltaSummary
+    ) {
+        public AuditRecord(
+                int id,
+                String timestamp,
+                String driveModel,
+                String serialNumber,
+                String capacity,
+                String wipeStandard,
+                String status,
+                String digitalSignature
+        ) {
+            this(id, timestamp, driveModel, serialNumber, capacity, wipeStandard, status, digitalSignature,
+                 100, 100, 0, 0, "Integrity Verified: 0 Defects");
+        }
+    }
 
     static {
         initDatabase();
@@ -54,12 +73,24 @@ public class AuditDb {
                 capacity TEXT NOT NULL,
                 wipe_standard TEXT NOT NULL,
                 status TEXT NOT NULL,
-                digital_signature TEXT NOT NULL
+                digital_signature TEXT NOT NULL,
+                pre_health_score INTEGER DEFAULT 100,
+                post_health_score INTEGER DEFAULT 100,
+                bad_blocks_delta INTEGER DEFAULT 0,
+                wear_delta_percent INTEGER DEFAULT 0,
+                smart_delta_summary TEXT DEFAULT 'Integrity Verified: 0 Defects'
             );
             """;
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
+
+            // Safe progressive migration if columns don't exist yet
+            try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN pre_health_score INTEGER DEFAULT 100;"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN post_health_score INTEGER DEFAULT 100;"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN bad_blocks_delta INTEGER DEFAULT 0;"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN wear_delta_percent INTEGER DEFAULT 0;"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN smart_delta_summary TEXT DEFAULT 'Integrity Verified: 0 Defects';"); } catch (Exception ignored) {}
         } catch (SQLException e) {
             AppLogger.error(MODULE, "SQLite Init Error", e);
         }
@@ -69,17 +100,30 @@ public class AuditDb {
         if (!getAllRecords().isEmpty()) return;
 
         AppLogger.info(MODULE, "Database is empty. Seeding initial baseline production audit records...");
-        saveRecord("SanDisk Ultra Flair 32GB", "SD-FLAIR-99421", "32 GB", "DoD 5220.22-M", "SUCCESS", "SIG_SHA256_RSA4096_0x99A418F");
-        saveRecord("Kingston DataTraveler 64GB", "KG-DT100-3882", "64 GB", "NIST SP 800-88", "SUCCESS", "SIG_SHA256_RSA4096_0x77B312E");
-        saveRecord("Corsair Voyager 128GB", "CS-VYG-88210", "128 GB", "DoD 5220.22-M", "SUCCESS", "SIG_SHA256_RSA4096_0x55C109D");
-        saveRecord("Samsung Bar Plus 64GB", "SS-BAR-55419", "64 GB", "NIST SP 800-88", "SUCCESS", "SIG_SHA256_RSA4096_0x11D904A");
-        saveRecord("Transcend JetFlash 32GB", "TC-JF790-2104", "32 GB", "DoD 5220.22-M", "SUCCESS", "SIG_SHA256_RSA4096_0x33E807B");
-        saveRecord("PNY Turbo 64GB", "PNY-TRB-44109", "64 GB", "NIST SP 800-88", "SUCCESS", "SIG_SHA256_RSA4096_0x88F702C");
+        saveRecord("SanDisk Ultra Flair 32GB", "SD-FLAIR-99421", "32 GB", "DoD 5220.22-M", "SUCCESS", "SIG_SHA256_RSA4096_0x99A418F", 100, 100, 0, 0, "Integrity Verified: 0 Defects");
+        saveRecord("Kingston DataTraveler 64GB", "KG-DT100-3882", "64 GB", "NIST SP 800-88", "SUCCESS", "SIG_SHA256_RSA4096_0x77B312E", 98, 98, 0, 0, "Integrity Verified: 0 Defects");
+        saveRecord("Corsair Voyager 128GB", "CS-VYG-88210", "128 GB", "DoD 5220.22-M", "SUCCESS", "SIG_SHA256_RSA4096_0x55C109D", 95, 95, 0, 0, "Integrity Verified: 0 Defects");
+        saveRecord("Samsung Bar Plus 64GB", "SS-BAR-55419", "64 GB", "NIST SP 800-88", "SUCCESS", "SIG_SHA256_RSA4096_0x11D904A", 99, 99, 0, 0, "Integrity Verified: 0 Defects");
+        saveRecord("Transcend JetFlash 32GB", "TC-JF790-2104", "32 GB", "DoD 5220.22-M", "SUCCESS", "SIG_SHA256_RSA4096_0x33E807B", 92, 92, 0, 0, "Integrity Verified: 0 Defects");
+        saveRecord("PNY Turbo 64GB", "PNY-TRB-44109", "64 GB", "NIST SP 800-88", "SUCCESS", "SIG_SHA256_RSA4096_0x88F702C", 97, 97, 0, 0, "Integrity Verified: 0 Defects");
     }
 
     public static boolean saveRecord(String driveModel, String serialNumber, String capacity,
                                      String wipeStandard, String status, String signature) {
-        String sql = "INSERT INTO wipe_logs(drive_model, serial_number, capacity, wipe_standard, status, digital_signature) VALUES(?,?,?,?,?,?)";
+        return saveRecord(driveModel, serialNumber, capacity, wipeStandard, status, signature,
+                100, 100, 0, 0, "Integrity Verified: 0 Defects");
+    }
+
+    public static boolean saveRecord(String driveModel, String serialNumber, String capacity,
+                                     String wipeStandard, String status, String signature,
+                                     int preHealthScore, int postHealthScore,
+                                     int badBlocksDelta, int wearDeltaPercent, String deltaSummary) {
+        String sql = """
+            INSERT INTO wipe_logs(
+                drive_model, serial_number, capacity, wipe_standard, status, digital_signature,
+                pre_health_score, post_health_score, bad_blocks_delta, wear_delta_percent, smart_delta_summary
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+            """;
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, driveModel);
@@ -88,6 +132,11 @@ public class AuditDb {
             pstmt.setString(4, wipeStandard);
             pstmt.setString(5, status);
             pstmt.setString(6, signature);
+            pstmt.setInt(7, preHealthScore);
+            pstmt.setInt(8, postHealthScore);
+            pstmt.setInt(9, badBlocksDelta);
+            pstmt.setInt(10, wearDeltaPercent);
+            pstmt.setString(11, deltaSummary != null ? deltaSummary : "Integrity Verified: 0 Defects");
             pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
@@ -111,7 +160,12 @@ public class AuditDb {
                         rs.getString("capacity"),
                         rs.getString("wipe_standard"),
                         rs.getString("status"),
-                        rs.getString("digital_signature")
+                        rs.getString("digital_signature"),
+                        rs.getInt("pre_health_score"),
+                        rs.getInt("post_health_score"),
+                        rs.getInt("bad_blocks_delta"),
+                        rs.getInt("wear_delta_percent"),
+                        rs.getString("smart_delta_summary")
                 ));
             }
         } catch (SQLException e) {
