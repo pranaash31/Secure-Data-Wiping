@@ -91,6 +91,7 @@ public class WipeEngine {
             String err = "CRITICAL SAFETY SHIELD: Primary system drive (" + systemPath + ") blocked from wiping!";
             AppLogger.shield(MODULE, err);
             if (logCallback != null) logCallback.accept(err);
+            com.sanitizer.alert.AlertDispatcher.notifyShieldViolation(systemPath, "Low-level block overwrite", "Primary system disk protected");
             return false;
         }
 
@@ -336,6 +337,7 @@ public class WipeEngine {
                     if (currentTemp >= autoPauseThreshold) {
                         log(logCallback, String.format("[THERMAL SAFEGUARD - %s] Drive temperature reached %d°C (>= %d°C threshold)! Auto-pausing sanitization to prevent NAND/media degradation...", deviceType.getDisplayName(), currentTemp, autoPauseThreshold));
                         com.sanitizer.util.SoundManager.playAlertSound();
+                        com.sanitizer.alert.AlertDispatcher.notifyThermalAutoPause(systemPath, null, currentTemp, autoPauseThreshold, deviceType.getDisplayName());
 
                         // Suspend dd process
                         pauseProcess(process);

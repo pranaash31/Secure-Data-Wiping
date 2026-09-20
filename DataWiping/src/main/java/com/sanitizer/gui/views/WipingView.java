@@ -572,6 +572,7 @@ public class WipingView {
                     if (!records.isEmpty()) {
                         AuditDb.AuditRecord latest = records.get(0);
                         String pdfPath = CertificateGenerator.generateCertificate(latest);
+                        com.sanitizer.alert.AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), stdString, true, pdfPath);
                         if (pdfPath != null) {
                             appendLog("[PDF] Exported PDF Certificate: " + pdfPath);
                             showAlert(Alert.AlertType.INFORMATION, "Sanitization Complete",
@@ -583,6 +584,8 @@ public class WipingView {
                                      "PDF Certificate Exported:\n" + pdfPath +
                                      "\n\nRSA Signature: " + signature.substring(0, 30) + "...");
                         }
+                    } else {
+                        com.sanitizer.alert.AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), stdString, true, null);
                     }
                 }
             } else {
@@ -613,6 +616,13 @@ public class WipingView {
                         postScore,
                         deltaSummary
                 );
+
+                com.sanitizer.alert.AlertDispatcher.notifyQuarantineDefect(
+                        target.model(), target.serial(), qRecord.quarantineId(),
+                        "Unrecoverable Hardware I/O Fault (" + detectedBadSectors.size() + " bad LBAs)",
+                        qRecord.destructionRecommendation().getTitle()
+                );
+                com.sanitizer.alert.AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), selectedPolicy.getName(), false, null);
 
                 // Save Quarantined Record to SQLite
                 AuditDb.saveRecord(

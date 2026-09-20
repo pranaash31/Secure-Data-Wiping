@@ -739,10 +739,14 @@ public class BatchWipeView {
                         preWipeIfaceSummary
                 );
 
+                String pdfPath = null;
                 List<AuditDb.AuditRecord> recs = AuditDb.getAllRecords();
                 if (!recs.isEmpty()) {
-                    CertificateGenerator.generateCertificate(recs.get(0));
+                    pdfPath = CertificateGenerator.generateCertificate(recs.get(0));
                 }
+
+                com.sanitizer.alert.AlertDispatcher.notifySingleWipeCompleted(
+                        drive.model(), drive.serial(), policy.getName(), true, pdfPath);
 
                 NavigationManager.getInstance().showNotification("Drive Sanitized",
                         drive.model() + " sanitized & certified. S.M.A.R.T. Delta: " + deltaSummary, ToastNotification.ToastType.SUCCESS);
@@ -753,6 +757,9 @@ public class BatchWipeView {
                 passBadge.setText("Wipe Failed");
                 passBadge.setStyle("-fx-font-size: 11px; -fx-background-color: #FEE2E2; -fx-text-fill: #991B1B; -fx-padding: 4 10; -fx-background-radius: 6px; -fx-font-weight: bold;");
                 heatmap.setAborted();
+
+                com.sanitizer.alert.AlertDispatcher.notifySingleWipeCompleted(
+                        drive.model(), drive.serial(), policy.getName(), false, null);
 
                 NavigationManager.getInstance().showNotification("Wipe Failed",
                         drive.model() + " sanitization failed.", ToastNotification.ToastType.ERROR);
@@ -770,6 +777,14 @@ public class BatchWipeView {
             updateAmbientDashboard();
             if (activeTasks.isEmpty()) {
                 btnRunAll.setDisable(false);
+                // Dispatch batch complete summary alert
+                int totalDrives = driveControllers.size();
+                long totalBytes = 0;
+                for (DriveCardController c : driveControllers.values()) {
+                    totalBytes += c.drive.sizeBytes();
+                }
+                String volStr = String.format(java.util.Locale.US, "%.1f GB", totalBytes / (1024.0 * 1024.0 * 1024.0));
+                com.sanitizer.alert.AlertDispatcher.notifyBatchWipeCompleted(totalDrives, totalDrives, 0, volStr, 60);
             }
         }
 
