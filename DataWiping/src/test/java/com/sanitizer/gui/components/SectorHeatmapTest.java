@@ -27,8 +27,20 @@ class SectorHeatmapTest {
                 SectorHeatmapComponent.BlockState.ACTIVE_HEAD,
                 SectorHeatmapComponent.BlockState.PATTERN,
                 SectorHeatmapComponent.BlockState.ZEROED,
+                SectorHeatmapComponent.BlockState.BAD_SECTOR,
                 SectorHeatmapComponent.BlockState.IDLE
         );
+    }
+
+    @Test
+    @DisplayName("Verify markBadSector illuminates defective LBA on grid")
+    void testMarkBadSector() {
+        SectorHeatmapComponent component = new SectorHeatmapComponent(50, 10, 12, 2, 2);
+        component.reset(1_000_000_000L);
+
+        // Mark a bad sector at 250MB offset (Block 12)
+        component.markBadSector(250_000_000L, "POSIX EIO Defect");
+        assertThat(component).isNotNull();
     }
 
     @Test

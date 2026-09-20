@@ -67,6 +67,21 @@ public class WipeEngine {
             Consumer<WipeMetrics> metricsCallback,
             Consumer<String> logCallback
     ) {
+        return executeWipeWithPolicy(systemPath, totalBytes, policy, isTestMode, metricsCallback, logCallback, null);
+    }
+
+    /**
+     * Executes custom multi-pass sanitization configured by a WipePolicy with granular bad sector fault tracking.
+     */
+    public static boolean executeWipeWithPolicy(
+            String systemPath,
+            long totalBytes,
+            WipePolicy policy,
+            boolean isTestMode,
+            Consumer<WipeMetrics> metricsCallback,
+            Consumer<String> logCallback,
+            Consumer<com.sanitizer.quarantine.LbaFailureRecord> badSectorCallback
+    ) {
         if (policy == null) {
             policy = WipePolicyManager.getInstance().getDefaultPolicy();
         }
@@ -120,6 +135,7 @@ public class WipeEngine {
                     pass.getDisplayName(),
                     metricsCallback,
                     logCallback,
+                    badSectorCallback,
                     startPct,
                     endPct
             );
@@ -254,6 +270,7 @@ public class WipeEngine {
     private static boolean runDdCommand(String systemPath, String sourcePath, long targetBytes, boolean isTestMode,
                                         int currentPass, int totalPasses, String passName,
                                         Consumer<WipeMetrics> metricsCallback, Consumer<String> logCallback,
+                                        Consumer<com.sanitizer.quarantine.LbaFailureRecord> badSectorCallback,
                                         double startPct, double endPct) {
         List<String> command = new ArrayList<>();
         command.add("dd");
@@ -269,6 +286,7 @@ public class WipeEngine {
 
         long startNanoTime = System.nanoTime();
         long totalWipeTargetBytes = targetBytes * totalPasses;
+        long lastBytesWritten = 0;
 
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
@@ -286,6 +304,24 @@ public class WipeEngine {
                     }
 
                     if (logCallback != null) logCallback.accept(line);
+
+                    // Check for Hardware I/O Fault / Bad Sector errors from dd stream
+                    String lowerLine = line.toLowerCase();
+                    if (lowerLine.contains("input/output error") || lowerLine.contains("error writing")
+                            || lowerLine.contains("bad sector") || lowerLine.contains("write error")
+                            || lowerLine.contains("device not configured")) {
+                        long failingOffset = lastBytesWritten;
+                        long failingLba = failingOffset / 512;
+                        com.sanitizer.quarantine.LbaFailureRecord failureRecord =
+                                com.sanitizer.quarantine.LbaFailureRecord.ofByteOffset(
+                                        failingOffset, 4096, currentPass, "POSIX_EIO", line
+                                );
+                        if (badSectorCallback != null) {
+                            badSectorCallback.accept(failureRecord);
+                        }
+                        log(logCallback, String.format("⚠️ [HARDWARE I/O DEFECT] Block fault @ offset %,d (LBA ~0x%08X): %s",
+                                failingOffset, failingLba, line));
+                    }
 
                     // Device-Aware Thermal Safeguard Check
                     com.sanitizer.detector.DeviceType deviceType = com.sanitizer.detector.DeviceType.fromDrive(null, systemPath, targetBytes);
@@ -306,7 +342,7 @@ public class WipeEngine {
 
                         if (metricsCallback != null) {
                             WipeMetrics pauseMetrics = new WipeMetrics(
-                                    systemPath,
+                                     systemPath,
                                     startPct,
                                     currentPass,
                                     totalPasses,
@@ -363,6 +399,7 @@ public class WipeEngine {
                         try {
                             String[] parts = line.trim().split("\\s+");
                             long bytesWrittenInPass = Long.parseLong(parts[0]);
+                            lastBytesWritten = bytesWrittenInPass;
                             double passPercent = Math.min(1.0, ((double) bytesWrittenInPass / targetBytes));
                             double overallPercent = startPct + (passPercent * (endPct - startPct));
                             if (overallPercent > endPct) overallPercent = endPct;

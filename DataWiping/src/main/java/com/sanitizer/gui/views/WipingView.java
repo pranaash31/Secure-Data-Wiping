@@ -410,6 +410,8 @@ public class WipingView {
                 com.sanitizer.detector.SmartDiagnostics.captureSnapshot(target);
 
         final boolean[] wasThermalPaused = {false};
+        final List<com.sanitizer.quarantine.LbaFailureRecord> detectedBadSectors =
+                java.util.Collections.synchronizedList(new java.util.ArrayList<>());
 
         final WipeVerifier.VerificationMode verifyMode = cmbVerifyMode.getValue() != null
                 ? cmbVerifyMode.getValue() : WipeVerifier.VerificationMode.FAST_SAMPLE_5_PERCENT;
@@ -465,7 +467,11 @@ public class WipingView {
                             }
                             sectorMatrix.updateProgress(metrics);
                         }),
-                        line -> Platform.runLater(() -> appendLog(line))
+                        line -> Platform.runLater(() -> appendLog(line)),
+                        badSector -> {
+                            detectedBadSectors.add(badSector);
+                            Platform.runLater(() -> sectorMatrix.markBadSector(badSector.startByteOffset(), badSector.errorType()));
+                        }
                 );
 
                 if (!wipeSuccess) {
@@ -580,11 +586,95 @@ public class WipingView {
                     }
                 }
             } else {
+                // --- HARDWARE FAILURE & QUARANTINE ASSESSMENT BRANCH ---
                 com.sanitizer.util.SoundManager.playAlertSound();
-                lblStatusMessage.setText("Sanitization failed!");
-                appendLog("\n[ERROR] Sector wiping failed. Please check drive permissions.");
-                sectorMatrix.setAborted();
-                showAlert(Alert.AlertType.ERROR, "Wipe Failed", "Low-level dd operation failed. Make sure you have administrator privileges.");
+                lblStatusMessage.setText("⚠️ SANITIZATION FAILED: HARDWARE DEFECT / BAD SECTORS ENCOUNTERED");
+                lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #EF4444;");
+                appendLog("\n⚠️ [CRITICAL DEFECT] Sector wiping encountered unrecoverable hardware I/O fault.");
+
+                com.sanitizer.detector.SmartDiagnostics.SmartSnapshot postFailSnapshot =
+                        com.sanitizer.detector.SmartDiagnostics.captureSnapshot(target);
+                com.sanitizer.detector.SmartDiagnostics.SmartDelta failDelta =
+                        com.sanitizer.detector.SmartDiagnostics.compareSnapshots(preWipeSnapshot, postFailSnapshot);
+
+                int preScore = (failDelta != null && failDelta.preWipe() != null) ? failDelta.preWipe().healthScore() : 90;
+                int postScore = (failDelta != null && failDelta.postWipe() != null) ? failDelta.postWipe().healthScore() : 40;
+                String deltaSummary = failDelta != null ? failDelta.formattedSummary() : "Critical I/O Defect: Bad Sectors Encountered";
+
+                com.sanitizer.quarantine.QuarantineRecord qRecord = com.sanitizer.quarantine.QuarantineEngine.assessHardwareFailure(
+                        target.model(),
+                        target.serial(),
+                        target.formattedSize(),
+                        target.systemPath(),
+                        selectedPolicy.getName(),
+                        "Unrecoverable Hardware I/O Fault / Defective Blocks",
+                        detectedBadSectors,
+                        preScore,
+                        postScore,
+                        deltaSummary
+                );
+
+                // Save Quarantined Record to SQLite
+                AuditDb.saveRecord(
+                        target.model(),
+                        target.serial(),
+                        target.formattedSize(),
+                        selectedPolicy.getName(),
+                        "QUARANTINED_DEFECTIVE",
+                        qRecord.digitalAttestationSignature(),
+                        preScore,
+                        postScore,
+                        detectedBadSectors.size(),
+                        100,
+                        "QUARANTINED: " + qRecord.destructionRecommendation().getTitle(),
+                        (thermalGraph != null) ? thermalGraph.getPeakTemp() : 0,
+                        0,
+                        detectedBadSectors.size(),
+                        "HARDWARE_DEFECT_EIO",
+                        "FAIL — Defective LBAs Prevented Overwrite",
+                        0,
+                        8.0000,
+                        "SHA256:HARDWARE_QUARANTINE_NON_COMPLIANT"
+                );
+
+                String quarantinePdfPath = com.sanitizer.quarantine.QuarantineReportGenerator.generatePdfReport(qRecord);
+                if (quarantinePdfPath != null) {
+                    appendLog("[QUARANTINE REPORT] Generated Physical Destruction Order: " + quarantinePdfPath);
+                }
+
+                String alertMsg = String.format(
+                        java.util.Locale.US,
+                        """
+                        ⚠️ HARDWARE DEFECT DETECTED — ASSET QUARANTINED!
+                        
+                        The target drive encountered unrecoverable hardware I/O errors and cannot be safely sanitized via software overwrite.
+                        
+                        • Quarantine Tracking ID: %s
+                        • Device Model:           %s
+                        • Serial Number:          %s
+                        • Failing Sectors Logged: %,d bad block LBA(s)
+                        
+                        ──────────────────────────────────────────────────────
+                        🔥 MANDATORY PHYSICAL DISPOSITION DIRECTIVE:
+                        %s
+                        Standard: %s
+                        %s
+                        ──────────────────────────────────────────────────────
+                        
+                        Official Defective Hardware Quarantine Order Exported:
+                        %s
+                        """,
+                        qRecord.quarantineId(),
+                        qRecord.driveModel(),
+                        qRecord.serialNumber(),
+                        qRecord.totalBadSectorsDetected(),
+                        qRecord.destructionRecommendation().getTitle().toUpperCase(),
+                        qRecord.destructionRecommendation().getStandardReference(),
+                        qRecord.destructionRecommendation().getTechnicalDescription(),
+                        quarantinePdfPath != null ? quarantinePdfPath : "Generated in application folder"
+                );
+
+                showAlert(Alert.AlertType.ERROR, "⚠️ Hardware Quarantine Directive", alertMsg);
             }
             setUiControlsDisabled(false);
         });

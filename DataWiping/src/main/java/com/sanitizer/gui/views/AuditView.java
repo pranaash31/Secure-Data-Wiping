@@ -117,11 +117,16 @@ public class AuditView {
         btnExportPdf.setTooltip(new Tooltip("Generate PDF certificate for selected record (also: double-click row)"));
         btnExportPdf.setOnAction(e -> handleExportPdf());
 
+        Button btnQuarantine = new Button("⚠️ Quarantine Report");
+        btnQuarantine.setStyle("-fx-background-color: #DC2626; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        btnQuarantine.setTooltip(new Tooltip("Generate Defective Hardware Quarantine & Physical Destruction Order PDF"));
+        btnQuarantine.setOnAction(e -> handleExportQuarantineReport());
+
         Button btnVerify = new Button("Verify Signature");
         btnVerify.setTooltip(new Tooltip("Verify SHA256withRSA signature for selected record"));
         btnVerify.setOnAction(e -> handleVerifySignature());
 
-        toolbar.getChildren().addAll(txtSearch, new Region(), btnRefresh, btnCompliance, mbExport, btnExportPdf, btnVerify);
+        toolbar.getChildren().addAll(txtSearch, new Region(), btnRefresh, btnCompliance, mbExport, btnExportPdf, btnQuarantine, btnVerify);
         HBox.setHgrow(toolbar.getChildren().get(1), Priority.ALWAYS);
 
         // F5 shortcut = refresh audit log
@@ -476,6 +481,49 @@ public class AuditView {
             com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Export Error",
                     pdfTask.getException().getMessage(), com.sanitizer.gui.components.ToastNotification.ToastType.ERROR));
         new Thread(pdfTask, "audit-pdf-export-thread").start();
+    }
+
+    private void handleExportQuarantineReport() {
+        AuditDb.AuditRecord selected = tblAuditHistory.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("No Selection",
+                    "Select an audit record to generate Quarantine Report.", com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
+            return;
+        }
+
+        Task<String> qTask = new Task<>() {
+            @Override
+            protected String call() {
+                com.sanitizer.quarantine.QuarantineRecord qRecord = com.sanitizer.quarantine.QuarantineEngine.assessHardwareFailure(
+                        selected.driveModel(),
+                        selected.serialNumber(),
+                        selected.capacity(),
+                        null,
+                        selected.wipeStandard(),
+                        "Defective Blocks / Non-Compliant Sanitization Attempt",
+                        List.of(),
+                        selected.preHealthScore(),
+                        selected.postHealthScore(),
+                        selected.smartDeltaSummary()
+                );
+                return com.sanitizer.quarantine.QuarantineReportGenerator.generatePdfReport(qRecord);
+            }
+        };
+
+        qTask.setOnSucceeded(ev -> {
+            String qPath = qTask.getValue();
+            if (qPath != null) {
+                com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Quarantine Report Exported",
+                        "Order generated at: " + qPath, com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
+                showAlert(Alert.AlertType.INFORMATION, "Defective Hardware Quarantine Order",
+                        "Physical Destruction Order generated successfully:\n\n" + qPath);
+            }
+        });
+
+        qTask.setOnFailed(ev ->
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Report Error",
+                    qTask.getException().getMessage(), com.sanitizer.gui.components.ToastNotification.ToastType.ERROR));
+        new Thread(qTask, "quarantine-pdf-thread").start();
     }
 
     private void handleVerifySignature() {

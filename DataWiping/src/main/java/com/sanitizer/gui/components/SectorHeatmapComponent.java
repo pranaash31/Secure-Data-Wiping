@@ -27,6 +27,7 @@ public class SectorHeatmapComponent extends VBox {
         ACTIVE_HEAD, // 🟡 Live write head actively overwriting
         PATTERN,     // 🔵 Cryptographic random pattern (DoD Pass 2)
         ZEROED,      // 🟢 Verified zeroed / sanitized (0x00)
+        BAD_SECTOR,  // ⚠️ Defective Bad Sector (Hardware I/O Fault)
         IDLE         // ⚪ Idle / Ready
     }
 
@@ -161,6 +162,29 @@ public class SectorHeatmapComponent extends VBox {
         lblHeaderInfo.setText("SECTOR LBA MATRIX: OPERATION HALTED (GRANULAR ABORT)");
     }
 
+    /**
+     * Marks a specific byte offset or LBA range as a defective bad sector on the grid.
+     */
+    public void markBadSector(long byteOffset, String errorReason) {
+        long bytesPerBlock = Math.max(1, totalDriveBytes / totalBlocks);
+        int blockIndex = (int) Math.min(totalBlocks - 1, Math.max(0, byteOffset / bytesPerBlock));
+
+        setBlockState(blockIndex, BlockState.BAD_SECTOR);
+        long startLba = (long) blockIndex * (bytesPerBlock / 512);
+        long endLba = startLba + (bytesPerBlock / 512) - 1;
+
+        Tooltip tooltip = blockTooltips.get(blockIndex);
+        tooltip.setText(String.format(
+                "⚠️ DEFECTIVE BAD LBA DETECTED!\nLBA Range: 0x%08X - 0x%08X\nByte Offset: %s\nFault Error: %s\nAction: QUARANTINE / PHYSICAL DESTRUCTION REQUIRED",
+                startLba, endLba, formatSize(byteOffset), errorReason != null ? errorReason : "I/O Hardware Error"
+        ));
+
+        lblHeaderInfo.setText(String.format(
+                "⚠️ HARDWARE DEFECT DETECTED: Bad LBA @ ~0x%08X | Offset: %s (%s)",
+                startLba, formatSize(byteOffset), errorReason != null ? errorReason : "POSIX EIO Fault"
+        ));
+    }
+
     private void setBlockState(int index, BlockState state) {
         blockStates.set(index, state);
         Rectangle rect = blockNodes.get(index);
@@ -176,6 +200,8 @@ public class SectorHeatmapComponent extends VBox {
                     "-fx-effect: dropshadow(three-pass-box, rgba(245, 158, 11, 0.7), 5, 0, 0, 0);");
             case PATTERN -> rect.setStyle("-fx-fill: #0284C7; -fx-stroke: #38BDF8; -fx-stroke-width: 0.8;");
             case ZEROED -> rect.setStyle("-fx-fill: #10B981; -fx-stroke: #059669; -fx-stroke-width: 0.8;");
+            case BAD_SECTOR -> rect.setStyle("-fx-fill: #9333EA; -fx-stroke: #EF4444; -fx-stroke-width: 1.6; " +
+                    "-fx-effect: dropshadow(three-pass-box, rgba(147, 51, 234, 0.85), 6, 0, 0, 0);");
             case IDLE -> rect.setStyle("-fx-fill: #CBD5E1; -fx-stroke: #94A3B8; -fx-stroke-width: 0.8;");
         }
     }
@@ -192,6 +218,7 @@ public class SectorHeatmapComponent extends VBox {
             case ACTIVE_HEAD -> "🟡 ACTIVE WRITE HEAD (OVERWRITING)";
             case PATTERN -> "🔵 PATTERN OVERWRITE (0xFF / PSEUDO-RANDOM)";
             case ZEROED -> "🟢 VERIFIED ZEROED (0x00 FILL COMPLIANT)";
+            case BAD_SECTOR -> "⚠️ DEFECTIVE BAD LBA (UNRECOVERABLE HARDWARE FAULT)";
             case IDLE -> "⚪ IDLE / READY";
         };
 
@@ -208,7 +235,8 @@ public class SectorHeatmapComponent extends VBox {
                 createLegendItem("#EF4444", "Raw Data"),
                 createLegendItem("#F59E0B", "Write Head"),
                 createLegendItem("#0284C7", "Pattern Pass"),
-                createLegendItem("#10B981", "Zeroed 0x00")
+                createLegendItem("#10B981", "Zeroed 0x00"),
+                createLegendItem("#9333EA", "⚠️ Bad LBA (Defective)")
         );
         return bar;
     }
