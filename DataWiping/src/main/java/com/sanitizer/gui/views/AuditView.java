@@ -4,6 +4,7 @@ import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.pdf.CertificateGenerator;
+import com.sanitizer.report.AuditExporter;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -16,7 +17,11 @@ import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
+import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 
+import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 public class AuditView {
@@ -71,28 +76,52 @@ public class AuditView {
         cardTable.getStyleClass().add("card");
         VBox.setVgrow(cardTable, Priority.ALWAYS);
 
-        HBox toolbar = new HBox(12);
+        HBox toolbar = new HBox(10);
         toolbar.setAlignment(Pos.CENTER_LEFT);
 
         TextField txtSearch = new TextField();
         txtSearch.setPromptText("Search by model, serial, standard...");
-        txtSearch.setPrefWidth(260);
+        txtSearch.setPrefWidth(220);
         txtSearch.textProperty().addListener((obs, oldVal, newVal) -> filterLog(newVal));
 
-        Button btnRefresh = new Button("Refresh Log (F5)");
+        Button btnRefresh = new Button("Refresh (F5)");
         btnRefresh.setTooltip(new Tooltip("Reload audit log from SQLite (F5)"));
         btnRefresh.setOnAction(e -> loadAuditHistory());
+
+        Button btnCompliance = new Button("📊 Compliance KPIs");
+        btnCompliance.setStyle("-fx-background-color: #3B82F6; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        btnCompliance.setTooltip(new Tooltip("View Consolidated Corporate Compliance & Executive KPIs"));
+        btnCompliance.setOnAction(e -> handleShowComplianceSummary());
+
+        // Multi-Format Batch Export MenuButton
+        MenuButton mbExport = new MenuButton("📤 Batch Export");
+        mbExport.setStyle("-fx-background-color: #10B981; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        mbExport.setTooltip(new Tooltip("Export sanitized records into standard enterprise audit formats"));
+
+        MenuItem itemCsv = new MenuItem("📄 Export CSV (.csv)");
+        itemCsv.setOnAction(e -> handleBatchExport("CSV"));
+
+        MenuItem itemJson = new MenuItem("📋 Export JSON (.json)");
+        itemJson.setOnAction(e -> handleBatchExport("JSON"));
+
+        MenuItem itemExcel = new MenuItem("📊 Export Excel Spreadsheet (.xml)");
+        itemExcel.setOnAction(e -> handleBatchExport("EXCEL"));
+
+        MenuItem itemAll = new MenuItem("📦 Export Full Package (CSV + JSON + Excel)");
+        itemAll.setOnAction(e -> handleExportFullPackage());
+
+        mbExport.getItems().addAll(itemCsv, itemJson, itemExcel, new SeparatorMenuItem(), itemAll);
 
         Button btnExportPdf = new Button("Export PDF Certificate");
         btnExportPdf.getStyleClass().add("button-primary");
         btnExportPdf.setTooltip(new Tooltip("Generate PDF certificate for selected record (also: double-click row)"));
         btnExportPdf.setOnAction(e -> handleExportPdf());
 
-        Button btnVerify = new Button("Verify RSA Signature");
+        Button btnVerify = new Button("Verify Signature");
         btnVerify.setTooltip(new Tooltip("Verify SHA256withRSA signature for selected record"));
         btnVerify.setOnAction(e -> handleVerifySignature());
 
-        toolbar.getChildren().addAll(txtSearch, new Region(), btnRefresh, btnExportPdf, btnVerify);
+        toolbar.getChildren().addAll(txtSearch, new Region(), btnRefresh, btnCompliance, mbExport, btnExportPdf, btnVerify);
         HBox.setHgrow(toolbar.getChildren().get(1), Priority.ALWAYS);
 
         // F5 shortcut = refresh audit log
@@ -225,6 +254,181 @@ public class AuditView {
         );
 
         showAlert(Alert.AlertType.INFORMATION, "🌱 ESG Corporate Sustainability Audit Report", report);
+    }
+
+    private void handleShowComplianceSummary() {
+        List<AuditDb.AuditRecord> records = new ArrayList<>(filteredData);
+        if (records.isEmpty()) {
+            records = AuditDb.getAllRecords();
+        }
+
+        AuditExporter.ComplianceSummary s = AuditExporter.generateComplianceSummary(records);
+
+        String summaryText = String.format(
+                java.util.Locale.US,
+                """
+                ══════════════════════════════════════════════════════════════
+                📊 CONSOLIDATED ENTERPRISE SANITIZATION COMPLIANCE KPIS
+                Standard: NIST SP 800-88 R1 / ISO 27040 / EU GDPR Art. 17
+                ══════════════════════════════════════════════════════════════
+                • Total Storage Assets Processed: %d devices
+                • Successful Sanitizations:       %d devices (%.2f%%)
+                • Failed Sanitization Attempts:   %d devices
+                • Total Data Volume Sanitized:    %s (%d bytes)
+                • Average Residual Shannon Score: %.4f bits/byte (Target: 0.000)
+                • Earliest Logged Audit Entry:    %s
+                • Latest Logged Audit Entry:      %s
+                ──────────────────────────────────────────────────────────────
+                🌱 Corporate ESG & Scope 3 Sustainability Impact:
+                • E-Waste Diverted from Landfills: %.1f kg
+                • Scope 3 CO₂ Emissions Mitigated: %.1f kg CO₂e
+                • 10-Year Tree Seedlings Saved:    %.2f trees
+                • Manufacturing Power Conserved:   %.1f kWh
+                • Circular Disposition Index:      100%% Zero-Landfill E-Waste
+                ══════════════════════════════════════════════════════════════
+                """,
+                s.totalDrivesProcessed(),
+                s.successCount(),
+                s.passRatePercent(),
+                s.failureCount(),
+                s.formattedTotalCapacity(),
+                s.totalCapacityBytes(),
+                s.averageResidualEntropy(),
+                s.earliestRecordTimestamp(),
+                s.latestRecordTimestamp(),
+                s.esgImpact().eWasteDivertedKg(),
+                s.esgImpact().co2EmissionsSavedKg(),
+                s.esgImpact().treesEquivalent(),
+                s.esgImpact().energySavedKwh()
+        );
+
+        showAlert(Alert.AlertType.INFORMATION, "📊 Executive Compliance & Sanitization KPIs", summaryText);
+    }
+
+    private void handleBatchExport(String format) {
+        List<AuditDb.AuditRecord> records = new ArrayList<>(filteredData);
+        if (records.isEmpty()) {
+            records = AuditDb.getAllRecords();
+        }
+        if (records.isEmpty()) {
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
+                    "No Records", "No audit records found to export.", com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
+            return;
+        }
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save Sanitization Audit Report (" + format + ")");
+        String timestamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+                .withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.now());
+
+        switch (format.toUpperCase()) {
+            case "CSV" -> {
+                fileChooser.setInitialFileName("Sanitization_Audit_Report_" + timestamp + ".csv");
+                fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Comma Delimited (*.csv)", "*.csv"));
+            }
+            case "JSON" -> {
+                fileChooser.setInitialFileName("Sanitization_Audit_Report_" + timestamp + ".json");
+                fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Data (*.json)", "*.json"));
+            }
+            case "EXCEL" -> {
+                fileChooser.setInitialFileName("Sanitization_Audit_Report_" + timestamp + ".xml");
+                fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Excel Spreadsheet XML (*.xml, *.xls)", "*.xml", "*.xls"));
+            }
+        }
+
+        File targetFile = fileChooser.showSaveDialog(rootContainer.getScene() != null ? rootContainer.getScene().getWindow() : null);
+        if (targetFile == null) return;
+
+        final List<AuditDb.AuditRecord> exportList = records;
+        Task<Void> exportTask = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                switch (format.toUpperCase()) {
+                    case "CSV" -> AuditExporter.exportToCsv(exportList, targetFile);
+                    case "JSON" -> AuditExporter.exportToJson(exportList, targetFile);
+                    case "EXCEL" -> AuditExporter.exportToExcelXml(exportList, targetFile);
+                }
+                return null;
+            }
+        };
+
+        exportTask.setOnSucceeded(ev -> {
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
+                    format + " Export Successful",
+                    "Exported " + exportList.size() + " records to: " + targetFile.getName(),
+                    com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS
+            );
+            showAlert(Alert.AlertType.INFORMATION, format + " Audit Export Complete",
+                    "Audit log successfully exported (" + exportList.size() + " records):\n\n" + targetFile.getAbsolutePath());
+        });
+
+        exportTask.setOnFailed(ev -> {
+            Throwable ex = exportTask.getException();
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
+                    "Export Failed", ex != null ? ex.getMessage() : "Unknown export error",
+                    com.sanitizer.gui.components.ToastNotification.ToastType.ERROR
+            );
+        });
+
+        new Thread(exportTask, "audit-export-thread").start();
+    }
+
+    private void handleExportFullPackage() {
+        List<AuditDb.AuditRecord> records = new ArrayList<>(filteredData);
+        if (records.isEmpty()) {
+            records = AuditDb.getAllRecords();
+        }
+        if (records.isEmpty()) {
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
+                    "No Records", "No audit records found to export.", com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
+            return;
+        }
+
+        DirectoryChooser dirChooser = new DirectoryChooser();
+        dirChooser.setTitle("Select Target Folder for Full Audit Package");
+        File targetDir = dirChooser.showDialog(rootContainer.getScene() != null ? rootContainer.getScene().getWindow() : null);
+        if (targetDir == null) return;
+
+        final List<AuditDb.AuditRecord> exportList = records;
+        String timestamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+                .withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.now());
+
+        File csvFile = new File(targetDir, "Sanitization_Audit_" + timestamp + ".csv");
+        File jsonFile = new File(targetDir, "Sanitization_Audit_" + timestamp + ".json");
+        File excelFile = new File(targetDir, "Sanitization_Audit_" + timestamp + ".xml");
+
+        Task<Void> packageTask = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                AuditExporter.exportToCsv(exportList, csvFile);
+                AuditExporter.exportToJson(exportList, jsonFile);
+                AuditExporter.exportToExcelXml(exportList, excelFile);
+                return null;
+            }
+        };
+
+        packageTask.setOnSucceeded(ev -> {
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
+                    "Audit Package Exported",
+                    "Generated CSV, JSON, and Excel reports in " + targetDir.getName(),
+                    com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS
+            );
+            showAlert(Alert.AlertType.INFORMATION, "Audit Package Export Complete",
+                    "Full Compliance Audit Package exported successfully:\n\n"
+                    + "• CSV:   " + csvFile.getAbsolutePath() + "\n"
+                    + "• JSON:  " + jsonFile.getAbsolutePath() + "\n"
+                    + "• Excel: " + excelFile.getAbsolutePath());
+        });
+
+        packageTask.setOnFailed(ev -> {
+            Throwable ex = packageTask.getException();
+            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
+                    "Package Export Failed", ex != null ? ex.getMessage() : "Unknown error",
+                    com.sanitizer.gui.components.ToastNotification.ToastType.ERROR
+            );
+        });
+
+        new Thread(packageTask, "audit-package-thread").start();
     }
 
     private void filterLog(String query) {
