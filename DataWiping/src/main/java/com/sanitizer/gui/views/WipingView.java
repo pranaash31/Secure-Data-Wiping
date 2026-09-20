@@ -10,6 +10,8 @@ import com.sanitizer.engine.WipeVerifier;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ThermalGraphComponent;
 import com.sanitizer.pdf.CertificateGenerator;
+import com.sanitizer.policy.WipePolicy;
+import com.sanitizer.policy.WipePolicyManager;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
@@ -33,8 +35,8 @@ public class WipingView {
     private Label lblDriveBadge;
     private Label lblSelectedDriveInfo;
 
-    private RadioButton rdoDod;
-    private RadioButton rdoNist;
+    private ComboBox<WipePolicy> cmbPolicy;
+    private Label lblPolicyPatternSummary;
     private ComboBox<WipeVerifier.VerificationMode> cmbVerifyMode;
     private CheckBox chkTestMode;
 
@@ -142,15 +144,27 @@ public class WipingView {
         Label lblConfigTitle = new Label("Sanitization Standard & Verification Controls");
         lblConfigTitle.getStyleClass().add("card-title");
 
-        ToggleGroup group = new ToggleGroup();
-        rdoDod = new RadioButton("DoD 5220.22-M (3-Pass Military Wipe)");
-        rdoDod.setToggleGroup(group);
-        rdoDod.setSelected(true);
+        Label lblStandard = new Label("Wiping Standard / Custom Policy:");
+        lblStandard.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #475569;");
 
-        rdoNist = new RadioButton("NIST SP 800-88 Clear (Single Pass 0x00)");
-        rdoNist.setToggleGroup(group);
+        cmbPolicy = new ComboBox<>();
+        cmbPolicy.setItems(FXCollections.observableArrayList(WipePolicyManager.getInstance().getAllPolicies()));
+        cmbPolicy.setValue(WipePolicyManager.getInstance().getDefaultPolicy());
+        cmbPolicy.setMaxWidth(Double.MAX_VALUE);
+        cmbPolicy.setStyle("-fx-font-size: 11px;");
 
-        VBox radioBox = new VBox(8, rdoDod, rdoNist);
+        lblPolicyPatternSummary = new Label(cmbPolicy.getValue() != null ? cmbPolicy.getValue().getPatternSummary() : "0x00");
+        lblPolicyPatternSummary.setStyle("-fx-font-family: monospace; -fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #EFF6FF; -fx-text-fill: #2563EB; -fx-padding: 3 8; -fx-background-radius: 4px;");
+
+        cmbPolicy.setOnAction(e -> {
+            WipePolicy p = cmbPolicy.getValue();
+            if (p != null) {
+                lblPolicyPatternSummary.setText(p.getPatternSummary());
+                if (p.getVerificationMode() != null) {
+                    cmbVerifyMode.setValue(p.getVerificationMode());
+                }
+            }
+        });
 
         // Verification sampling configuration
         Label lblVerify = new Label("Post-Wipe Sampling & Verification Engine:");
@@ -174,7 +188,7 @@ public class WipingView {
         HBox healthSummaryRow = new HBox(10, lblPreWipeHealthBadge, lblLiveTempBadge);
         healthSummaryRow.setAlignment(Pos.CENTER_LEFT);
 
-        cardConfig.getChildren().addAll(lblConfigTitle, radioBox, new Separator(), lblVerify, cmbVerifyMode, chkTestMode, healthSummaryRow);
+        cardConfig.getChildren().addAll(lblConfigTitle, lblStandard, cmbPolicy, lblPolicyPatternSummary, new Separator(), lblVerify, cmbVerifyMode, chkTestMode, healthSummaryRow);
 
         topRow.getChildren().addAll(cardDrive, cardConfig);
 
@@ -358,17 +372,19 @@ public class WipingView {
                     "CRC=" + iface.crcErrors() + ", Timeouts=" + iface.commandTimeouts() + ".");
         }
 
-        WipeEngine.WipeStandard standard = rdoDod.isSelected() ? WipeEngine.WipeStandard.DOD_5220_22_M : WipeEngine.WipeStandard.NIST_800_88_CLEAR;
+        WipePolicy selectedPolicy = cmbPolicy.getValue() != null
+                ? cmbPolicy.getValue() : WipePolicyManager.getInstance().getDefaultPolicy();
         boolean isTestMode = chkTestMode.isSelected();
 
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
         confirm.setTitle("CONFIRM DATA SANITIZATION");
         confirm.setHeaderText("PERMANENT MEDIA DATA DESTRUCTION WARNING");
         confirm.setContentText(String.format(
-                "Target Device: %s (%s)\nBlock Path: %s\nSanitization Standard: %s\nMode: %s\n\n" +
+                "Target Device: %s (%s)\nBlock Path: %s\nSanitization Standard: %s\nPattern: %s\nMode: %s\n\n" +
                 "Are you sure you want to execute sector sanitization? ALL DATA WILL BE PERMANENTLY DESTROYED!",
                 target.model(), target.formattedSize(), target.systemPath(),
-                standard == WipeEngine.WipeStandard.DOD_5220_22_M ? "DoD 5220.22-M (3-Pass)" : "NIST SP 800-88 (1-Pass)",
+                selectedPolicy.getName(),
+                selectedPolicy.getPatternSummary(),
                 isTestMode ? "Fast Test Mode (1 GB Cap)" : "FULL DRIVE SANITIZATION"
         ));
 
@@ -403,10 +419,10 @@ public class WipingView {
         Task<TaskOutcome> task = new Task<>() {
             @Override
             protected TaskOutcome call() {
-                boolean wipeSuccess = WipeEngine.executeWipeWithMetrics(
+                boolean wipeSuccess = WipeEngine.executeWipeWithPolicy(
                         target.systemPath(),
                         target.sizeBytes(),
-                        standard,
+                        selectedPolicy,
                         isTestMode,
                         metrics -> Platform.runLater(() -> {
                             double p = metrics.overallPercent() / 100.0;
@@ -497,7 +513,7 @@ public class WipingView {
                     appendLog("[S.M.A.R.T. DELTA] " + smartDelta.formattedSummary());
                 }
 
-                String stdString = standard == WipeEngine.WipeStandard.DOD_5220_22_M ? "DoD 5220.22-M" : "NIST SP 800-88";
+                String stdString = selectedPolicy.getName();
                 String auditPayload = target.model() + "|" + target.serial() + "|" + target.formattedSize() + "|" + stdString + "|SUCCESS";
                 String signature = CryptoSigner.signData(auditPayload);
 
@@ -554,6 +570,7 @@ public class WipingView {
                             appendLog("[PDF] Exported PDF Certificate: " + pdfPath);
                             showAlert(Alert.AlertType.INFORMATION, "Sanitization Complete",
                                      "Data Wiping Finished Successfully!\n\n" +
+                                     "Sanitization Standard: " + stdString + "\n" +
                                      "Zero-Residual Shannon Entropy: " + String.format(java.util.Locale.US, "%.4f bits/byte (0.000%%)", vEntropy) + "\n" +
                                      "Verified Sectors Sampled: " + String.format(java.util.Locale.US, "%,d LBAs", vSectors) + "\n\n" +
                                      "S.M.A.R.T. Wear & Integrity Delta: " + deltaSummary + "\n\n" +
@@ -592,8 +609,7 @@ public class WipingView {
         btnExecuteWipe.setDisable(disabled);
         btnRefreshDrives.setDisable(disabled);
         cmbDrives.setDisable(disabled);
-        rdoDod.setDisable(disabled);
-        rdoNist.setDisable(disabled);
+        cmbPolicy.setDisable(disabled);
         cmbVerifyMode.setDisable(disabled);
         chkTestMode.setDisable(disabled);
     }

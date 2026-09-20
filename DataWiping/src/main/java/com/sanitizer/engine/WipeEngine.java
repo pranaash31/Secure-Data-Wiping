@@ -1,5 +1,9 @@
 package com.sanitizer.engine;
 
+import com.sanitizer.policy.WipePass;
+import com.sanitizer.policy.WipePatternType;
+import com.sanitizer.policy.WipePolicy;
+import com.sanitizer.policy.WipePolicyManager;
 import com.sanitizer.util.AppLogger;
 
 import java.io.BufferedReader;
@@ -46,6 +50,27 @@ public class WipeEngine {
 
     public static boolean executeWipeWithMetrics(String systemPath, long totalBytes, WipeStandard standard, boolean isTestMode,
                                                 Consumer<WipeMetrics> metricsCallback, Consumer<String> logCallback) {
+        WipePolicy policy = (standard == WipeStandard.DOD_5220_22_M)
+                ? WipePolicyManager.getInstance().getPolicyById("dod-5220-22-m")
+                : WipePolicyManager.getInstance().getPolicyById("nist-800-88");
+        return executeWipeWithPolicy(systemPath, totalBytes, policy, isTestMode, metricsCallback, logCallback);
+    }
+
+    /**
+     * Executes custom multi-pass sanitization configured by a WipePolicy.
+     */
+    public static boolean executeWipeWithPolicy(
+            String systemPath,
+            long totalBytes,
+            WipePolicy policy,
+            boolean isTestMode,
+            Consumer<WipeMetrics> metricsCallback,
+            Consumer<String> logCallback
+    ) {
+        if (policy == null) {
+            policy = WipePolicyManager.getInstance().getDefaultPolicy();
+        }
+
         // HARD SAFETY GUARDRAIL: Block primary system disk
         if (systemPath.contains("disk0") || systemPath.contains("rdisk0")) {
             String err = "CRITICAL SAFETY SHIELD: Primary system drive (" + systemPath + ") blocked from wiping!";
@@ -57,40 +82,60 @@ public class WipeEngine {
         MacUtil.unmountDiskIfMac(systemPath);
 
         long targetBytes = isTestMode ? Math.min(totalBytes, TEST_CAP_BYTES) : totalBytes;
-
-        if (standard == WipeStandard.DOD_5220_22_M) {
-            log(logCallback, "Starting DoD 5220.22-M (3-Pass Defense Wipe) on " + systemPath + (isTestMode ? " [TEST MODE: 1GB CAP]" : " [FULL WIPE]"));
-
-            // Pass 1: Zero Fill
-            log(logCallback, "DoD Pass 1/3: Overwriting with 0x00...");
-            if (!runDdCommand(systemPath, "/dev/zero", targetBytes, isTestMode, 1, 3, "Zero Fill (0x00)",
-                    metricsCallback, logCallback, 0.0, 33.3)) return false;
-
-            // Pass 2: Cryptographic Random / Pattern Overwrite
-            log(logCallback, "DoD Pass 2/3: Overwriting with Cryptographic Pseudo-Random Data...");
-            if (!runDdCommand(systemPath, "/dev/urandom", targetBytes, isTestMode, 2, 3, "Cryptographic Random",
-                    metricsCallback, logCallback, 33.3, 66.6)) return false;
-
-            // Pass 3: Final Zero Verification Pass
-            log(logCallback, "DoD Pass 3/3: Final Zero Verification Pass...");
-            if (!runDdCommand(systemPath, "/dev/zero", targetBytes, isTestMode, 3, 3, "Verification Pass (0x00)",
-                    metricsCallback, logCallback, 66.6, 100.0)) return false;
-
-            // Final completion metric notification
-            if (metricsCallback != null) {
-                metricsCallback.accept(new WipeMetrics(systemPath, 100.0, 3, 3, "Completed", targetBytes, targetBytes, 0.0, 0));
-            }
-            return true;
-        } else {
-            // Standard NIST SP 800-88 Clear (Single Pass 0x00)
-            log(logCallback, "Starting NIST SP 800-88 Clear (Single Pass Zero-Fill) on " + systemPath + (isTestMode ? " [TEST MODE: 1GB CAP]" : " [FULL WIPE]"));
-            boolean success = runDdCommand(systemPath, "/dev/zero", targetBytes, isTestMode, 1, 1, "Zero Fill (0x00)",
-                    metricsCallback, logCallback, 0.0, 100.0);
-            if (success && metricsCallback != null) {
-                metricsCallback.accept(new WipeMetrics(systemPath, 100.0, 1, 1, "Completed", targetBytes, targetBytes, 0.0, 0));
-            }
-            return success;
+        List<WipePass> passes = policy.getPasses();
+        if (passes == null || passes.isEmpty()) {
+            passes = List.of(new WipePass(1, WipePatternType.ZERO_FILL, 0x00, "Default Zero Fill"));
         }
+
+        int totalPasses = passes.size();
+        log(logCallback, "═════════════════════════════════════════════════════════════════");
+        log(logCallback, String.format("Starting %s (%d-Pass Standard) on %s%s",
+                policy.getName(), totalPasses, systemPath, isTestMode ? " [TEST MODE: 1GB CAP]" : " [FULL WIPE]"));
+        log(logCallback, String.format("Standard Org: %s | Pattern Sequence: %s",
+                policy.getOrganization(), policy.getPatternSummary()));
+
+        double passSlice = 100.0 / totalPasses;
+
+        for (int i = 0; i < totalPasses; i++) {
+            WipePass pass = passes.get(i);
+            int currentPass = i + 1;
+            double startPct = i * passSlice;
+            double endPct = (i + 1) * passSlice;
+
+            String sourcePath = "/dev/zero";
+            if (pass.getPatternType() == WipePatternType.PSEUDO_RANDOM) {
+                sourcePath = "/dev/urandom";
+            }
+
+            log(logCallback, String.format("[%s] Pass %d/%d: %s (%s)...",
+                    policy.getStandardCode(), currentPass, totalPasses, pass.getDescription(), pass.getPatternHex()));
+
+            boolean passSuccess = runDdCommand(
+                    systemPath,
+                    sourcePath,
+                    targetBytes,
+                    isTestMode,
+                    currentPass,
+                    totalPasses,
+                    pass.getDisplayName(),
+                    metricsCallback,
+                    logCallback,
+                    startPct,
+                    endPct
+            );
+
+            if (!passSuccess) {
+                log(logCallback, String.format("[ERROR] Pass %d/%d failed on %s", currentPass, totalPasses, systemPath));
+                return false;
+            }
+        }
+
+        if (metricsCallback != null) {
+            metricsCallback.accept(new WipeMetrics(systemPath, 100.0, totalPasses, totalPasses, "Completed", targetBytes, targetBytes, 0.0, 0));
+        }
+        log(logCallback, String.format("[SUCCESS] All %d passes of %s successfully executed on %s.", totalPasses, policy.getName(), systemPath));
+        log(logCallback, "═════════════════════════════════════════════════════════════════");
+        return true;
     }
 
     /**
@@ -124,10 +169,28 @@ public class WipeEngine {
             Consumer<String> logCallback,
             Consumer<Boolean> completionCallback
     ) {
+        WipePolicy policy = (standard == WipeStandard.DOD_5220_22_M)
+                ? WipePolicyManager.getInstance().getPolicyById("dod-5220-22-m")
+                : WipePolicyManager.getInstance().getPolicyById("nist-800-88");
+        return submitBatchWipeTaskWithPolicy(systemPath, totalBytes, policy, isTestMode, metricsCallback, logCallback, completionCallback);
+    }
+
+    /**
+     * Submits an asynchronous concurrent wiping task to the batch executor queue using a custom WipePolicy.
+     */
+    public static Future<Boolean> submitBatchWipeTaskWithPolicy(
+            String systemPath,
+            long totalBytes,
+            WipePolicy policy,
+            boolean isTestMode,
+            Consumer<WipeMetrics> metricsCallback,
+            Consumer<String> logCallback,
+            Consumer<Boolean> completionCallback
+    ) {
         Future<Boolean> future = batchExecutor.submit(() -> {
             boolean success = false;
             try {
-                success = executeWipeWithMetrics(systemPath, totalBytes, standard, isTestMode, metricsCallback, logCallback);
+                success = executeWipeWithPolicy(systemPath, totalBytes, policy, isTestMode, metricsCallback, logCallback);
             } catch (Exception e) {
                 AppLogger.error(MODULE, "Batch wipe error on " + systemPath, e);
             } finally {

@@ -45,6 +45,12 @@
             <artifactId>javase</artifactId>
             <version>3.5.3</version>
         </dependency>
+        <!-- 4. Gson: JSON Policy Profiles Import/Export -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.10.1</version>
+        </dependency>
         <!-- 5. JavaFX: UI Frontend -->
         <dependency>
             <groupId>org.openjfx</groupId>

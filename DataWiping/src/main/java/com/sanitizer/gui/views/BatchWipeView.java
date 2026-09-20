@@ -10,8 +10,11 @@ import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.pdf.CertificateGenerator;
+import com.sanitizer.policy.WipePolicy;
+import com.sanitizer.policy.WipePolicyManager;
 import com.sanitizer.util.SoundManager;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
@@ -33,7 +36,7 @@ public class BatchWipeView {
     private Label queueStatusLabel;
     private Label poolCapacityBadge;
 
-    private ComboBox<WipeEngine.WipeStandard> cmbGlobalStandard;
+    private ComboBox<WipePolicy> cmbGlobalStandard;
     private Button btnRunAll;
     private Button btnStopAll;
     private Button btnAudioToggle;
@@ -106,13 +109,13 @@ public class BatchWipeView {
         btnRefresh.getStyleClass().add("button-primary");
         btnRefresh.setOnAction(e -> refreshQueue());
 
-        Label lblStandard = new Label("Global Standard:");
+        Label lblStandard = new Label("Global Standard / Policy:");
         lblStandard.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #334155;");
 
         cmbGlobalStandard = new ComboBox<>();
-        cmbGlobalStandard.getItems().addAll(WipeEngine.WipeStandard.DOD_5220_22_M, WipeEngine.WipeStandard.NIST_800_88_CLEAR);
-        cmbGlobalStandard.setValue(WipeEngine.WipeStandard.DOD_5220_22_M);
-        cmbGlobalStandard.setStyle("-fx-font-size: 12px; -fx-pref-width: 200px;");
+        cmbGlobalStandard.setItems(FXCollections.observableArrayList(WipePolicyManager.getInstance().getAllPolicies()));
+        cmbGlobalStandard.setValue(WipePolicyManager.getInstance().getDefaultPolicy());
+        cmbGlobalStandard.setStyle("-fx-font-size: 12px; -fx-pref-width: 260px;");
 
         btnRunAll = new Button("▶ Run All Queued Wipes");
         btnRunAll.getStyleClass().add("button-success");
@@ -381,12 +384,15 @@ public class BatchWipeView {
         List<UsbDetector.UsbDriveInfo> drives = UsbDetector.getConnectedUsbDrives();
         if (drives.isEmpty()) return;
 
+        WipePolicy globalPolicy = cmbGlobalStandard.getValue() != null
+                ? cmbGlobalStandard.getValue() : WipePolicyManager.getInstance().getDefaultPolicy();
+
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
         confirm.setTitle("BATCH DATA SANITIZATION CONFIRMATION");
         confirm.setHeaderText("CONCURRENT PERMANENT MEDIA SANITIZATION");
         confirm.setContentText(String.format(
                 "You are about to launch concurrent multi-threaded sanitization on %d target drive(s) simultaneously using %s.\n\nAre you sure you want to proceed?",
-                drives.size(), cmbGlobalStandard.getValue().name()
+                drives.size(), globalPolicy.getName()
         ));
 
         Optional<ButtonType> res = confirm.showAndWait();
@@ -401,7 +407,7 @@ public class BatchWipeView {
 
         for (DriveCardController controller : driveControllers.values()) {
             if (!activeTasks.containsKey(controller.drive.systemPath())) {
-                controller.cmbStandard.setValue(cmbGlobalStandard.getValue());
+                controller.cmbStandard.setValue(globalPolicy);
                 controller.startWipe();
             }
         }
@@ -448,7 +454,7 @@ public class BatchWipeView {
         private final Label pctLabel;
         private final ProgressBar progressBar;
         private final SectorHeatmapComponent heatmap;
-        private final ComboBox<WipeEngine.WipeStandard> cmbStandard;
+        private final ComboBox<WipePolicy> cmbStandard;
         private final Button btnStart;
         private final Button btnAbort;
         private final Button btnInspect;
@@ -531,9 +537,9 @@ public class BatchWipeView {
             HBox.setHgrow(mSpacer, Priority.ALWAYS);
 
             cmbStandard = new ComboBox<>();
-            cmbStandard.getItems().addAll(WipeEngine.WipeStandard.DOD_5220_22_M, WipeEngine.WipeStandard.NIST_800_88_CLEAR);
-            cmbStandard.setValue(WipeEngine.WipeStandard.DOD_5220_22_M);
-            cmbStandard.setStyle("-fx-font-size: 11px; -fx-pref-width: 170px;");
+            cmbStandard.setItems(FXCollections.observableArrayList(WipePolicyManager.getInstance().getAllPolicies()));
+            cmbStandard.setValue(cmbGlobalStandard != null && cmbGlobalStandard.getValue() != null ? cmbGlobalStandard.getValue() : WipePolicyManager.getInstance().getDefaultPolicy());
+            cmbStandard.setStyle("-fx-font-size: 11px; -fx-pref-width: 220px;");
 
             metricsRow.getChildren().addAll(speedLabel, etaLabel, pctLabel, mSpacer, cmbStandard);
 
@@ -598,16 +604,17 @@ public class BatchWipeView {
             // Capture Point-in-time Pre-Wipe S.M.A.R.T. Snapshot
             preWipeSnapshot = com.sanitizer.detector.SmartDiagnostics.captureSnapshot(drive);
 
-            WipeEngine.WipeStandard selectedStd = cmbStandard.getValue();
+            WipePolicy selectedPolicy = cmbStandard.getValue() != null
+                    ? cmbStandard.getValue() : WipePolicyManager.getInstance().getDefaultPolicy();
 
-            Future<Boolean> future = WipeEngine.submitBatchWipeTaskWithMetrics(
+            Future<Boolean> future = WipeEngine.submitBatchWipeTaskWithPolicy(
                     drive.systemPath(),
                     drive.sizeBytes(),
-                    selectedStd,
+                    selectedPolicy,
                     true, // Fast mode enabled for safe queue testing demo
                     metrics -> Platform.runLater(() -> updateMetricsUi(metrics)),
                     null,
-                    success -> Platform.runLater(() -> handleCompletion(success, selectedStd))
+                    success -> Platform.runLater(() -> handleCompletion(success, selectedPolicy))
             );
 
             activeTasks.put(drive.systemPath(), future);
@@ -679,7 +686,7 @@ public class BatchWipeView {
             cmbStandard.setDisable(false);
         }
 
-        private void handleCompletion(boolean success, WipeEngine.WipeStandard standard) {
+        private void handleCompletion(boolean success, WipePolicy policy) {
             activeTasks.remove(drive.systemPath());
             liveMetricsMap.remove(drive.systemPath());
 
@@ -708,7 +715,7 @@ public class BatchWipeView {
                 int wearDelta = smartDelta != null ? smartDelta.wearDeltaPercent() : 0;
                 String deltaSummary = smartDelta != null ? smartDelta.formattedSummary() : "Integrity Verified: 0 Defects";
 
-                String payload = drive.model() + "|" + drive.serial() + "|" + drive.formattedSize() + "|" + standard.name() + "|SUCCESS";
+                String payload = drive.model() + "|" + drive.serial() + "|" + drive.formattedSize() + "|" + policy.getName() + "|SUCCESS";
                 String sig = CryptoSigner.signData(payload);
 
                 // Capture peak thermal data from last wipe metrics
@@ -718,7 +725,7 @@ public class BatchWipeView {
                         drive.model(),
                         drive.serial(),
                         drive.formattedSize(),
-                        standard.name(),
+                        policy.getName(),
                         "SUCCESS",
                         sig,
                         preScore,
