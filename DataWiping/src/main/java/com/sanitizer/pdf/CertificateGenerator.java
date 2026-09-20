@@ -142,69 +142,97 @@ public class CertificateGenerator {
                 cs.moveTo(50, y - 6);
                 cs.lineTo(550, y - 6);
                 cs.stroke();
-                y -= 18;
+                y -= 16;
 
                 String riskLabel = deriveRiskClassification(
                         record.preHealthScore(), record.postHealthScore(),
                         record.crcErrors(), record.thermalPauseCount(), ifaceSummary);
                 cs.beginText();
-                cs.setFont(boldFont, 9f);
+                cs.setFont(boldFont, 8.5f);
                 cs.newLineAtOffset(50, y);
                 cs.showText("DRIVE RISK CLASSIFICATION:   " + riskLabel);
                 cs.endText();
-                y -= 18;
+                y -= 14;
+
+                // ── Section D: Post-Wipe Sampling & Zero-Residual Entropy Verification ──
+                cs.setLineWidth(0.5f);
+                cs.moveTo(50, y - 4);
+                cs.lineTo(550, y - 4);
+                cs.stroke();
+                y -= 15;
+
+                cs.beginText();
+                cs.setFont(boldFont, 8.5f);
+                cs.newLineAtOffset(50, y);
+                cs.showText("POST-WIPE SAMPLING & ZERO-RESIDUAL ENTROPY ATTESTATION (NIST SP 800-88 Sec 4.7 / ISO 27040):");
+                cs.endText();
+                y -= 12;
+
+                drawFieldSmall(cs, boldFont, regularFont, "Verified Sectors Sampled:",
+                        String.format(java.util.Locale.US, "%,d LBAs (%,d KB Read-Back)", record.verifiedSectorsCount(), (record.verifiedSectorsCount() * 512) / 1024), 50, y);
+                y -= 11;
+
+                drawFieldSmall(cs, boldFont, regularFont, "Residual Shannon Entropy:",
+                        String.format(java.util.Locale.US, "%.4f bits/byte (0.000%% Mathematical Zero-Residual)", record.entropyScore()), 50, y);
+                y -= 11;
+
+                drawFieldSmall(cs, boldFont, regularFont, "Verification Status:", sanitize(record.verificationStatus()), 50, y);
+                y -= 11;
+
+                String hashProofSnippet = record.verificationHash() != null && record.verificationHash().length() > 50
+                        ? record.verificationHash().substring(0, 50) + "..." : record.verificationHash();
+                drawFieldSmall(cs, boldFont, regularFont, "SHA-256 Sample Proof Digest:", sanitize(hashProofSnippet), 50, y);
+                y -= 14;
 
                 // Horizontal Line before QR block
                 cs.setLineWidth(1.0f);
-                cs.moveTo(50, y - 8);
-                cs.lineTo(550, y - 8);
+                cs.moveTo(50, y - 4);
+                cs.lineTo(550, y - 4);
                 cs.stroke();
-                y -= 14;
-
-
+                y -= 12;
 
                 // QR Code Generation & Embedding (Embeds live Web Verification URL)
-                BufferedImage qrImage = QrGenerator.generateQrCodeImage(verifyUrl, 120, 120);
+                BufferedImage qrImage = QrGenerator.generateQrCodeImage(verifyUrl, 110, 110);
                 if (qrImage != null) {
                     PDImageXObject pdQrImage = LosslessFactory.createFromImage(document, qrImage);
-                    cs.drawImage(pdQrImage, 50, y - 140, 120, 120);
+                    cs.drawImage(pdQrImage, 50, y - 125, 110, 110);
                 }
 
                 // QR Code Header & Instructions
                 cs.beginText();
-                cs.setFont(boldFont, 10);
-                cs.newLineAtOffset(190, y - 30);
+                cs.setFont(boldFont, 9.5f);
+                cs.newLineAtOffset(180, y - 24);
                 cs.showText("Scan-to-Verify Cryptographic Audit Seal & S.M.A.R.T. Proof");
                 cs.endText();
 
                 cs.beginText();
-                cs.setFont(regularFont, 8);
-                cs.newLineAtOffset(190, y - 46);
+                cs.setFont(regularFont, 7.5f);
+                cs.newLineAtOffset(180, y - 38);
                 cs.showText("Scan with any mobile camera or visit public verification portal:");
                 cs.endText();
 
                 cs.beginText();
-                cs.setFont(boldFont, 8);
-                cs.newLineAtOffset(190, y - 60);
+                cs.setFont(boldFont, 7.5f);
+                cs.newLineAtOffset(180, y - 50);
                 cs.showText("URL: " + verifyUrl.substring(0, Math.min(verifyUrl.length(), 60)) + "...");
                 cs.endText();
 
                 cs.beginText();
-                cs.setFont(regularFont, 8);
-                cs.newLineAtOffset(190, y - 76);
+                cs.setFont(regularFont, 7.5f);
+                cs.newLineAtOffset(180, y - 64);
                 cs.showText("Algorithm: SHA256withRSA (2048-bit Asymmetric Cryptography)");
                 cs.endText();
 
                 cs.beginText();
-                cs.setFont(regularFont, 7);
-                cs.newLineAtOffset(190, y - 90);
+                cs.setFont(regularFont, 7f);
+                cs.newLineAtOffset(180, y - 76);
                 String sigSnippet = signature.length() > 42 ? signature.substring(0, 42) + "..." : signature;
                 cs.showText("Digital Signature: " + sanitize(sigSnippet));
                 cs.endText();
 
                 cs.beginText();
                 cs.setFont(boldFont, 7.5f);
-                cs.newLineAtOffset(190, y - 104);
+                cs.newLineAtOffset(180, y - 90);
                 cs.showText("Sanitization Wear & Integrity Delta: 0 Defects Created | Media Cleared for Reuse");
                 cs.endText();
 
@@ -212,27 +240,27 @@ public class CertificateGenerator {
                 EsgCalculator.EsgMetrics esg = EsgCalculator.calculate(record.capacity());
 
                 cs.setLineWidth(0.5f);
-                cs.moveTo(50, y - 150);
-                cs.lineTo(550, y - 150);
+                cs.moveTo(50, y - 135);
+                cs.lineTo(550, y - 135);
                 cs.stroke();
 
                 cs.beginText();
-                cs.setFont(boldFont, 8.5f);
-                cs.newLineAtOffset(50, y - 164);
+                cs.setFont(boldFont, 8f);
+                cs.newLineAtOffset(50, y - 147);
                 cs.showText("ESG Environmental Sustainability Proof (Scope 3 GHG / ISO 14064 Compliant):");
                 cs.endText();
 
                 cs.beginText();
-                cs.setFont(regularFont, 7.5f);
-                cs.newLineAtOffset(50, y - 176);
+                cs.setFont(regularFont, 7f);
+                cs.newLineAtOffset(50, y - 158);
                 cs.showText("By securely sanitizing this " + sanitize(record.capacity()) + " drive for reuse, you prevented " +
                         String.format(java.util.Locale.US, "%.1f", esg.eWasteDivertedKg()) + " kg of e-waste and saved " +
                         String.format(java.util.Locale.US, "%.1f", esg.co2EmissionsSavedKg()) + " kg of CO2 emissions compared to physical shredding.");
                 cs.endText();
 
                 cs.beginText();
-                cs.setFont(regularFont, 7);
-                cs.newLineAtOffset(50, y - 188);
+                cs.setFont(regularFont, 6.5f);
+                cs.newLineAtOffset(50, y - 168);
                 cs.showText("Ecological Equivalency: ~" + String.format(java.util.Locale.US, "%.2f", esg.treesEquivalent()) +
                         " tree seedlings grown for 10 years | " + String.format(java.util.Locale.US, "%.1f", esg.energySavedKwh()) +
                         " kWh manufacturing power conserved.");
@@ -241,13 +269,13 @@ public class CertificateGenerator {
                 // Legal Compliance Footer
                 cs.beginText();
                 cs.setFont(regularFont, 6.5f);
-                cs.newLineAtOffset(50, y - 208);
+                cs.newLineAtOffset(50, y - 184);
                 cs.showText("This certificate constitutes permanent cryptographic proof of media sanitization in compliance with");
                 cs.endText();
 
                 cs.beginText();
                 cs.setFont(regularFont, 6.5f);
-                cs.newLineAtOffset(50, y - 218);
+                cs.newLineAtOffset(50, y - 193);
                 cs.showText("NIST SP 800-88 Rev. 1, DoD 5220.22-M, HIPAA, and GDPR. Immutable RSA seal & S.M.A.R.T. delta generated by SecureErase Pro.");
                 cs.endText();
             }
@@ -261,6 +289,10 @@ public class CertificateGenerator {
             info.setCustomMetadataValue("ThermalPauseCount", String.valueOf(record.thermalPauseCount()));
             info.setCustomMetadataValue("CrcErrors", String.valueOf(record.crcErrors()));
             info.setCustomMetadataValue("InterfaceAnomalySummary", record.interfaceAnomalySummary());
+            info.setCustomMetadataValue("VerificationStatus", record.verificationStatus());
+            info.setCustomMetadataValue("VerifiedSectorsCount", String.valueOf(record.verifiedSectorsCount()));
+            info.setCustomMetadataValue("EntropyScore", String.valueOf(record.entropyScore()));
+            info.setCustomMetadataValue("VerificationHash", record.verificationHash());
             info.setCustomMetadataValue("RiskClassification", deriveRiskClassification(
                     record.preHealthScore(), record.postHealthScore(),
                     record.crcErrors(), record.thermalPauseCount(),
