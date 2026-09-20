@@ -107,6 +107,7 @@ public class SettingsView {
                 createSettingRow(I18n.get("settings.crypto_algo"), "SHA256withRSA"),
                 createSettingRow(I18n.get("settings.crypto_keypair"), "RSA 2048-bit"),
                 createSettingRow(I18n.get("settings.crypto_barcode"), "ZXing QR Code (150×150)"),
+                createSettingRow("Cryptographic Ledger", "SHA-256 Block Chaining Active"),
                 createSettingRow(I18n.get("settings.crypto_payload"), "Model|Serial|Capacity|Standard|Status")
         );
         cardCrypto.getChildren().addAll(cryptoHeader, new Separator(), cryptoFields);
@@ -148,13 +149,28 @@ public class SettingsView {
 
         VBox dbFields = new VBox(12);
         dbFields.getChildren().addAll(
-                createSettingRow(I18n.get("settings.db_engine"), "SQLite 3.45 JDBC"),
+                createSettingRow(I18n.get("settings.db_engine"), "SQLite 3.45 JDBC (WAL Mode)"),
                 createSettingRow(I18n.get("settings.db_file"), "sanitizer_history.db"),
+                createSettingRow("Tamper Protection", "SHA-256 Cryptographic Block Ledger"),
                 createSettingRow(I18n.get("settings.db_pdf"), "Apache PDFBox 3.0.1"),
                 createSettingRow(I18n.get("settings.db_hardware"), "OSHI 6.4.10")
         );
 
         HBox dbActions = new HBox(12);
+        Button btnVerifyDb = new Button("🔒 Verify Database Integrity");
+        btnVerifyDb.setStyle("-fx-background-color: #059669; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 16; -fx-font-size: 12px; -fx-cursor: hand;");
+        btnVerifyDb.setTooltip(new Tooltip("Instant cryptographic proof verifying no SQLite records have been manually modified or injected"));
+        btnVerifyDb.setOnAction(e -> {
+            var res = com.sanitizer.db.AuditDb.verifyDatabaseIntegrity();
+            com.sanitizer.gui.views.AuditView.showLedgerVerificationDialog(res);
+        });
+        btnVerifyDb.setOnKeyPressed(ev -> {
+            if (ev.getCode() == KeyCode.ENTER) {
+                var res = com.sanitizer.db.AuditDb.verifyDatabaseIntegrity();
+                com.sanitizer.gui.views.AuditView.showLedgerVerificationDialog(res);
+            }
+        });
+
         Button btnClearDb = new Button(I18n.get("settings.db_clear"));
         btnClearDb.setStyle("-fx-text-fill: #F87171; -fx-padding: 8 16; -fx-font-size: 12px;");
         btnClearDb.setTooltip(new Tooltip("Permanently clear all sanitization audit records from SQLite"));
@@ -167,7 +183,7 @@ public class SettingsView {
         btnExportDb.setOnAction(e -> handleExportDbBackup());
         btnExportDb.setOnKeyPressed(ev -> { if (ev.getCode() == KeyCode.ENTER) handleExportDbBackup(); });
 
-        dbActions.getChildren().addAll(btnClearDb, btnExportDb);
+        dbActions.getChildren().addAll(btnVerifyDb, btnClearDb, btnExportDb);
         cardDb.getChildren().addAll(dbHeader, new Separator(), dbFields, dbActions);
 
         // Card 5 — System Info

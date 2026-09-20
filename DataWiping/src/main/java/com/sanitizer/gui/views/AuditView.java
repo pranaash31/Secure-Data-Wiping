@@ -126,7 +126,12 @@ public class AuditView {
         btnVerify.setTooltip(new Tooltip("Verify SHA256withRSA signature for selected record"));
         btnVerify.setOnAction(e -> handleVerifySignature());
 
-        toolbar.getChildren().addAll(txtSearch, new Region(), btnRefresh, btnCompliance, mbExport, btnExportPdf, btnQuarantine, btnVerify);
+        Button btnVerifyLedger = new Button("🔒 Verify Ledger Integrity");
+        btnVerifyLedger.setStyle("-fx-background-color: #059669; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        btnVerifyLedger.setTooltip(new Tooltip("Verify SHA-256 cryptographic block chaining & tamper resistance across the entire database"));
+        btnVerifyLedger.setOnAction(e -> handleVerifyLedgerIntegrity());
+
+        toolbar.getChildren().addAll(txtSearch, new Region(), btnRefresh, btnCompliance, mbExport, btnExportPdf, btnQuarantine, btnVerify, btnVerifyLedger);
         HBox.setHgrow(toolbar.getChildren().get(1), Priority.ALWAYS);
 
         // F5 shortcut = refresh audit log
@@ -177,6 +182,14 @@ public class AuditView {
         });
         colHealth.setPrefWidth(210);
 
+        TableColumn<AuditDb.AuditRecord, String> colLedger = new TableColumn<>("SHA-256 Ledger Hash");
+        colLedger.setCellValueFactory(data -> {
+            String hash = data.getValue().recordHash();
+            if (hash == null || hash.isBlank()) return new SimpleStringProperty("UNSEALED");
+            return new SimpleStringProperty(hash.length() > 16 ? hash.substring(0, 16) + "..." : hash);
+        });
+        colLedger.setPrefWidth(150);
+
         TableColumn<AuditDb.AuditRecord, String> colSig = new TableColumn<>("RSA Digital Signature");
         colSig.setCellValueFactory(data -> {
             String s = data.getValue().digitalSignature();
@@ -184,7 +197,7 @@ public class AuditView {
         });
         colSig.setPrefWidth(180);
 
-        tblAuditHistory.getColumns().addAll(colId, colTime, colModel, colSerial, colCapacity, colStandard, colStatus, colHealth, colSig);
+        tblAuditHistory.getColumns().addAll(colId, colTime, colModel, colSerial, colCapacity, colStandard, colStatus, colHealth, colLedger, colSig);
 
         auditData = FXCollections.observableArrayList();
         filteredData = new FilteredList<>(auditData, p -> true);
@@ -548,6 +561,112 @@ public class AuditView {
             showAlert(Alert.AlertType.ERROR, "Verification Failed",
                     "SIGNATURE MISMATCH\n\nThe digital signature could not be verified against the current keypair or record payload.");
         }
+    }
+
+    private void handleVerifyLedgerIntegrity() {
+        var result = AuditDb.verifyDatabaseIntegrity();
+        showLedgerVerificationDialog(result);
+    }
+
+    public static void showLedgerVerificationDialog(com.sanitizer.db.LedgerIntegrityEngine.LedgerVerificationResult result) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("SQLite Audit Ledger — Cryptographic Integrity Proof");
+        dialog.setHeaderText(null);
+
+        DialogPane dp = dialog.getDialogPane();
+        dp.getButtonTypes().add(ButtonType.CLOSE);
+        dp.setStyle("-fx-background-color: #0F172A;");
+
+        VBox content = new VBox(16);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(650);
+
+        // Header Status Banner
+        HBox headerBox = new HBox(12);
+        headerBox.setAlignment(Pos.CENTER_LEFT);
+        headerBox.setPadding(new Insets(14, 16, 14, 16));
+
+        Label lblBadge = new Label(result.isFullyValid() ? "🔒 100% TAMPER-PROOF" : "⚠️ INTEGRITY BREACH DETECTED");
+        lblBadge.setStyle(result.isFullyValid()
+                ? "-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #10B981; -fx-background-color: rgba(16,185,129,0.15); -fx-padding: 6 12; -fx-background-radius: 6px;"
+                : "-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #EF4444; -fx-background-color: rgba(239,68,68,0.15); -fx-padding: 6 12; -fx-background-radius: 6px;");
+
+        Label lblTitle = new Label(result.isFullyValid()
+                ? "SHA-256 Ledger Chain Authenticated"
+                : "Cryptographic Tampering / Anomaly Detected");
+        lblTitle.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #F8FAFC;");
+
+        headerBox.getChildren().addAll(lblBadge, lblTitle);
+        headerBox.setStyle(result.isFullyValid()
+                ? "-fx-background-color: #13271F; -fx-background-radius: 8px; -fx-border-color: #059669; -fx-border-radius: 8px; -fx-border-width: 1px;"
+                : "-fx-background-color: #311417; -fx-background-radius: 8px; -fx-border-color: #DC2626; -fx-border-radius: 8px; -fx-border-width: 1px;");
+
+        // Metrics Grid
+        GridPane grid = new GridPane();
+        grid.setHgap(14);
+        grid.setVgap(12);
+
+        grid.add(createLedgerTile("Total Records Verified", String.valueOf(result.totalRecordsChecked()), "#38BDF8"), 0, 0);
+        grid.add(createLedgerTile("Valid Block Chains", result.validChainLength() + " / " + result.totalRecordsChecked(), result.isFullyValid() ? "#34D399" : "#F87171"), 1, 0);
+        grid.add(createLedgerTile("Genesis Root", result.genesisHash().substring(0, Math.min(16, result.genesisHash().length())) + "...", "#94A3B8"), 0, 1);
+        grid.add(createLedgerTile("Latest Block Hash", result.latestBlockHash().substring(0, Math.min(16, result.latestBlockHash().length())) + "...", "#A78BFA"), 1, 1);
+
+        ColumnConstraints c1 = new ColumnConstraints(); c1.setPercentWidth(50);
+        ColumnConstraints c2 = new ColumnConstraints(); c2.setPercentWidth(50);
+        grid.getColumnConstraints().addAll(c1, c2);
+
+        // Status Details
+        Label lblDetails = new Label(result.getSummaryMessage());
+        lblDetails.setWrapText(true);
+        lblDetails.setStyle("-fx-font-size: 12px; -fx-text-fill: #CBD5E1; -fx-line-spacing: 4px;");
+
+        content.getChildren().addAll(headerBox, grid, lblDetails);
+
+        // If anomalies exist, display forensic inspection table/list
+        if (result.hasAnomalies()) {
+            VBox anomalyBox = new VBox(8);
+            Label lblAnomTitle = new Label("Forensic Defect & Tamper Inspection:");
+            lblAnomTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #FCA5A5;");
+            anomalyBox.getChildren().add(lblAnomTitle);
+
+            for (var anom : result.anomalies()) {
+                VBox item = new VBox(4);
+                item.setPadding(new Insets(8, 12, 8, 12));
+                item.setStyle("-fx-background-color: #1E293B; -fx-background-radius: 6px; -fx-border-color: #DC2626; -fx-border-radius: 6px;");
+
+                Label lblType = new Label("[" + anom.type() + "] Record ID: " + anom.recordId() + " (S/N: " + anom.serialNumber() + ")");
+                lblType.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #F87171;");
+
+                Label lblDesc = new Label(anom.description());
+                lblDesc.setWrapText(true);
+                lblDesc.setStyle("-fx-font-size: 11px; -fx-text-fill: #E2E8F0;");
+
+                Label lblHashes = new Label("Expected: " + anom.expectedHash() + "\nFound:    " + anom.actualHash());
+                lblHashes.setStyle("-fx-font-family: 'Courier New', monospace; -fx-font-size: 10px; -fx-text-fill: #94A3B8;");
+
+                item.getChildren().addAll(lblType, lblDesc, lblHashes);
+                anomalyBox.getChildren().add(item);
+            }
+            content.getChildren().add(anomalyBox);
+        }
+
+        dp.setContent(content);
+        dialog.showAndWait();
+    }
+
+    private static VBox createLedgerTile(String title, String value, String valueColor) {
+        VBox box = new VBox(4);
+        box.setPadding(new Insets(10, 14, 10, 14));
+        box.setStyle("-fx-background-color: #1E293B; -fx-background-radius: 8px; -fx-border-color: #334155; -fx-border-radius: 8px;");
+
+        Label lblTitle = new Label(title);
+        lblTitle.setStyle("-fx-font-size: 11px; -fx-text-fill: #94A3B8;");
+
+        Label lblVal = new Label(value);
+        lblVal.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: " + valueColor + ";");
+
+        box.getChildren().addAll(lblTitle, lblVal);
+        return box;
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {

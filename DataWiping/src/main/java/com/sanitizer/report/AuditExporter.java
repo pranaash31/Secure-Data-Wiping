@@ -141,7 +141,9 @@ public class AuditExporter {
                 "Verified_Sectors_LBA",
                 "Residual_Entropy_Score",
                 "Sample_SHA256_Proof",
-                "RSA_Digital_Signature"
+                "RSA_Digital_Signature",
+                "Prev_Block_Hash",
+                "Ledger_Block_Hash"
         ))).append("\n");
 
         if (records != null) {
@@ -166,7 +168,9 @@ public class AuditExporter {
                   .append(r.verifiedSectorsCount()).append(",")
                   .append(String.format(Locale.US, "%.4f", r.entropyScore())).append(",")
                   .append(csvEscape(r.verificationHash())).append(",")
-                  .append(csvEscape(r.digitalSignature()))
+                  .append(csvEscape(r.digitalSignature())).append(",")
+                  .append(csvEscape(r.prevRecordHash())).append(",")
+                  .append(csvEscape(r.recordHash()))
                   .append("\n");
             }
         }
@@ -302,10 +306,12 @@ public class AuditExporter {
         sb.append("   <Column ss:Width=\"160\"/>\n"); // Verification
         sb.append("   <Column ss:Width=\"100\"/>\n"); // Entropy
         sb.append("   <Column ss:Width=\"220\"/>\n"); // Signature
+        sb.append("   <Column ss:Width=\"220\"/>\n"); // Prev Hash
+        sb.append("   <Column ss:Width=\"220\"/>\n"); // Record Hash
 
         // Header Row
         sb.append("   <Row ss:Height=\"24\">\n");
-        for (String h : List.of("ID", "Timestamp", "Drive Model", "Serial Number", "Capacity", "Sanitization Standard", "Status", "Health Delta", "SMART Integrity Delta", "Peak Temp", "Interface Telemetry", "Verification Attestation", "Entropy (bits/B)", "RSA Signature Digest")) {
+        for (String h : List.of("ID", "Timestamp", "Drive Model", "Serial Number", "Capacity", "Sanitization Standard", "Status", "Health Delta", "SMART Integrity Delta", "Peak Temp", "Interface Telemetry", "Verification Attestation", "Entropy (bits/B)", "RSA Signature Digest", "Prev Block Hash", "Ledger Block Hash (SHA-256)")) {
             sb.append("    <Cell ss:StyleID=\"TableHeader\"><Data ss:Type=\"String\">").append(xmlEscape(h)).append("</Data></Cell>\n");
         }
         sb.append("   </Row>\n");
@@ -330,6 +336,8 @@ public class AuditExporter {
                 sb.append("    <Cell><Data ss:Type=\"String\">").append(xmlEscape(r.verificationStatus())).append("</Data></Cell>\n");
                 sb.append("    <Cell><Data ss:Type=\"Number\">").append(String.format(Locale.US, "%.4f", r.entropyScore())).append("</Data></Cell>\n");
                 sb.append("    <Cell ss:StyleID=\"MonoCode\"><Data ss:Type=\"String\">").append(xmlEscape(r.digitalSignature())).append("</Data></Cell>\n");
+                sb.append("    <Cell ss:StyleID=\"MonoCode\"><Data ss:Type=\"String\">").append(xmlEscape(r.prevRecordHash())).append("</Data></Cell>\n");
+                sb.append("    <Cell ss:StyleID=\"MonoCode\"><Data ss:Type=\"String\">").append(xmlEscape(r.recordHash())).append("</Data></Cell>\n");
                 sb.append("   </Row>\n");
             }
         }
