@@ -1,12 +1,17 @@
 package com.sanitizer.gui.navigation;
 
+import com.sanitizer.a11y.AccessibilityManager;
+import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.views.*;
+import com.sanitizer.i18n.I18n;
 import com.sanitizer.session.SessionContext;
 import com.sanitizer.util.AppLogger;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
@@ -21,6 +26,7 @@ public class NavigationManager {
     private Stage primaryStage;
     private Scene scene;
     private MainLayout mainLayout;
+    private String currentActiveView = "dashboard";
 
     // Session State
     private SessionContext sessionContext;
@@ -29,7 +35,18 @@ public class NavigationManager {
     // View Node Cache (ViewKey -> Root Node)
     private final Map<String, Node> viewCache = new HashMap<>();
 
-    private NavigationManager() {}
+    private NavigationManager() {
+        // When locale changes, invalidate cached views and refresh current active view
+        I18n.addListener(locale -> {
+            if (isAuthenticated && mainLayout != null) {
+                viewCache.clear();
+                navigateTo(currentActiveView);
+                if (primaryStage != null) {
+                    primaryStage.setTitle(I18n.get("app.title") + " — " + I18n.get("topbar.badge") + " | " + getOfficerName());
+                }
+            }
+        });
+    }
 
     /** Thread-safe Initialization-on-Demand Holder Singleton. */
     private static class InstanceHolder {
@@ -58,9 +75,12 @@ public class NavigationManager {
     public void showHeroView() {
         Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
         HeroView heroView = new HeroView(this::showLoginView);
+        AccessibilityManager.applyThemeAndScale(heroView);
         scene = new Scene(heroView, bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
-        primaryStage.setTitle("SecureErase Pro — Enterprise Hardware Sanitization Platform");
+        attachGlobalShortcuts(scene);
+
+        primaryStage.setTitle(I18n.get("app.title") + " — " + I18n.get("app.subtitle"));
         primaryStage.setScene(scene);
         primaryStage.setMinWidth(1100);
         primaryStage.setMinHeight(700);
@@ -75,9 +95,13 @@ public class NavigationManager {
         this.viewCache.clear();
         Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
         LoginView loginView = new LoginView(this);
-        scene = new Scene(loginView.getRoot(), bounds.getWidth(), bounds.getHeight());
+        Parent root = loginView.getRoot();
+        AccessibilityManager.applyThemeAndScale(root);
+        scene = new Scene(root, bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
-        primaryStage.setTitle("SecureErase Pro — Officer Authentication Portal");
+        attachGlobalShortcuts(scene);
+
+        primaryStage.setTitle(I18n.get("app.title") + " — " + I18n.get("login.portal_badge"));
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
     }
@@ -93,27 +117,83 @@ public class NavigationManager {
     public void showMainPortal() {
         Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
         mainLayout = new MainLayout(this);
-        scene = new Scene(mainLayout.getRoot(), bounds.getWidth(), bounds.getHeight());
+        Parent root = mainLayout.getRoot();
+        AccessibilityManager.applyThemeAndScale(root);
+        scene = new Scene(root, bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
+        attachGlobalShortcuts(scene);
 
-        // Global Keyboard Shortcuts (Cmd/Ctrl + Key)
-        scene.setOnKeyPressed(event -> {
-            if (event.isControlDown() || event.isMetaDown()) {
-                if (event.getCode() == KeyCode.D) navigateTo("dashboard");
-                else if (event.getCode() == KeyCode.W) navigateTo("wiping");
-                else if (event.getCode() == KeyCode.B) navigateTo("batchWipe");
-                else if (event.getCode() == KeyCode.K) navigateTo("keyvault");
-                else if (event.getCode() == KeyCode.A) navigateTo("audit");
-                else if (event.getCode() == KeyCode.COMMA) navigateTo("settings");
-            }
-        });
-
-        primaryStage.setTitle("SecureErase Pro — Enterprise Suite | " + getOfficerName());
+        primaryStage.setTitle(I18n.get("app.title") + " — " + I18n.get("topbar.badge") + " | " + getOfficerName());
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
 
         // Default landing — Dashboard
         navigateTo("dashboard");
+    }
+
+    // ── Global Keyboard Shortcuts & Accessibility Accelerators ─────────────────
+    private void attachGlobalShortcuts(Scene scene) {
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            boolean ctrlOrMeta = event.isControlDown() || event.isMetaDown();
+
+            // F1: Accessibility Help Dialog
+            if (event.getCode() == KeyCode.F1) {
+                AccessibilityHelpDialog.show(primaryStage);
+                event.consume();
+                return;
+            }
+
+            if (ctrlOrMeta) {
+                // Font Scaling / Zoom: Ctrl/Cmd + Plus / Equals
+                if (event.getCode() == KeyCode.PLUS || event.getCode() == KeyCode.EQUALS || event.getCode() == KeyCode.ADD) {
+                    AccessibilityManager.increaseFontScale();
+                    event.consume();
+                    return;
+                }
+                // Font Scaling / Zoom: Ctrl/Cmd + Minus
+                if (event.getCode() == KeyCode.MINUS || event.getCode() == KeyCode.SUBTRACT) {
+                    AccessibilityManager.decreaseFontScale();
+                    event.consume();
+                    return;
+                }
+                // Font Scaling / Zoom: Ctrl/Cmd + 0
+                if (event.getCode() == KeyCode.DIGIT0 || event.getCode() == KeyCode.NUMPAD0) {
+                    AccessibilityManager.resetFontScale();
+                    event.consume();
+                    return;
+                }
+                // High Contrast Toggle: Ctrl/Cmd + H
+                if (event.getCode() == KeyCode.H) {
+                    AccessibilityManager.toggleHighContrast();
+                    event.consume();
+                    return;
+                }
+                // Dark/Light Theme Toggle: Ctrl/Cmd + T
+                if (event.getCode() == KeyCode.T) {
+                    AccessibilityManager.toggleDarkLight();
+                    event.consume();
+                    return;
+                }
+                // Cycle Language: Ctrl/Cmd + L
+                if (event.getCode() == KeyCode.L) {
+                    I18n.cycleNextLanguage();
+                    event.consume();
+                    return;
+                }
+
+                // View Navigation Shortcuts (Ctrl/Cmd + Key)
+                if (isAuthenticated) {
+                    if (event.getCode() == KeyCode.D || event.getCode() == KeyCode.DIGIT1) navigateTo("dashboard");
+                    else if (event.getCode() == KeyCode.W || event.getCode() == KeyCode.DIGIT2) navigateTo("wiping");
+                    else if (event.getCode() == KeyCode.B || event.getCode() == KeyCode.DIGIT3) navigateTo("batchWipe");
+                    else if (event.getCode() == KeyCode.DIGIT4) navigateTo("diagnostics");
+                    else if (event.getCode() == KeyCode.DIGIT5) navigateTo("clients");
+                    else if (event.getCode() == KeyCode.K || event.getCode() == KeyCode.DIGIT6) navigateTo("keyvault");
+                    else if (event.getCode() == KeyCode.A || event.getCode() == KeyCode.DIGIT7) navigateTo("audit");
+                    else if (event.getCode() == KeyCode.COMMA || event.getCode() == KeyCode.DIGIT8) navigateTo("settings");
+                }
+            }
+        });
     }
 
     // ── Router ───────────────────────────────────────────────────────────────
@@ -124,6 +204,7 @@ public class NavigationManager {
         }
 
         String key = viewName.toLowerCase();
+        this.currentActiveView = key;
         Node viewNode = viewCache.get(key);
 
         if (viewNode == null) {

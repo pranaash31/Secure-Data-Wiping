@@ -1,25 +1,31 @@
 package com.sanitizer.gui.views;
 
+import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.DeviceType;
 import com.sanitizer.detector.ThermalPolicy;
 import com.sanitizer.detector.ThermalPolicyManager;
+import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.navigation.NavigationManager;
+import com.sanitizer.i18n.I18n;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.AccessibleRole;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
+import javafx.util.StringConverter;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.EnumMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -52,13 +58,16 @@ public class SettingsView {
 
         // ── Header ──────────────────────────────────────────────────────
         VBox titleBox = new VBox(4);
-        Label lblTitle = new Label("Security Policy & System Settings");
+        Label lblTitle = new Label(I18n.get("settings.title"));
         lblTitle.getStyleClass().add("section-label");
-        Label lblSub = new Label("Configurable thermal limits, cryptographic parameters, hardware safety shield, and database engine");
+        Label lblSub = new Label(I18n.get("settings.subtitle"));
         lblSub.getStyleClass().add("section-sublabel");
         titleBox.getChildren().addAll(lblTitle, lblSub);
 
-        // ── Card 0: Configurable Thermal Limits & Throttling Policies ────
+        // ── Card 0: Internationalization & Accessibility (WCAG 2.1 AA / Section 508) ────
+        VBox cardA11y = buildAccessibilityAndI18nCard();
+
+        // ── Card 1: Configurable Thermal Limits & Throttling Policies ────
         VBox cardThermal = buildThermalPolicyCard();
 
         // ── Settings Grid ─────────────────────────────────────────────
@@ -66,7 +75,7 @@ public class SettingsView {
         grid.setHgap(18);
         grid.setVgap(18);
 
-        // Card 1 — Cryptographic Parameters
+        // Card 2 — Cryptographic Parameters
         VBox cardCrypto = new VBox(16);
         cardCrypto.getStyleClass().add("card");
 
@@ -75,20 +84,20 @@ public class SettingsView {
         Label cryptoIcon = new Label("[CRYPTO]");
         cryptoIcon.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #FBBF24; " +
                 "-fx-background-color: rgba(245,158,11,0.12); -fx-background-radius: 6px; -fx-padding: 4 8;");
-        Label cryptoTitle = new Label("Cryptographic Signing Parameters");
+        Label cryptoTitle = new Label(I18n.get("settings.crypto_title"));
         cryptoTitle.getStyleClass().add("settings-section-title");
         cryptoHeader.getChildren().addAll(cryptoIcon, cryptoTitle);
 
         VBox cryptoFields = new VBox(12);
         cryptoFields.getChildren().addAll(
-                createSettingRow("Signature Algorithm", "SHA256withRSA"),
-                createSettingRow("Keypair Strength", "RSA 2048-bit"),
-                createSettingRow("Verification Barcode", "ZXing QR Code (150×150)"),
-                createSettingRow("Audit Payload Format", "Model|Serial|Capacity|Standard|Status")
+                createSettingRow(I18n.get("settings.crypto_algo"), "SHA256withRSA"),
+                createSettingRow(I18n.get("settings.crypto_keypair"), "RSA 2048-bit"),
+                createSettingRow(I18n.get("settings.crypto_barcode"), "ZXing QR Code (150×150)"),
+                createSettingRow(I18n.get("settings.crypto_payload"), "Model|Serial|Capacity|Standard|Status")
         );
         cardCrypto.getChildren().addAll(cryptoHeader, new Separator(), cryptoFields);
 
-        // Card 2 — Hardware Safety Shield
+        // Card 3 — Hardware Safety Shield
         VBox cardShield = new VBox(16);
         cardShield.getStyleClass().add("card");
 
@@ -97,20 +106,20 @@ public class SettingsView {
         Label shieldIcon = new Label("[SHIELD]");
         shieldIcon.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #34D399; " +
                 "-fx-background-color: rgba(16,185,129,0.12); -fx-background-radius: 6px; -fx-padding: 4 8;");
-        Label shieldTitle = new Label("Hardware Safety Guardrails");
+        Label shieldTitle = new Label(I18n.get("settings.shield_title"));
         shieldTitle.getStyleClass().add("settings-section-title");
         shieldHeader.getChildren().addAll(shieldIcon, shieldTitle);
 
         VBox shieldFields = new VBox(12);
         shieldFields.getChildren().addAll(
-                createSettingRow("Primary Disk Guard", "ENABLED (disk0 & rdisk0 Blocked)"),
-                createSettingRow("Internal Storage Filter", "ENABLED (Apple SSD, NVMe Ignored)"),
-                createSettingRow("Target Capacity Window", "1 GB – 128 GB Removable USB"),
-                createSettingRow("macOS Unmount Command", "diskutil unmountDisk /dev/diskX")
+                createSettingRow(I18n.get("settings.shield_disk0"), "ENABLED (disk0 & rdisk0 Blocked)"),
+                createSettingRow(I18n.get("settings.shield_internal"), "ENABLED (Apple SSD, NVMe Ignored)"),
+                createSettingRow(I18n.get("settings.shield_capacity"), "1 GB – 128 GB Removable USB"),
+                createSettingRow(I18n.get("settings.shield_unmount"), "diskutil unmountDisk /dev/diskX")
         );
         cardShield.getChildren().addAll(shieldHeader, new Separator(), shieldFields);
 
-        // Card 3 — Database & Storage Engine
+        // Card 4 — Database & Storage Engine
         VBox cardDb = new VBox(16);
         cardDb.getStyleClass().add("card");
 
@@ -119,26 +128,26 @@ public class SettingsView {
         Label dbIcon = new Label("[DB]");
         dbIcon.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #60A5FA; " +
                 "-fx-background-color: rgba(59,130,246,0.12); -fx-background-radius: 6px; -fx-padding: 4 8;");
-        Label dbTitle = new Label("Database & Storage Engine");
+        Label dbTitle = new Label(I18n.get("settings.db_title"));
         dbTitle.getStyleClass().add("settings-section-title");
         dbHeader.getChildren().addAll(dbIcon, dbTitle);
 
         VBox dbFields = new VBox(12);
         dbFields.getChildren().addAll(
-                createSettingRow("Database Engine", "SQLite 3.45 JDBC"),
-                createSettingRow("Database File", "sanitizer_history.db"),
-                createSettingRow("PDF Engine", "Apache PDFBox 3.0.1"),
-                createSettingRow("Hardware Library", "OSHI 6.4.10")
+                createSettingRow(I18n.get("settings.db_engine"), "SQLite 3.45 JDBC"),
+                createSettingRow(I18n.get("settings.db_file"), "sanitizer_history.db"),
+                createSettingRow(I18n.get("settings.db_pdf"), "Apache PDFBox 3.0.1"),
+                createSettingRow(I18n.get("settings.db_hardware"), "OSHI 6.4.10")
         );
 
         HBox dbActions = new HBox(12);
-        Button btnClearDb = new Button("Clear Audit History");
+        Button btnClearDb = new Button(I18n.get("settings.db_clear"));
         btnClearDb.setStyle("-fx-text-fill: #F87171; -fx-padding: 8 16; -fx-font-size: 12px;");
         btnClearDb.setTooltip(new Tooltip("Permanently clear all sanitization audit records from SQLite"));
         btnClearDb.setOnAction(e -> handleClearHistory());
         btnClearDb.setOnKeyPressed(ev -> { if (ev.getCode() == KeyCode.ENTER) handleClearHistory(); });
 
-        Button btnExportDb = new Button("Export Database Backup");
+        Button btnExportDb = new Button(I18n.get("settings.db_export"));
         btnExportDb.setStyle("-fx-padding: 8 16; -fx-font-size: 12px;");
         btnExportDb.setTooltip(new Tooltip("Save a copy of sanitizer_history.db to a chosen location"));
         btnExportDb.setOnAction(e -> handleExportDbBackup());
@@ -147,7 +156,7 @@ public class SettingsView {
         dbActions.getChildren().addAll(btnClearDb, btnExportDb);
         cardDb.getChildren().addAll(dbHeader, new Separator(), dbFields, dbActions);
 
-        // Card 4 — System Info
+        // Card 5 — System Info
         VBox cardSystem = new VBox(16);
         cardSystem.getStyleClass().add("card");
 
@@ -156,18 +165,18 @@ public class SettingsView {
         Label sysIcon = new Label("[SYS]");
         sysIcon.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #94A3B8; " +
                 "-fx-background-color: rgba(148,163,184,0.10); -fx-background-radius: 6px; -fx-padding: 4 8;");
-        Label sysTitle = new Label("System Information");
+        Label sysTitle = new Label(I18n.get("settings.sys_title"));
         sysTitle.getStyleClass().add("settings-section-title");
         sysHeader.getChildren().addAll(sysIcon, sysTitle);
 
         VBox sysFields = new VBox(12);
         sysFields.getChildren().addAll(
-                createSettingRow("Application", "SecureErase Pro v2.0.0 Enterprise"),
-                createSettingRow("Java Runtime", System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + ")"),
-                createSettingRow("JavaFX Version", System.getProperty("javafx.version", "21")),
-                createSettingRow("Operating System", System.getProperty("os.name") + " " + System.getProperty("os.version")),
-                createSettingRow("Architecture", System.getProperty("os.arch")),
-                createSettingRow("Low-Level Wipe Binary", "dd (Block Size: bs=2m)")
+                createSettingRow(I18n.get("settings.sys_app"), "SecureErase Pro v2.0.0 Enterprise"),
+                createSettingRow(I18n.get("settings.sys_java"), System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + ")"),
+                createSettingRow(I18n.get("settings.sys_javafx"), System.getProperty("javafx.version", "21")),
+                createSettingRow(I18n.get("settings.sys_os"), System.getProperty("os.name") + " " + System.getProperty("os.version")),
+                createSettingRow(I18n.get("settings.sys_arch"), System.getProperty("os.arch")),
+                createSettingRow(I18n.get("settings.sys_wipe_binary"), "dd (Block Size: bs=2m)")
         );
         cardSystem.getChildren().addAll(sysHeader, new Separator(), sysFields);
 
@@ -197,7 +206,158 @@ public class SettingsView {
         HBox.setHgrow(footerSpacer, Priority.ALWAYS);
         footer.getChildren().addAll(footerLabel, footerSpacer, versionBadge);
 
-        rootContainer.getChildren().addAll(titleBox, cardThermal, grid, footer);
+        rootContainer.getChildren().addAll(titleBox, cardA11y, cardThermal, grid, footer);
+    }
+
+    private VBox buildAccessibilityAndI18nCard() {
+        VBox card = new VBox(18);
+        card.getStyleClass().add("card");
+
+        // Header
+        HBox header = new HBox(12);
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label iconBadge = new Label("♿ [I18N & A11Y]");
+        iconBadge.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #2563EB; " +
+                "-fx-background-color: rgba(37,99,235,0.12); -fx-background-radius: 6px; -fx-padding: 4 10;");
+
+        VBox titleCol = new VBox(2);
+        Label lblTitle = new Label(I18n.get("a11y.section_title"));
+        lblTitle.getStyleClass().add("settings-section-title");
+        Label lblDesc = new Label(I18n.get("a11y.section_sub"));
+        lblDesc.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748B;");
+        lblDesc.getStyleClass().add("settings-key-label");
+        titleCol.getChildren().addAll(lblTitle, lblDesc);
+
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+
+        Label wcagBadge = new Label(I18n.get("a11y.wcag_badge"));
+        wcagBadge.getStyleClass().add("badge-success");
+
+        header.getChildren().addAll(iconBadge, titleCol, headerSpacer, wcagBadge);
+
+        // Grid of Settings
+        GridPane a11yGrid = new GridPane();
+        a11yGrid.setHgap(20);
+        a11yGrid.setVgap(16);
+
+        // 1. Language Picker
+        VBox langBox = new VBox(6);
+        Label lblLang = new Label(I18n.get("a11y.language_select"));
+        lblLang.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #1E293B;");
+        lblLang.getStyleClass().add("settings-key-label");
+
+        ComboBox<Locale> cmbLang = new ComboBox<>();
+        cmbLang.getItems().addAll(I18n.getSupportedLocales());
+        cmbLang.setValue(I18n.getLocale());
+        cmbLang.setMaxWidth(Double.MAX_VALUE);
+        cmbLang.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(Locale locale) {
+                return I18n.getLanguageDisplayName(locale);
+            }
+            @Override
+            public Locale fromString(String s) { return null; }
+        });
+        cmbLang.setOnAction(e -> {
+            Locale selected = cmbLang.getValue();
+            if (selected != null && !selected.equals(I18n.getLocale())) {
+                I18n.setLocale(selected);
+            }
+        });
+        AccessibilityManager.setupAccessible(cmbLang, "Language Selector", "Select interface language", AccessibleRole.COMBO_BOX);
+        langBox.getChildren().addAll(lblLang, cmbLang);
+
+        // 2. Contrast Theme Picker
+        VBox themeBox = new VBox(6);
+        Label lblTheme = new Label(I18n.get("a11y.theme_select"));
+        lblTheme.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #1E293B;");
+        lblTheme.getStyleClass().add("settings-key-label");
+
+        ComboBox<AccessibilityManager.Theme> cmbTheme = new ComboBox<>();
+        cmbTheme.getItems().addAll(AccessibilityManager.Theme.values());
+        cmbTheme.setValue(AccessibilityManager.getTheme());
+        cmbTheme.setMaxWidth(Double.MAX_VALUE);
+        cmbTheme.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(AccessibilityManager.Theme t) {
+                return t != null ? t.getDisplayName() : "";
+            }
+            @Override
+            public AccessibilityManager.Theme fromString(String s) { return null; }
+        });
+        cmbTheme.setOnAction(e -> {
+            AccessibilityManager.Theme selected = cmbTheme.getValue();
+            if (selected != null) {
+                AccessibilityManager.setTheme(selected);
+            }
+        });
+        AccessibilityManager.setupAccessible(cmbTheme, "Theme Selector", "Select visual contrast theme", AccessibleRole.COMBO_BOX);
+        themeBox.getChildren().addAll(lblTheme, cmbTheme);
+
+        // 3. Font Scaling / Zoom Level
+        VBox scaleBox = new VBox(6);
+        Label lblScale = new Label(I18n.get("a11y.font_scale_title"));
+        lblScale.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #1E293B;");
+        lblScale.getStyleClass().add("settings-key-label");
+
+        HBox scaleControls = new HBox(8);
+        scaleControls.setAlignment(Pos.CENTER_LEFT);
+
+        Button btnScaleDown = new Button("A-");
+        btnScaleDown.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 6 12;");
+        btnScaleDown.setOnAction(e -> AccessibilityManager.decreaseFontScale());
+        AccessibilityManager.setupAccessible(btnScaleDown, "Decrease Font Scale", "Scales down font size", AccessibleRole.BUTTON);
+
+        Label lblScaleValue = new Label((int)(AccessibilityManager.getFontScale() * 100) + "%");
+        lblScaleValue.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-min-width: 50px; -fx-alignment: CENTER;");
+        AccessibilityManager.addScaleListener(s -> lblScaleValue.setText((int)(s * 100) + "%"));
+
+        Button btnScaleUp = new Button("A+");
+        btnScaleUp.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 6 12;");
+        btnScaleUp.setOnAction(e -> AccessibilityManager.increaseFontScale());
+        AccessibilityManager.setupAccessible(btnScaleUp, "Increase Font Scale", "Scales up font size", AccessibleRole.BUTTON);
+
+        Button btnScaleReset = new Button(I18n.get("a11y.zoom_reset"));
+        btnScaleReset.setStyle("-fx-font-size: 12px; -fx-padding: 6 12;");
+        btnScaleReset.setOnAction(e -> AccessibilityManager.resetFontScale());
+        AccessibilityManager.setupAccessible(btnScaleReset, "Reset Font Scale", "Resets font scaling to 100%", AccessibleRole.BUTTON);
+
+        scaleControls.getChildren().addAll(btnScaleDown, lblScaleValue, btnScaleUp, btnScaleReset);
+        scaleBox.getChildren().addAll(lblScale, scaleControls);
+
+        // 4. Keyboard Shortcuts Help Action
+        VBox actionBox = new VBox(6);
+        Label lblHelp = new Label(I18n.get("a11y.keyboard_shortcuts_title"));
+        lblHelp.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #1E293B;");
+        lblHelp.getStyleClass().add("settings-key-label");
+
+        Button btnOpenA11yHelp = new Button(I18n.get("a11y.btn_shortcuts_help"));
+        btnOpenA11yHelp.getStyleClass().add("button-primary");
+        btnOpenA11yHelp.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 8 16;");
+        btnOpenA11yHelp.setOnAction(e -> AccessibilityHelpDialog.show(scrollRoot.getScene().getWindow()));
+        btnOpenA11yHelp.setOnKeyPressed(ev -> {
+            if (ev.getCode() == KeyCode.ENTER || ev.getCode() == KeyCode.SPACE) {
+                AccessibilityHelpDialog.show(scrollRoot.getScene().getWindow());
+            }
+        });
+        AccessibilityManager.setupAccessible(btnOpenA11yHelp, "Keyboard Navigation Guide", "Opens keyboard shortcuts and accessibility help dialog (F1)", AccessibleRole.BUTTON);
+        actionBox.getChildren().addAll(lblHelp, btnOpenA11yHelp);
+
+        a11yGrid.add(langBox, 0, 0);
+        a11yGrid.add(themeBox, 1, 0);
+        a11yGrid.add(scaleBox, 0, 1);
+        a11yGrid.add(actionBox, 1, 1);
+
+        ColumnConstraints c1 = new ColumnConstraints();
+        c1.setPercentWidth(50);
+        ColumnConstraints c2 = new ColumnConstraints();
+        c2.setPercentWidth(50);
+        a11yGrid.getColumnConstraints().addAll(c1, c2);
+
+        card.getChildren().addAll(header, new Separator(), a11yGrid);
+        return card;
     }
 
     private VBox buildThermalPolicyCard() {
@@ -213,16 +373,17 @@ public class SettingsView {
                 "-fx-background-color: rgba(239,68,68,0.12); -fx-background-radius: 6px; -fx-padding: 4 10;");
 
         VBox titleCol = new VBox(2);
-        Label lblTitle = new Label("Configurable Thermal Limits & Throttling Policies");
+        Label lblTitle = new Label(I18n.get("settings.thermal_title"));
         lblTitle.getStyleClass().add("settings-section-title");
-        Label lblDesc = new Label("Set autonomous auto-pause and cooldown resume temperature thresholds customized by storage media category.");
+        Label lblDesc = new Label(I18n.get("settings.thermal_sub"));
         lblDesc.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748B;");
+        lblDesc.getStyleClass().add("settings-key-label");
         titleCol.getChildren().addAll(lblTitle, lblDesc);
 
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
 
-        Label shieldStatus = new Label("AUTONOMOUS SAFEGUARD ACTIVE");
+        Label shieldStatus = new Label(I18n.get("settings.thermal_safeguard"));
         shieldStatus.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #10B981; " +
                 "-fx-background-color: #ECFDF5; -fx-background-radius: 12px; -fx-border-color: #A7F3D0; " +
                 "-fx-border-radius: 12px; -fx-padding: 4 12;");
@@ -239,13 +400,13 @@ public class SettingsView {
         HBox actionsBar = new HBox(12);
         actionsBar.setAlignment(Pos.CENTER_LEFT);
 
-        Button btnSave = new Button("Apply Thermal Policies");
+        Button btnSave = new Button(I18n.get("settings.thermal_apply"));
         btnSave.getStyleClass().add("btn-primary");
         btnSave.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 8 18;");
         btnSave.setOnAction(e -> handleSaveThermalPolicies());
         btnSave.setOnKeyPressed(ev -> { if (ev.getCode() == KeyCode.ENTER) handleSaveThermalPolicies(); });
 
-        Button btnReset = new Button("Reset to Factory Defaults");
+        Button btnReset = new Button(I18n.get("settings.thermal_reset"));
         btnReset.setStyle("-fx-font-size: 12px; -fx-padding: 8 16;");
         btnReset.setOnAction(e -> handleResetThermalDefaults());
         btnReset.setOnKeyPressed(ev -> { if (ev.getCode() == KeyCode.ENTER) handleResetThermalDefaults(); });
@@ -253,8 +414,9 @@ public class SettingsView {
         Region actionSpacer = new Region();
         HBox.setHgrow(actionSpacer, Priority.ALWAYS);
 
-        Label lblHelp = new Label("ℹ Auto-pause must be at least 3°C higher than cooldown resume threshold.");
+        Label lblHelp = new Label(I18n.get("settings.thermal_help"));
         lblHelp.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B; -fx-font-style: italic;");
+        lblHelp.getStyleClass().add("settings-key-label");
 
         actionsBar.getChildren().addAll(btnSave, btnReset, actionSpacer, lblHelp);
 
@@ -283,10 +445,12 @@ public class SettingsView {
 
         Label name = new Label(type.getDisplayName());
         name.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #0F172A;");
+        name.getStyleClass().add("settings-section-title");
         titleBox.getChildren().addAll(badge, name);
 
         Label desc = new Label(type.getDescription());
         desc.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B;");
+        desc.getStyleClass().add("settings-key-label");
         devInfo.getChildren().addAll(titleBox, desc);
 
         // Auto-Pause Control

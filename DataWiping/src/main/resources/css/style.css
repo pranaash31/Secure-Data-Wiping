@@ -1008,3 +1008,367 @@
     -fx-border-width: 1px;
     -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 10, 0, 0, 3);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY: DYNAMIC FONT SCALING (WCAG 1.4.4)
+   ══════════════════════════════════════════════════════════════════════════ */
+.font-scale-100 {
+    -fx-font-size: 13px;
+}
+.font-scale-125 {
+    -fx-font-size: 16px;
+}
+.font-scale-150 {
+    -fx-font-size: 19px;
+}
+.font-scale-175 {
+    -fx-font-size: 22px;
+}
+.font-scale-200 {
+    -fx-font-size: 25px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY: HIGH-CONTRAST DARK THEME (WCAG 2.1 AAA - ≥ 7:1 Contrast)
+   Black base (#000000), Stark Yellow (#FFD700), Pure White (#FFFFFF),
+   Bright Cyan (#00FFFF) focus highlights.
+   ══════════════════════════════════════════════════════════════════════════ */
+.high-contrast-dark,
+.high-contrast-dark .root {
+    -fx-base: #000000;
+    -fx-background-color: #000000;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.high-contrast-dark .top-bar,
+.high-contrast-dark .sidebar {
+    -fx-background-color: #000000;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 2px;
+}
+
+.high-contrast-dark .top-bar-title,
+.high-contrast-dark .section-label,
+.high-contrast-dark .card-title,
+.high-contrast-dark .settings-section-title,
+.high-contrast-dark .header-title,
+.high-contrast-dark .hero-brand-name,
+.high-contrast-dark .login-title {
+    -fx-text-fill: #FFD700;
+    -fx-font-weight: bold;
+}
+
+.high-contrast-dark .top-bar-user,
+.high-contrast-dark .section-sublabel,
+.high-contrast-dark .card-subtitle,
+.high-contrast-dark .label-muted,
+.high-contrast-dark .settings-key-label,
+.high-contrast-dark .settings-value-label,
+.high-contrast-dark .header-subtitle,
+.high-contrast-dark .login-subtitle {
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+}
+
+.high-contrast-dark .card,
+.high-contrast-dark .kpi-card,
+.high-contrast-dark .card-panel,
+.high-contrast-dark .login-card,
+.high-contrast-dark .hero-feature-card,
+.high-contrast-dark .hero-stat-card {
+    -fx-background-color: #000000;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 2px;
+}
+
+.high-contrast-dark .kpi-value {
+    -fx-fill: #FFD700;
+}
+.high-contrast-dark .kpi-label {
+    -fx-text-fill: #FFFFFF;
+}
+
+.high-contrast-dark .nav-button {
+    -fx-background-color: #000000;
+    -fx-text-fill: #FFFFFF;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+}
+.high-contrast-dark .nav-button:hover {
+    -fx-background-color: #FFD700;
+    -fx-text-fill: #000000;
+}
+.high-contrast-dark .nav-button-active {
+    -fx-background-color: #FFD700;
+    -fx-text-fill: #000000;
+    -fx-font-weight: bold;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 2px;
+}
+
+.high-contrast-dark .button {
+    -fx-background-color: #000000;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 2px;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+}
+.high-contrast-dark .button:hover {
+    -fx-background-color: #FFD700;
+    -fx-text-fill: #000000;
+    -fx-border-color: #FFD700;
+}
+.high-contrast-dark .button-primary {
+    -fx-background-color: #FFD700;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 2px;
+    -fx-text-fill: #000000;
+}
+.high-contrast-dark .button-primary:hover {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #000000;
+}
+.high-contrast-dark .button-danger {
+    -fx-background-color: #FF1744;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 2px;
+    -fx-text-fill: #FFFFFF;
+}
+.high-contrast-dark .button-success {
+    -fx-background-color: #00E676;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 2px;
+    -fx-text-fill: #000000;
+}
+
+.high-contrast-dark .text-field,
+.high-contrast-dark .password-field,
+.high-contrast-dark .combo-box,
+.high-contrast-dark .choice-box {
+    -fx-background-color: #000000;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 2px;
+    -fx-text-fill: #FFFFFF;
+}
+.high-contrast-dark .text-field:focused,
+.high-contrast-dark .password-field:focused {
+    -fx-border-color: #00FFFF;
+    -fx-border-width: 3px;
+}
+
+.high-contrast-dark .badge-info,
+.high-contrast-dark .badge-success,
+.high-contrast-dark .badge-warning,
+.high-contrast-dark .badge-danger,
+.high-contrast-dark .top-bar-badge {
+    -fx-background-color: #000000;
+    -fx-border-color: #FFD700;
+    -fx-border-width: 2px;
+    -fx-text-fill: #FFD700;
+    -fx-font-weight: bold;
+}
+
+.high-contrast-dark .table-view {
+    -fx-background-color: #000000;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 2px;
+}
+.high-contrast-dark .table-view .column-header-background {
+    -fx-background-color: #000000;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 0 0 2 0;
+}
+.high-contrast-dark .table-view .column-header .label {
+    -fx-text-fill: #FFD700;
+    -fx-font-weight: bold;
+}
+.high-contrast-dark .table-row-cell {
+    -fx-background-color: #000000;
+    -fx-border-color: #333333;
+    -fx-border-width: 0 0 1 0;
+}
+.high-contrast-dark .table-row-cell:hover,
+.high-contrast-dark .table-row-cell:selected {
+    -fx-background-color: #222222;
+    -fx-border-color: #FFD700;
+}
+.high-contrast-dark .table-cell {
+    -fx-text-fill: #FFFFFF;
+}
+
+.high-contrast-dark .terminal-area {
+    -fx-control-inner-background: #000000;
+    -fx-background-color: #000000;
+    -fx-text-fill: #00FFFF;
+    -fx-border-color: #FFFFFF;
+    -fx-border-width: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY: HIGH-CONTRAST LIGHT THEME (WCAG 2.1 AAA - ≥ 7:1 Contrast)
+   Stark White base (#FFFFFF), Jet Black (#000000) borders and text,
+   High-contrast Blue / Yellow focus rings.
+   ══════════════════════════════════════════════════════════════════════════ */
+.high-contrast-light,
+.high-contrast-light .root {
+    -fx-base: #FFFFFF;
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #000000;
+    -fx-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.high-contrast-light .top-bar,
+.high-contrast-light .sidebar {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #000000;
+    -fx-border-width: 2px;
+}
+
+.high-contrast-light .top-bar-title,
+.high-contrast-light .section-label,
+.high-contrast-light .card-title,
+.high-contrast-light .settings-section-title,
+.high-contrast-light .header-title,
+.high-contrast-light .hero-brand-name,
+.high-contrast-light .login-title,
+.high-contrast-light .kpi-value {
+    -fx-text-fill: #000000;
+    -fx-fill: #000000;
+    -fx-font-weight: bold;
+}
+
+.high-contrast-light .top-bar-user,
+.high-contrast-light .section-sublabel,
+.high-contrast-light .card-subtitle,
+.high-contrast-light .label-muted,
+.high-contrast-light .settings-key-label,
+.high-contrast-light .settings-value-label,
+.high-contrast-light .login-subtitle,
+.high-contrast-light .kpi-label {
+    -fx-text-fill: #000000;
+    -fx-font-weight: bold;
+}
+
+.high-contrast-light .card,
+.high-contrast-light .kpi-card,
+.high-contrast-light .card-panel,
+.high-contrast-light .login-card,
+.high-contrast-light .hero-feature-card,
+.high-contrast-light .hero-stat-card {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #000000;
+    -fx-border-width: 2px;
+}
+
+.high-contrast-light .nav-button {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #000000;
+    -fx-border-color: #000000;
+    -fx-border-width: 1px;
+}
+.high-contrast-light .nav-button:hover {
+    -fx-background-color: #E2E8F0;
+    -fx-text-fill: #000000;
+}
+.high-contrast-light .nav-button-active {
+    -fx-background-color: #000000;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+}
+
+.high-contrast-light .button {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #000000;
+    -fx-border-width: 2px;
+    -fx-text-fill: #000000;
+    -fx-font-weight: bold;
+}
+.high-contrast-light .button:hover {
+    -fx-background-color: #000000;
+    -fx-text-fill: #FFFFFF;
+}
+.high-contrast-light .button-primary {
+    -fx-background-color: #000000;
+    -fx-border-color: #000000;
+    -fx-border-width: 2px;
+    -fx-text-fill: #FFFFFF;
+}
+.high-contrast-light .button-primary:hover {
+    -fx-background-color: #1E3A8A;
+    -fx-text-fill: #FFFFFF;
+}
+
+.high-contrast-light .text-field,
+.high-contrast-light .password-field,
+.high-contrast-light .combo-box,
+.high-contrast-light .choice-box {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #000000;
+    -fx-border-width: 2px;
+    -fx-text-fill: #000000;
+}
+
+.high-contrast-light .badge-info,
+.high-contrast-light .badge-success,
+.high-contrast-light .badge-warning,
+.high-contrast-light .badge-danger,
+.high-contrast-light .top-bar-badge {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #000000;
+    -fx-border-width: 2px;
+    -fx-text-fill: #000000;
+    -fx-font-weight: bold;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY: WCAG 2.1 FOCUS VISIBLE (2.4.7) 3PX HIGH-CONTRAST FOCUS RING
+   ══════════════════════════════════════════════════════════════════════════ */
+:focused {
+    -fx-focus-color: #2563EB;
+    -fx-faint-focus-color: transparent;
+}
+.button:focused,
+.nav-button:focused,
+.text-field:focused,
+.password-field:focused,
+.combo-box:focused,
+.choice-box:focused,
+.spinner:focused,
+.table-view:focused {
+    -fx-border-color: #2563EB;
+    -fx-border-width: 2.5px;
+}
+
+.dark-theme .button:focused,
+.dark-theme .nav-button:focused,
+.dark-theme .text-field:focused,
+.dark-theme .password-field:focused,
+.dark-theme .combo-box:focused,
+.dark-theme .spinner:focused {
+    -fx-border-color: #38BDF8;
+    -fx-border-width: 2.5px;
+}
+
+.high-contrast-dark .button:focused,
+.high-contrast-dark .nav-button:focused,
+.high-contrast-dark .text-field:focused,
+.high-contrast-dark .password-field:focused,
+.high-contrast-dark .combo-box:focused,
+.high-contrast-dark .spinner:focused {
+    -fx-border-color: #00FFFF;
+    -fx-border-width: 3.5px;
+}
+
+.high-contrast-light .button:focused,
+.high-contrast-light .nav-button:focused,
+.high-contrast-light .text-field:focused,
+.high-contrast-light .password-field:focused,
+.high-contrast-light .combo-box:focused,
+.high-contrast-light .spinner:focused {
+    -fx-border-color: #0000FF;
+    -fx-border-width: 3.5px;
+}
+

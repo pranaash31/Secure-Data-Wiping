@@ -1,7 +1,9 @@
 package com.sanitizer.gui.views;
 
+import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.esg.EsgCalculator;
+import com.sanitizer.i18n.I18n;
 import com.sanitizer.util.AppLogger;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -9,6 +11,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.AccessibleRole;
 import javafx.scene.Parent;
 import javafx.scene.chart.BarChart;
 import javafx.scene.chart.CategoryAxis;
@@ -81,18 +84,19 @@ public class DashboardView {
         HBox headerRow = new HBox(16);
         headerRow.setAlignment(Pos.CENTER_LEFT);
         VBox titleBox = new VBox(4);
-        Label lblTitle = new Label("Executive Dashboard");
+        Label lblTitle = new Label(I18n.get("dashboard.title"));
         lblTitle.getStyleClass().add("section-label");
-        Label lblSub = new Label("Real-time sanitization KPIs, audit metrics, and quick actions for your mission-critical operations");
+        Label lblSub = new Label(I18n.get("dashboard.subtitle"));
         lblSub.getStyleClass().add("section-sublabel");
         titleBox.getChildren().addAll(lblTitle, lblSub);
 
         Region hSpacer = new Region();
         HBox.setHgrow(hSpacer, Priority.ALWAYS);
-        Button btnRefresh = new Button("Refresh Metrics (F5)");
+        Button btnRefresh = new Button(I18n.get("dashboard.refresh"));
         btnRefresh.getStyleClass().add("button-primary");
         btnRefresh.setTooltip(new Tooltip("Reload all KPI metrics and charts (F5)"));
         btnRefresh.setOnAction(e -> refreshData());
+        AccessibilityManager.setupAccessible(btnRefresh, "Refresh Metrics", "Reloads KPI charts and audit counts (F5)", AccessibleRole.BUTTON);
         headerRow.getChildren().addAll(titleBox, hSpacer, btnRefresh);
 
         // --- KPI Metric Cards Row ---
@@ -115,10 +119,10 @@ public class DashboardView {
         kpiGrid.setHgap(16);
         kpiGrid.setVgap(16);
 
-        kpiGrid.add(createKpiCard("TOTAL SANITIZATION OPERATIONS", lblValTotalWipes, "SQLite Audit DB", "badge-success"), 0, 0);
-        kpiGrid.add(createKpiCard("ZERO-RECOVERY SUCCESS RATE", lblValSuccessRate, "SP 800-88 & DoD 5220.22-M", "badge-info"), 1, 0);
-        kpiGrid.add(createKpiCard("DIGITAL PKI SIGNATURES", lblValSignatures, "RSA-4096 / SHA-256", "badge-info"), 2, 0);
-        kpiGrid.add(createKpiCard("CONNECTED TARGET DRIVES", lblValActiveDrives, lblBadgeActiveDrives), 3, 0);
+        kpiGrid.add(createKpiCard(I18n.get("dashboard.kpi_total_wipes"), lblValTotalWipes, "SQLite Audit DB", "badge-success"), 0, 0);
+        kpiGrid.add(createKpiCard(I18n.get("dashboard.kpi_success_rate"), lblValSuccessRate, "SP 800-88 & DoD 5220.22-M", "badge-info"), 1, 0);
+        kpiGrid.add(createKpiCard(I18n.get("dashboard.kpi_signatures"), lblValSignatures, "RSA-2048 / SHA-256", "badge-info"), 2, 0);
+        kpiGrid.add(createKpiCard(I18n.get("dashboard.kpi_active_drives"), lblValActiveDrives, lblBadgeActiveDrives), 3, 0);
 
         for (int i = 0; i < 4; i++) {
             ColumnConstraints cc = new ColumnConstraints();
@@ -132,7 +136,7 @@ public class DashboardView {
 
         HBox esgHeader = new HBox(12);
         esgHeader.setAlignment(Pos.CENTER_LEFT);
-        Label lblEsgTitle = new Label("🌱 ENTERPRISE ESG SUSTAINABILITY & CIRCULAR ECONOMY (SCOPE 3 GHG MITIGATION)");
+        Label lblEsgTitle = new Label("🌱 " + I18n.get("dashboard.esg_title"));
         lblEsgTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #34D399; -fx-letter-spacing: 0.5px;");
         Region esgSpacer = new Region();
         HBox.setHgrow(esgSpacer, Priority.ALWAYS);
@@ -177,12 +181,13 @@ public class DashboardView {
         pieCard.getStyleClass().add("card");
         HBox.setHgrow(pieCard, Priority.ALWAYS);
 
-        Label lblPieTitle = new Label("Sanitization Standards Distribution");
+        Label lblPieTitle = new Label(I18n.get("dashboard.chart_standards"));
         lblPieTitle.getStyleClass().add("card-title");
 
         PieChart pieChart = new PieChart(pieData);
         pieChart.setLegendSide(javafx.geometry.Side.BOTTOM);
         pieChart.setPrefHeight(220);
+        AccessibilityManager.setupAccessible(pieChart, "Sanitization Standards Chart", "Pie chart showing percentage breakdown of wipe algorithms", AccessibleRole.IMAGE_VIEW);
         pieCard.getChildren().addAll(lblPieTitle, pieChart);
 
         // Chart 2: Bar Chart (Operational History by Status/Standard)
@@ -190,7 +195,7 @@ public class DashboardView {
         barCard.getStyleClass().add("card");
         HBox.setHgrow(barCard, Priority.ALWAYS);
 
-        Label lblBarTitle = new Label("Sanitization Operations Velocity");
+        Label lblBarTitle = new Label(I18n.get("dashboard.chart_monthly"));
         lblBarTitle.getStyleClass().add("card-title");
 
         CategoryAxis xAxis = new CategoryAxis();
@@ -203,6 +208,7 @@ public class DashboardView {
         barChart.setPrefHeight(220);
         barSeries.setName("Completed Operations");
         barChart.getData().add(barSeries);
+        AccessibilityManager.setupAccessible(barChart, "Monthly Sanitization Volume Bar Chart", "Bar chart depicting operation counts per standard", AccessibleRole.IMAGE_VIEW);
 
         barCard.getChildren().addAll(lblBarTitle, barChart);
 
@@ -213,11 +219,12 @@ public class DashboardView {
         tableCard.getStyleClass().add("card");
         VBox.setVgrow(tableCard, Priority.ALWAYS);
 
-        Label lblTableTitle = new Label("Recent Sanitization Operations Log");
+        Label lblTableTitle = new Label(I18n.get("dashboard.recent_activity"));
         lblTableTitle.getStyleClass().add("card-title");
 
         TableView<AuditDb.AuditRecord> tblRecent = new TableView<>();
         VBox.setVgrow(tblRecent, Priority.ALWAYS);
+        AccessibilityManager.setupAccessible(tblRecent, "Recent Sanitizations Table", "Table of most recent wiping audits and statuses", AccessibleRole.TABLE_VIEW);
 
         TableColumn<AuditDb.AuditRecord, Integer> colId = new TableColumn<>("ID");
         colId.setCellValueFactory(data -> new SimpleIntegerProperty(data.getValue().id()).asObject());
