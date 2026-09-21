@@ -4,6 +4,7 @@ import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
+import com.sanitizer.session.UserRole;
 import javafx.geometry.Pos;
 import javafx.scene.AccessibleRole;
 import javafx.scene.Node;
@@ -26,10 +27,12 @@ public class MainLayout {
     private Label lblTitle;
     private Label lblBadge;
     private Label lblUserInfo;
+    private Label lblRoleBadge;
     private Label mainLabel;
     private Label opsLabel;
     private Label mgmtLabel;
     private Label compLabel;
+    private Button btnLockSession;
     private Button btnLogoutTop;
     private Button btnThemeToggle;
     private Button btnA11yHelp;
@@ -82,6 +85,14 @@ public class MainLayout {
 
         lblBadge = new Label(I18n.get("topbar.badge"));
         lblBadge.getStyleClass().add("top-bar-badge");
+
+        // Role Clearance Badge
+        UserRole role = navManager.getUserRole();
+        lblRoleBadge = new Label(role.getTierLabel().toUpperCase());
+        lblRoleBadge.setStyle(String.format(
+                "-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: %s; -fx-background-color: %s; -fx-padding: 4 10; -fx-background-radius: 6px;",
+                role.getAccentColor(), role.getBgColor()
+        ));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -161,6 +172,14 @@ public class MainLayout {
         btnA11yHelp.setOnAction(e -> AccessibilityHelpDialog.show(rootPane.getScene().getWindow()));
         AccessibilityManager.setupAccessible(btnA11yHelp, "Accessibility & Keyboard Navigation Guide", "Opens keyboard navigation and WCAG accessibility guide", AccessibleRole.BUTTON);
 
+        // ── FISMA Session Lock Button ──
+        btnLockSession = new Button("🔒 Lock");
+        btnLockSession.getStyleClass().add("button-theme-toggle");
+        btnLockSession.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #F59E0B;");
+        btnLockSession.setTooltip(new Tooltip("Lock session immediately (FISMA / HIPAA Requirement) — Ctrl/Cmd + Alt + L"));
+        btnLockSession.setOnAction(e -> navManager.lockSessionNow());
+        AccessibilityManager.setupAccessible(btnLockSession, "Lock Session", "Instantly locks the session (Ctrl/Cmd + Alt + L)", AccessibleRole.BUTTON);
+
         // ── Sign Out ──
         btnLogoutTop = new Button(I18n.get("topbar.sign_out"));
         btnLogoutTop.getStyleClass().add("button-theme-toggle");
@@ -168,8 +187,8 @@ public class MainLayout {
         AccessibilityManager.setupAccessible(btnLogoutTop, "Sign Out", "Logs out from current session", AccessibleRole.BUTTON);
 
         topBar.getChildren().addAll(
-                brandRow, lblBadge, spacer,
-                lblUserInfo, cmbLanguage, zoomGroup, btnThemeToggle, btnA11yHelp, btnLogoutTop
+                brandRow, lblBadge, lblRoleBadge, spacer,
+                lblUserInfo, cmbLanguage, zoomGroup, btnThemeToggle, btnA11yHelp, btnLockSession, btnLogoutTop
         );
         rootPane.setTop(topBar);
 
@@ -193,12 +212,16 @@ public class MainLayout {
         mgmtLabel = new Label(I18n.get("nav.management"));
         mgmtLabel.getStyleClass().add("sidebar-section-label");
         Button btnClients   = createNavBtn("  " + I18n.get("nav.clients"), "clients", "Client Manager");
-        Button btnKeyVault  = createNavBtn("  " + I18n.get("nav.key_vault"), "keyvault", "Key Vault (Ctrl/Cmd + K)");
+
+        String keyVaultLabel = navManager.hasPermission(UserRole.Permission.KEYVAULT_MANAGE)
+                ? "  " + I18n.get("nav.key_vault")
+                : "  " + I18n.get("nav.key_vault") + " 🔒";
+        Button btnKeyVault  = createNavBtn(keyVaultLabel, "keyvault", "Key Vault (Ctrl/Cmd + K)");
 
         // COMPLIANCE section
         compLabel = new Label(I18n.get("nav.compliance"));
         compLabel.getStyleClass().add("sidebar-section-label");
-        Button btnAudit     = createNavBtn("  " + I18n.get("nav.audit"), "audit", "Audit Trail (Ctrl/Cmd + A)");
+        Button btnAudit     = createNavBtn("  " + I18n.get("nav.audit"), "audit", "Audit Trail & Security Log (Ctrl/Cmd + A)");
         Button btnVerify    = createNavBtn("  🛡️ " + I18n.get("nav.verify"), "verify", "Verify Certificate");
         Button btnSettings  = createNavBtn("  " + I18n.get("nav.settings"), "settings", "System & Security Settings (Ctrl/Cmd + ,)");
 
@@ -210,8 +233,9 @@ public class MainLayout {
         officerCard.getStyleClass().add("sidebar-officer-card");
         Label officerName = new Label(navManager.getOfficerName());
         officerName.getStyleClass().add("sidebar-officer-name");
-        officerRole = new Label(navManager.getRole());
+        officerRole = new Label(navManager.getRole() + " (" + role.getTierLabel() + ")");
         officerRole.getStyleClass().add("sidebar-officer-role");
+        officerRole.setStyle("-fx-text-fill: " + role.getAccentColor() + "; -fx-font-weight: bold;");
         Label officerAgency = new Label(navManager.getAgencyId());
         officerAgency.getStyleClass().add("sidebar-officer-agency");
         officerCard.getChildren().addAll(officerName, officerRole, officerAgency);
@@ -267,7 +291,11 @@ public class MainLayout {
         updateNavBtnText("batchwipe", "  " + I18n.get("nav.batch_wipe"));
         updateNavBtnText("diagnostics", "  " + I18n.get("nav.diagnostics"));
         updateNavBtnText("clients", "  " + I18n.get("nav.clients"));
-        updateNavBtnText("keyvault", "  " + I18n.get("nav.key_vault"));
+
+        String kvText = navManager.hasPermission(UserRole.Permission.KEYVAULT_MANAGE)
+                ? "  " + I18n.get("nav.key_vault")
+                : "  " + I18n.get("nav.key_vault") + " 🔒";
+        updateNavBtnText("keyvault", kvText);
         updateNavBtnText("audit", "  " + I18n.get("nav.audit"));
         updateNavBtnText("verify", "  🛡️ " + I18n.get("nav.verify"));
         updateNavBtnText("settings", "  " + I18n.get("nav.settings"));

@@ -4,6 +4,7 @@ import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.alert.AlertConfig;
 import com.sanitizer.alert.AlertConfigManager;
 import com.sanitizer.alert.AlertDispatcher;
+import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.DeviceType;
 import com.sanitizer.detector.ThermalPolicy;
@@ -17,6 +18,8 @@ import com.sanitizer.policy.WipePass;
 import com.sanitizer.policy.WipePatternType;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
+import com.sanitizer.session.SessionAutoLockManager;
+import com.sanitizer.session.UserRole;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -74,6 +77,9 @@ public class SettingsView {
 
         // ── Card 0: Internationalization & Accessibility (WCAG 2.1 AA / Section 508) ────
         VBox cardA11y = buildAccessibilityAndI18nCard();
+
+        // ── Card 0.5: Session Auto-Lock & FISMA/HIPAA Security Controls ────
+        VBox cardAutoLock = buildSessionAutoLockCard();
 
         // ── Card 1: Custom Wipe Standard & Pattern Builder ────
         VBox cardPolicyBuilder = buildCustomPolicyBuilderCard();
@@ -236,7 +242,106 @@ public class SettingsView {
         HBox.setHgrow(footerSpacer, Priority.ALWAYS);
         footer.getChildren().addAll(footerLabel, footerSpacer, versionBadge);
 
-        rootContainer.getChildren().addAll(titleBox, cardA11y, cardPolicyBuilder, cardThermal, grid, footer);
+        rootContainer.getChildren().addAll(titleBox, cardA11y, cardAutoLock, cardPolicyBuilder, cardThermal, cardAlerts, grid, footer);
+    }
+
+    private VBox buildSessionAutoLockCard() {
+        VBox card = new VBox(18);
+        card.getStyleClass().add("card");
+
+        // Header
+        HBox header = new HBox(12);
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label iconBadge = new Label("🔒 [SESSION AUTO-LOCK]");
+        iconBadge.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #F59E0B; " +
+                "-fx-background-color: rgba(245,158,11,0.12); -fx-background-radius: 6px; -fx-padding: 4 10;");
+
+        VBox titleCol = new VBox(2);
+        Label lblTitle = new Label("Session Auto-Lock & FISMA/HIPAA Security Controls");
+        lblTitle.getStyleClass().add("settings-section-title");
+        Label lblDesc = new Label("Configurable inactivity timeout locking (FISMA High & HIPAA Security Rule 45 CFR § 164.312 requirement)");
+        lblDesc.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748B;");
+        titleCol.getChildren().addAll(lblTitle, lblDesc);
+
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+
+        Label statusBadge = new Label("COMPLIANCE ENFORCED");
+        statusBadge.getStyleClass().add("badge-warning");
+
+        header.getChildren().addAll(iconBadge, titleCol, headerSpacer, statusBadge);
+
+        GridPane lockGrid = new GridPane();
+        lockGrid.setHgap(20);
+        lockGrid.setVgap(14);
+
+        // Timeout Selector
+        VBox timeoutBox = new VBox(6);
+        Label lblTimeout = new Label("Inactivity Auto-Lock Timeout:");
+        lblTimeout.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #1E293B;");
+
+        ComboBox<Integer> cmbTimeout = new ComboBox<>();
+        cmbTimeout.getItems().addAll(60, 300, 900, 1800, 0);
+        cmbTimeout.setValue(SessionAutoLockManager.getInstance().getTimeoutSeconds());
+        cmbTimeout.setMaxWidth(Double.MAX_VALUE);
+        cmbTimeout.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(Integer sec) {
+                if (sec == null) return "";
+                return switch (sec) {
+                    case 60   -> "1 Minute (Strict / Demo)";
+                    case 300  -> "5 Minutes (Standard FISMA Default)";
+                    case 900  -> "15 Minutes (HIPAA Standard)";
+                    case 1800 -> "30 Minutes (Extended Policy)";
+                    case 0    -> "Disabled (Testing Mode Only)";
+                    default   -> sec + " Seconds";
+                };
+            }
+            @Override
+            public Integer fromString(String s) { return null; }
+        });
+
+        var nav = NavigationManager.getInstance();
+        boolean canEdit = nav.hasPermission(UserRole.Permission.SETTINGS_MODIFY);
+        cmbTimeout.setDisable(!canEdit);
+
+        cmbTimeout.setOnAction(e -> {
+            Integer val = cmbTimeout.getValue();
+            if (val != null) {
+                SessionAutoLockManager.getInstance().setTimeoutSeconds(val);
+                SecurityAuditLogger.logConfigChange(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
+                        "Session Auto-Lock Timeout", val == 0 ? "Disabled" : val + "s");
+                nav.showNotification("Auto-Lock Policy Updated",
+                        "Inactivity timeout set to: " + cmbTimeout.getConverter().toString(val),
+                        ToastNotification.ToastType.SUCCESS);
+            }
+        });
+        timeoutBox.getChildren().addAll(lblTimeout, cmbTimeout);
+
+        // Manual Lock & Test Controls
+        VBox actionBox = new VBox(6);
+        Label lblTest = new Label("Security Lock Actions:");
+        lblTest.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #1E293B;");
+
+        HBox btnRow = new HBox(10);
+        Button btnLockNow = new Button("🔒 Lock Session Now (Ctrl+Alt+L)");
+        btnLockNow.getStyleClass().add("button-primary");
+        btnLockNow.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-padding: 8 16;");
+        btnLockNow.setOnAction(e -> nav.lockSessionNow());
+
+        btnRow.getChildren().add(btnLockNow);
+        actionBox.getChildren().addAll(lblTest, btnRow);
+
+        lockGrid.add(timeoutBox, 0, 0);
+        lockGrid.add(actionBox, 1, 0);
+
+        ColumnConstraints c1 = new ColumnConstraints(); c1.setPercentWidth(50);
+        ColumnConstraints c2 = new ColumnConstraints(); c2.setPercentWidth(50);
+        lockGrid.getColumnConstraints().addAll(c1, c2);
+
+        card.getChildren().addAll(header, new Separator(), lockGrid);
+        return card;
     }
 
     private VBox buildAccessibilityAndI18nCard() {
@@ -556,6 +661,13 @@ public class SettingsView {
             return;
         }
 
+        var nav = NavigationManager.getInstance();
+        if (!nav.hasPermission(UserRole.Permission.THERMAL_CONFIG)) {
+            nav.showAccessDeniedDialog("Thermal Policy Configuration", "SUPERVISOR / CHIEF AUDITOR");
+            SecurityAuditLogger.logAccessDenied(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Thermal Policy Manager", "THERMAL_CONFIG");
+            return;
+        }
+
         // Commit and apply all policies
         for (DeviceType type : DeviceType.values()) {
             Spinner<Integer> spPause = pauseSpinners.get(type);
@@ -571,6 +683,8 @@ public class SettingsView {
                 }
             }
         }
+
+        SecurityAuditLogger.logThermalChange(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "USB/NVMe/HDD limits updated");
 
         NavigationManager.getInstance().showNotification(
                 "Thermal Policies Saved",
@@ -1016,6 +1130,13 @@ public class SettingsView {
     }
 
     private void handleSaveCurrentPolicy() {
+        var nav = NavigationManager.getInstance();
+        if (!nav.hasPermission(UserRole.Permission.POLICY_EDIT)) {
+            nav.showAccessDeniedDialog("Wipe Policy Configuration", "SUPERVISOR / CHIEF AUDITOR");
+            SecurityAuditLogger.logAccessDenied(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Wipe Policy Manager", "POLICY_EDIT");
+            return;
+        }
+
         WipePolicy current = cmbPolicySelector.getValue();
         if (current == null) return;
 
@@ -1041,6 +1162,7 @@ public class SettingsView {
                     "Custom"
             );
             WipePolicyManager.getInstance().savePolicy(customFork);
+            SecurityAuditLogger.logPolicyChange(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Forked & Saved", customFork.getName());
             refreshPolicySelectorItems();
             cmbPolicySelector.setValue(customFork);
             loadPolicyIntoForm(customFork);
@@ -1056,17 +1178,26 @@ public class SettingsView {
         current.setPasses(new ArrayList<>(currentEditingPasses));
 
         WipePolicyManager.getInstance().savePolicy(current);
+        SecurityAuditLogger.logPolicyChange(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Saved / Modified", current.getName());
         refreshPolicySelectorItems();
         cmbPolicySelector.setValue(current);
         NavigationManager.getInstance().showNotification("Policy Saved", "Wipe policy profile updated successfully.", ToastNotification.ToastType.SUCCESS);
     }
 
     private void handleDeleteCurrentPolicy() {
+        var nav = NavigationManager.getInstance();
+        if (!nav.hasPermission(UserRole.Permission.POLICY_EDIT)) {
+            nav.showAccessDeniedDialog("Wipe Policy Configuration", "SUPERVISOR / CHIEF AUDITOR");
+            SecurityAuditLogger.logAccessDenied(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Wipe Policy Manager", "POLICY_EDIT");
+            return;
+        }
+
         WipePolicy current = cmbPolicySelector.getValue();
         if (current == null || current.isSystemBuiltin()) return;
 
         boolean deleted = WipePolicyManager.getInstance().deletePolicy(current.getId());
         if (deleted) {
+            SecurityAuditLogger.logPolicyChange(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Deleted", current.getName());
             refreshPolicySelectorItems();
             loadPolicyIntoForm(WipePolicyManager.getInstance().getDefaultPolicy());
             NavigationManager.getInstance().showNotification("Policy Deleted", "Policy profile removed.", ToastNotification.ToastType.WARNING);
@@ -1282,6 +1413,12 @@ public class SettingsView {
         Button btnSaveAlerts = new Button("💾 Save Alert Configuration");
         btnSaveAlerts.getStyleClass().add("button-primary");
         btnSaveAlerts.setOnAction(e -> {
+            var nav = NavigationManager.getInstance();
+            if (!nav.hasPermission(UserRole.Permission.ALERT_CONFIG)) {
+                nav.showAccessDeniedDialog("Real-Time Alert Dispatcher", "SUPERVISOR / CHIEF AUDITOR");
+                SecurityAuditLogger.logAccessDenied(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Alert Dispatcher", "ALERT_CONFIG");
+                return;
+            }
             AlertConfig toSave = buildAlertConfigFromForm(
                     chkWebhook.isSelected(), cmbPlatform.getValue(), txtWebhookUrl.getText(),
                     chkSmtp.isSelected(), txtHost.getText(), spnPort.getValue(),
@@ -1290,6 +1427,8 @@ public class SettingsView {
                     chkShield.isSelected(), chkQuarantine.isSelected()
             );
             AlertConfigManager.getInstance().saveConfig(toSave);
+            SecurityAuditLogger.logAlertChange(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
+                    "Webhook=" + toSave.isWebhookEnabled() + ", SMTP=" + toSave.isSmtpEnabled());
             NavigationManager.getInstance().showNotification(
                     "Alert Settings Saved",
                     "Real-time email and webhook alert settings updated successfully.",

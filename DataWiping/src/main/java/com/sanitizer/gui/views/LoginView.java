@@ -3,6 +3,7 @@ package com.sanitizer.gui.views;
 import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
+import com.sanitizer.session.UserRole;
 import javafx.animation.FadeTransition;
 import javafx.geometry.Pos;
 import javafx.scene.AccessibleRole;
@@ -10,6 +11,7 @@ import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.util.Duration;
+import javafx.util.StringConverter;
 
 public class LoginView {
 
@@ -32,7 +34,7 @@ public class LoginView {
         splitLayout.setFillHeight(true);
 
         // ── LEFT BRAND PANEL ──────────────────────────────────────────────
-        VBox brandPanel = new VBox(32);
+        VBox brandPanel = new VBox(28);
         brandPanel.getStyleClass().add("login-brand-panel");
         brandPanel.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(brandPanel, Priority.ALWAYS);
@@ -62,31 +64,31 @@ public class LoginView {
         brandSub.getStyleClass().add("brand-sub");
         brandSub.setWrapText(true);
 
-        // Feature list
-        VBox features = new VBox(14);
-        String[][] featureData = {
-                {I18n.get("login.feat_certificates"), "#34D399"},
-                {I18n.get("login.feat_monitoring"), "#60A5FA"},
-                {I18n.get("login.feat_standards"), "#FBBF24"},
-                {I18n.get("login.feat_fips"), "#34D399"},
-                {I18n.get("login.feat_airgap"), "#60A5FA"}
-        };
-        for (String[] f : featureData) {
-            Label feat = new Label(f[0]);
-            feat.setStyle("-fx-font-size: 13px; -fx-text-fill: " + f[1] + "; -fx-font-weight: bold;");
-            features.getChildren().add(feat);
-        }
+        // RBAC Tier Overview Box
+        VBox rbacOverview = new VBox(10);
+        rbacOverview.setStyle("-fx-background-color: rgba(15,23,42,0.6); -fx-padding: 14; -fx-background-radius: 10px; -fx-border-color: rgba(59,130,246,0.2); -fx-border-radius: 10px;");
+        Label lblRbacHeader = new Label("Multi-Tier Authorization (RBAC) Active:");
+        lblRbacHeader.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #94A3B8;");
+
+        Label tier1 = new Label("• Tier 1: INSPECTOR — Sanitization Execution & Diagnostics");
+        tier1.setStyle("-fx-font-size: 11px; -fx-text-fill: #38BDF8;");
+        Label tier2 = new Label("• Tier 2: SUPERVISOR — Policy Builder, Thermal & Alert Config");
+        tier2.setStyle("-fx-font-size: 11px; -fx-text-fill: #FBBF24;");
+        Label tier3 = new Label("• Tier 3: CHIEF AUDITOR — Full Governance, Ledger Proof & Logs");
+        tier3.setStyle("-fx-font-size: 11px; -fx-text-fill: #C084FC;");
+        rbacOverview.getChildren().addAll(lblRbacHeader, tier1, tier2, tier3);
 
         // Compliance badge row
-        HBox complianceBadges = new HBox(10);
+        HBox complianceBadges = new HBox(8);
         complianceBadges.setAlignment(Pos.CENTER_LEFT);
-        for (String s : new String[]{"NIST 800-88", "DoD 5220.22-M", "FIPS 140-2", "WCAG 2.1 AA"}) {
+        for (String s : new String[]{"NIST 800-88", "FISMA/HIPAA", "FIPS 140-2", "RBAC Tiers"}) {
             Label b = new Label(s);
             b.getStyleClass().add("badge-info");
+            b.setStyle("-fx-font-size: 10px;");
             complianceBadges.getChildren().add(b);
         }
 
-        brandPanel.getChildren().addAll(logoRow, brandHeadline, brandSub, new Separator(), features, complianceBadges);
+        brandPanel.getChildren().addAll(logoRow, brandHeadline, brandSub, new Separator(), rbacOverview, complianceBadges);
 
         // ── RIGHT LOGIN PANEL ─────────────────────────────────────────────
         VBox formPanel = new VBox();
@@ -94,22 +96,38 @@ public class LoginView {
         formPanel.setAlignment(Pos.CENTER);
         HBox.setHgrow(formPanel, Priority.ALWAYS);
 
-        VBox loginCard = new VBox(22);
+        VBox loginCard = new VBox(18);
         loginCard.getStyleClass().add("login-card");
-        loginCard.setMaxWidth(420);
+        loginCard.setMaxWidth(440);
 
         // Card header
-        VBox headerBox = new VBox(6);
+        VBox headerBox = new VBox(4);
         Label badgeLabel = new Label(I18n.get("login.portal_badge"));
         badgeLabel.getStyleClass().add("badge-info");
         Label loginTitle = new Label(I18n.get("login.title"));
         loginTitle.getStyleClass().add("login-title");
-        Label loginSub = new Label(I18n.get("login.subtitle"));
+        Label loginSub = new Label("Select assigned officer role clearance to authenticate");
         loginSub.getStyleClass().add("login-subtitle");
         headerBox.getChildren().addAll(badgeLabel, loginTitle, loginSub);
 
         // Form fields
-        VBox formFields = new VBox(14);
+        VBox formFields = new VBox(12);
+
+        Label lblRole = new Label("Assigned Role Clearance (RBAC):");
+        lblRole.getStyleClass().add("form-label");
+        ComboBox<UserRole> cmbRole = new ComboBox<>();
+        cmbRole.getItems().addAll(UserRole.values());
+        cmbRole.setValue(UserRole.INSPECTOR);
+        cmbRole.setMaxWidth(Double.MAX_VALUE);
+        cmbRole.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(UserRole r) {
+                return r != null ? r.getTitle() + " (" + r.getTierLabel() + ")" : "";
+            }
+            @Override
+            public UserRole fromString(String s) { return null; }
+        });
+        AccessibilityManager.setupAccessible(cmbRole, "User Role", "Select assigned clearance level", AccessibleRole.COMBO_BOX);
 
         Label lblAgency = new Label(I18n.get("login.agency_id"));
         lblAgency.getStyleClass().add("form-label");
@@ -132,42 +150,47 @@ public class LoginView {
         txtPass.setPromptText(I18n.get("login.pin_placeholder"));
         AccessibilityManager.setupAccessible(txtPass, "Security PIN", "Input security PIN or access code", AccessibleRole.PASSWORD_FIELD);
 
-        Label lblClearance = new Label(I18n.get("login.security_level"));
-        lblClearance.getStyleClass().add("form-label");
-        ComboBox<String> cmbClearance = new ComboBox<>();
-        cmbClearance.getItems().addAll(
-                I18n.get("login.level_top_secret"),
-                I18n.get("login.level_secret"),
-                I18n.get("login.level_confidential")
-        );
-        cmbClearance.getSelectionModel().select(0);
-        cmbClearance.setMaxWidth(Double.MAX_VALUE);
-        AccessibilityManager.setupAccessible(cmbClearance, "Clearance Level", "Select security clearance tier", AccessibleRole.COMBO_BOX);
+        txtUser.setOnAction(e -> navManager.loginSuccess(txtUser.getText(), txtAgency.getText(), cmbRole.getValue()));
+        txtPass.setOnAction(e -> navManager.loginSuccess(txtUser.getText(), txtAgency.getText(), cmbRole.getValue()));
 
-        txtUser.setOnAction(e -> navManager.loginSuccess(txtUser.getText(), txtAgency.getText()));
-        txtPass.setOnAction(e -> navManager.loginSuccess(txtUser.getText(), txtAgency.getText()));
-
-        formFields.getChildren().addAll(lblAgency, txtAgency, lblUser, txtUser, lblPass, txtPass, lblClearance, cmbClearance);
+        formFields.getChildren().addAll(lblRole, cmbRole, lblAgency, txtAgency, lblUser, txtUser, lblPass, txtPass);
 
         // Buttons
-        Button btnLogin = new Button(I18n.get("login.btn_login"));
+        Button btnLogin = new Button("AUTHENTICATE & ENTER PORTAL");
         btnLogin.getStyleClass().addAll("button-primary");
         btnLogin.setDefaultButton(true);
         btnLogin.setMaxWidth(Double.MAX_VALUE);
-        btnLogin.setStyle("-fx-font-size: 14px; -fx-padding: 14 20;");
-        btnLogin.setOnAction(e -> navManager.loginSuccess(txtUser.getText(), txtAgency.getText()));
+        btnLogin.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-padding: 12 20;");
+        btnLogin.setOnAction(e -> navManager.loginSuccess(txtUser.getText(), txtAgency.getText(), cmbRole.getValue()));
         AccessibilityManager.setupAccessible(btnLogin, "Authenticate", "Submit credentials and login to suite", AccessibleRole.BUTTON);
 
-        Button btnDemo = new Button(I18n.get("login.btn_demo"));
-        btnDemo.setMaxWidth(Double.MAX_VALUE);
-        btnDemo.setStyle("-fx-font-size: 12px;");
-        btnDemo.setOnAction(e -> navManager.loginSuccess("Officer Pranaash", "GOV-DEF-8942"));
-        AccessibilityManager.setupAccessible(btnDemo, "Demo Access", "Instant test login without credentials", AccessibleRole.BUTTON);
+        // Quick 1-Click Role Switch Demo Buttons
+        VBox demoBox = new VBox(6);
+        Label lblDemo = new Label("Quick 1-Click Role Authentication:");
+        lblDemo.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B; -fx-font-weight: bold;");
+
+        HBox demoButtons = new HBox(8);
+        demoButtons.setAlignment(Pos.CENTER);
+
+        Button btnInspector = new Button("🛡️ Inspector");
+        btnInspector.setStyle("-fx-font-size: 11px; -fx-padding: 6 10; -fx-text-fill: #0284C7; -fx-background-color: #E0F2FE; -fx-font-weight: bold; -fx-background-radius: 6px;");
+        btnInspector.setOnAction(e -> navManager.loginSuccess("Inspector Pranaash", "GOV-DEF-8942", UserRole.INSPECTOR));
+
+        Button btnSupervisor = new Button("⚙️ Supervisor");
+        btnSupervisor.setStyle("-fx-font-size: 11px; -fx-padding: 6 10; -fx-text-fill: #D97706; -fx-background-color: #FEF3C7; -fx-font-weight: bold; -fx-background-radius: 6px;");
+        btnSupervisor.setOnAction(e -> navManager.loginSuccess("Supervisor Vance", "GOV-DEF-8942", UserRole.SUPERVISOR));
+
+        Button btnAuditor = new Button("🔒 Chief Auditor");
+        btnAuditor.setStyle("-fx-font-size: 11px; -fx-padding: 6 10; -fx-text-fill: #9333EA; -fx-background-color: #F3E8FF; -fx-font-weight: bold; -fx-background-radius: 6px;");
+        btnAuditor.setOnAction(e -> navManager.loginSuccess("Chief Auditor Davis", "GOV-DEF-8942", UserRole.CHIEF_AUDITOR));
+
+        demoButtons.getChildren().addAll(btnInspector, btnSupervisor, btnAuditor);
+        demoBox.getChildren().addAll(lblDemo, demoButtons);
 
         // Footer
         Label disclaimer = new Label(I18n.get("login.disclaimer"));
         disclaimer.setWrapText(true);
-        disclaimer.setStyle("-fx-font-size: 11px; -fx-text-fill: #475569; -fx-text-alignment: center;");
+        disclaimer.setStyle("-fx-font-size: 10px; -fx-text-fill: #475569; -fx-text-alignment: center;");
         disclaimer.setAlignment(Pos.CENTER);
 
         loginCard.getChildren().addAll(
@@ -175,7 +198,7 @@ public class LoginView {
                 new Separator(),
                 formFields,
                 btnLogin,
-                btnDemo,
+                demoBox,
                 new Separator(),
                 disclaimer
         );

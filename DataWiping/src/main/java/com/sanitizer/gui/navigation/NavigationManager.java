@@ -1,17 +1,24 @@
 package com.sanitizer.gui.navigation;
 
 import com.sanitizer.a11y.AccessibilityManager;
+import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.views.*;
 import com.sanitizer.i18n.I18n;
+import com.sanitizer.session.SessionAutoLockManager;
 import com.sanitizer.session.SessionContext;
+import com.sanitizer.session.UserRole;
 import com.sanitizer.util.AppLogger;
+import javafx.application.Platform;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
@@ -26,6 +33,7 @@ public class NavigationManager {
     private Stage primaryStage;
     private Scene scene;
     private MainLayout mainLayout;
+    private StackPane portalRootContainer;
     private String currentActiveView = "dashboard";
 
     // Session State
@@ -44,6 +52,22 @@ public class NavigationManager {
                 if (primaryStage != null) {
                     primaryStage.setTitle(I18n.get("app.title") + " — " + I18n.get("topbar.badge") + " | " + getOfficerName());
                 }
+            }
+        });
+
+        // Listen for session lock / unlock events from SessionAutoLockManager
+        SessionAutoLockManager.getInstance().addListener(new SessionAutoLockManager.LockListener() {
+            @Override
+            public void onSessionLocked() {
+                Platform.runLater(() -> displayLockScreenOverlay());
+            }
+
+            @Override
+            public void onSessionUnlocked() {
+                Platform.runLater(() -> {
+                    showNotification("Session Restored", "Welcome back, " + getOfficerName(),
+                            com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
+                });
             }
         });
     }
@@ -79,6 +103,7 @@ public class NavigationManager {
         scene = new Scene(heroView, bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
         attachGlobalShortcuts(scene);
+        SessionAutoLockManager.getInstance().attachToScene(scene);
 
         primaryStage.setTitle(I18n.get("app.title") + " — " + I18n.get("app.subtitle"));
         primaryStage.setScene(scene);
@@ -100,6 +125,7 @@ public class NavigationManager {
         scene = new Scene(root, bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
         attachGlobalShortcuts(scene);
+        SessionAutoLockManager.getInstance().attachToScene(scene);
 
         primaryStage.setTitle(I18n.get("app.title") + " — " + I18n.get("login.portal_badge"));
         primaryStage.setScene(scene);
@@ -108,9 +134,14 @@ public class NavigationManager {
 
     // ── Auth Success → Main Portal ───────────────────────────────────────────
     public void loginSuccess(String username, String agency) {
-        this.sessionContext = new SessionContext(username, agency, "Senior Sanitization Inspector");
+        loginSuccess(username, agency, UserRole.INSPECTOR);
+    }
+
+    public void loginSuccess(String username, String agency, UserRole role) {
+        this.sessionContext = new SessionContext(username, agency, role);
         this.isAuthenticated = true;
-        AppLogger.info(MODULE, "Authenticated session established for: " + sessionContext.officerName());
+        AppLogger.info(MODULE, "Authenticated session established for: " + sessionContext.officerName() + " [" + role.getTitle() + "]");
+        SecurityAuditLogger.logLogin(sessionContext.officerName(), sessionContext.agencyId(), role.getTitle(), true);
         showMainPortal();
     }
 
@@ -118,12 +149,15 @@ public class NavigationManager {
         Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
         mainLayout = new MainLayout(this);
         Parent root = mainLayout.getRoot();
-        AccessibilityManager.applyThemeAndScale(root);
-        scene = new Scene(root, bounds.getWidth(), bounds.getHeight());
+
+        portalRootContainer = new StackPane(root);
+        AccessibilityManager.applyThemeAndScale(portalRootContainer);
+        scene = new Scene(portalRootContainer, bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
         attachGlobalShortcuts(scene);
+        SessionAutoLockManager.getInstance().attachToScene(scene);
 
-        primaryStage.setTitle(I18n.get("app.title") + " — " + I18n.get("topbar.badge") + " | " + getOfficerName());
+        primaryStage.setTitle(I18n.get("app.title") + " — " + I18n.get("topbar.badge") + " | " + getOfficerName() + " (" + getUserRole().getTierLabel() + ")");
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
 
@@ -135,6 +169,15 @@ public class NavigationManager {
     private void attachGlobalShortcuts(Scene scene) {
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             boolean ctrlOrMeta = event.isControlDown() || event.isMetaDown();
+
+            // Manual Lock Shortcut: Ctrl/Cmd + Alt + L or Ctrl/Cmd + Shift + L
+            if (ctrlOrMeta && (event.isAltDown() || event.isShiftDown()) && event.getCode() == KeyCode.L) {
+                if (isAuthenticated) {
+                    SessionAutoLockManager.getInstance().lockSession("Manual Lock (Shortcut)", getOfficerName(), getAgencyId(), getRole());
+                    event.consume();
+                    return;
+                }
+            }
 
             // F1: Accessibility Help Dialog
             if (event.getCode() == KeyCode.F1) {
@@ -174,15 +217,15 @@ public class NavigationManager {
                     event.consume();
                     return;
                 }
-                // Cycle Language: Ctrl/Cmd + L
-                if (event.getCode() == KeyCode.L) {
+                // Cycle Language: Ctrl/Cmd + L (without shift/alt)
+                if (event.getCode() == KeyCode.L && !event.isShiftDown() && !event.isAltDown()) {
                     I18n.cycleNextLanguage();
                     event.consume();
                     return;
                 }
 
                 // View Navigation Shortcuts (Ctrl/Cmd + Key)
-                if (isAuthenticated) {
+                if (isAuthenticated && !SessionAutoLockManager.getInstance().isLocked()) {
                     if (event.getCode() == KeyCode.D || event.getCode() == KeyCode.DIGIT1) navigateTo("dashboard");
                     else if (event.getCode() == KeyCode.W || event.getCode() == KeyCode.DIGIT2) navigateTo("wiping");
                     else if (event.getCode() == KeyCode.B || event.getCode() == KeyCode.DIGIT3) navigateTo("batchWipe");
@@ -196,14 +239,44 @@ public class NavigationManager {
         });
     }
 
-    // ── Router ───────────────────────────────────────────────────────────────
+    // ── Lock Screen Overlay ──────────────────────────────────────────────────
+    private void displayLockScreenOverlay() {
+        if (portalRootContainer != null) {
+            // Avoid duplicate overlays
+            for (Node child : portalRootContainer.getChildren()) {
+                if (child instanceof LockScreenOverlay) return;
+            }
+            LockScreenOverlay overlay = new LockScreenOverlay(this);
+            portalRootContainer.getChildren().add(overlay);
+        }
+    }
+
+    public void lockSessionNow() {
+        if (isAuthenticated) {
+            SessionAutoLockManager.getInstance().lockSession("Manual Lock Button", getOfficerName(), getAgencyId(), getRole());
+        }
+    }
+
+    // ── Router & RBAC Permission Enforcement ──────────────────────────────────
     public void navigateTo(String viewName) {
         if (!isAuthenticated || mainLayout == null) {
             showLoginView();
             return;
         }
 
+        if (SessionAutoLockManager.getInstance().isLocked()) {
+            return;
+        }
+
         String key = viewName.toLowerCase();
+
+        // RBAC Clearance Evaluation
+        if ("keyvault".equals(key) && !hasPermission(UserRole.Permission.KEYVAULT_MANAGE)) {
+            showAccessDeniedDialog("Key Vault & Certificate Authority", "Tier 3 — CHIEF AUDITOR Clearance");
+            SecurityAuditLogger.logAccessDenied(getOfficerName(), getAgencyId(), getRole(), "Key Vault", "KEYVAULT_MANAGE");
+            return;
+        }
+
         this.currentActiveView = key;
         Node viewNode = viewCache.get(key);
 
@@ -233,7 +306,26 @@ public class NavigationManager {
         };
     }
 
+    public void showAccessDeniedDialog(String resourceName, String requiredRole) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Access Restricted (RBAC)");
+        alert.setHeaderText("INSUFFICIENT ROLE CLEARANCE");
+        alert.setContentText(String.format(
+                "Access to %s is restricted.\n\n" +
+                "• Your Active Role: %s (%s)\n" +
+                "• Required Role:    %s\n\n" +
+                "Please authenticate with higher clearance or contact the Chief Compliance Auditor.",
+                resourceName, getOfficerName(), getRole(), requiredRole
+        ));
+        alert.showAndWait();
+        showNotification("Access Denied", "Insufficient role clearance for " + resourceName,
+                com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
+    }
+
     public void logout() {
+        if (sessionContext != null) {
+            SecurityAuditLogger.logLogout(getOfficerName(), getAgencyId(), getRole());
+        }
         showLoginView();
     }
 
@@ -252,12 +344,17 @@ public class NavigationManager {
         }
     }
 
-    // ── Getters ──────────────────────────────────────────────────────────────
+    // ── Getters & Permission Evaluator ─────────────────────────────────────────
     public SessionContext getSessionContext() {
-        return sessionContext != null ? sessionContext : new SessionContext("Officer Pranaash", "GOV-DEF-8942", "Senior Inspector");
+        return sessionContext != null ? sessionContext : new SessionContext("Officer Pranaash", "GOV-DEF-8942", UserRole.INSPECTOR);
     }
 
+    public UserRole getUserRole()  { return getSessionContext().userRole(); }
     public String getOfficerName() { return getSessionContext().officerName(); }
     public String getAgencyId()    { return getSessionContext().agencyId(); }
     public String getRole()        { return getSessionContext().role(); }
+
+    public boolean hasPermission(UserRole.Permission permission) {
+        return getSessionContext().hasPermission(permission);
+    }
 }

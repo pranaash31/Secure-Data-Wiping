@@ -1,5 +1,6 @@
 package com.sanitizer.gui.views;
 
+import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.ThermalPolicy;
@@ -9,6 +10,7 @@ import com.sanitizer.engine.WipeEngine;
 import com.sanitizer.engine.WipeVerifier;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ThermalGraphComponent;
+import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
@@ -568,6 +570,11 @@ public class WipingView {
 
                 if (dbSaved) {
                     appendLog("[DB] Saved audit record with S.M.A.R.T. Delta & Zero-Residual Entropy proof into SQLite database.");
+                    var nav = NavigationManager.getInstance();
+                    SecurityAuditLogger.logWipeAction(SecurityAuditLogger.EVENT_WIPE_COMPLETED,
+                            nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
+                            target.systemPath() + " (" + target.model() + ")", stdString, "SUCCESS");
+
                     List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
                     if (!records.isEmpty()) {
                         AuditDb.AuditRecord latest = records.get(0);
@@ -591,6 +598,10 @@ public class WipingView {
             } else {
                 // --- HARDWARE FAILURE & QUARANTINE ASSESSMENT BRANCH ---
                 com.sanitizer.util.SoundManager.playAlertSound();
+                var nav = NavigationManager.getInstance();
+                SecurityAuditLogger.logWipeAction(SecurityAuditLogger.EVENT_WIPE_FAILED,
+                        nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
+                        target.systemPath() + " (" + target.model() + ")", selectedPolicy.getName(), "FAILED");
                 lblStatusMessage.setText("⚠️ SANITIZATION FAILED: HARDWARE DEFECT / BAD SECTORS ENCOUNTERED");
                 lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #EF4444;");
                 appendLog("\n⚠️ [CRITICAL DEFECT] Sector wiping encountered unrecoverable hardware I/O fault.");

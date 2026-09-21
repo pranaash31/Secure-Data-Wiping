@@ -1,10 +1,13 @@
 package com.sanitizer.gui.views;
 
+import com.sanitizer.audit.SecurityAuditLogger;
+import com.sanitizer.audit.SecurityAuditRecord;
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.report.AuditExporter;
+import com.sanitizer.session.UserRole;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -26,33 +29,60 @@ import java.util.List;
 
 public class AuditView {
 
-    private final VBox rootContainer = new VBox(20);
+    private final VBox rootContainer = new VBox(16);
+
+    // Tab 1: Sanitization History
     private TableView<AuditDb.AuditRecord> tblAuditHistory;
     private ObservableList<AuditDb.AuditRecord> auditData;
     private FilteredList<AuditDb.AuditRecord> filteredData;
     private Label lblEsgBannerText;
 
+    // Tab 2: Security Audit Trail
+    private TableView<SecurityAuditRecord> tblSecurityHistory;
+    private ObservableList<SecurityAuditRecord> securityData;
+    private FilteredList<SecurityAuditRecord> filteredSecurityData;
+
     public AuditView() {
         buildUi();
         loadAuditHistory();
+        loadSecurityHistory();
     }
 
     public Parent getRoot() {
         return rootContainer;
     }
 
-    @SuppressWarnings("unchecked")
     private void buildUi() {
-        rootContainer.setPadding(new Insets(24));
+        rootContainer.setPadding(new Insets(20));
 
         // Header Title
         VBox titleBox = new VBox(4);
-        Label lblTitle = new Label("Audit Trail & Digital Certification");
+        Label lblTitle = new Label("Audit Trail & Security Governance");
         lblTitle.getStyleClass().add("card-title");
         lblTitle.setStyle("-fx-font-size: 22px;");
-        Label lblSub = new Label("Cryptographically signed sanitization logs with verifiable chain of custody");
+        Label lblSub = new Label("Tamper-evident sanitization records, cryptographic ledger chaining, and multi-tier RBAC security event logs");
         lblSub.getStyleClass().add("card-subtitle");
         titleBox.getChildren().addAll(lblTitle, lblSub);
+
+        // TabPane
+        TabPane tabPane = new TabPane();
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        VBox.setVgrow(tabPane, Priority.ALWAYS);
+
+        Tab tabSanitization = new Tab("💿 Sanitization History & Certificates", buildSanitizationTab());
+        Tab tabSecurity = new Tab("🛡️ Security Activity Trail (RBAC & System Events)", buildSecurityTrailTab());
+
+        tabPane.getTabs().addAll(tabSanitization, tabSecurity);
+
+        rootContainer.getChildren().addAll(titleBox, tabPane);
+    }
+
+    // ── Tab 1: Sanitization History ──────────────────────────────────────────
+    @SuppressWarnings("unchecked")
+    private VBox buildSanitizationTab() {
+        VBox container = new VBox(14);
+        container.setPadding(new Insets(16, 0, 0, 0));
+        VBox.setVgrow(container, Priority.ALWAYS);
 
         // --- ESG Corporate Sustainability Banner ---
         HBox esgBanner = new HBox(12);
@@ -72,7 +102,7 @@ public class AuditView {
         esgBanner.getChildren().addAll(lblEsgBannerText, esgRegion, btnExportEsg);
 
         // --- Card: Audit Log Table & Toolbar ---
-        VBox cardTable = new VBox(14);
+        VBox cardTable = new VBox(12);
         cardTable.getStyleClass().add("card");
         VBox.setVgrow(cardTable, Priority.ALWAYS);
 
@@ -134,15 +164,6 @@ public class AuditView {
         toolbar.getChildren().addAll(txtSearch, new Region(), btnRefresh, btnCompliance, mbExport, btnExportPdf, btnQuarantine, btnVerify, btnVerifyLedger);
         HBox.setHgrow(toolbar.getChildren().get(1), Priority.ALWAYS);
 
-        // F5 shortcut = refresh audit log
-        toolbar.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene != null) {
-                newScene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, ev -> {
-                    if (ev.getCode() == KeyCode.F5) loadAuditHistory();
-                });
-            }
-        });
-
         // Table
         tblAuditHistory = new TableView<>();
         VBox.setVgrow(tblAuditHistory, Priority.ALWAYS);
@@ -153,34 +174,34 @@ public class AuditView {
 
         TableColumn<AuditDb.AuditRecord, String> colTime = new TableColumn<>("Timestamp");
         colTime.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().timestamp()));
-        colTime.setPrefWidth(160);
+        colTime.setPrefWidth(150);
 
         TableColumn<AuditDb.AuditRecord, String> colModel = new TableColumn<>("Device Model");
         colModel.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().driveModel()));
-        colModel.setPrefWidth(200);
+        colModel.setPrefWidth(190);
 
         TableColumn<AuditDb.AuditRecord, String> colSerial = new TableColumn<>("Serial Number");
         colSerial.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().serialNumber()));
-        colSerial.setPrefWidth(150);
+        colSerial.setPrefWidth(140);
 
         TableColumn<AuditDb.AuditRecord, String> colCapacity = new TableColumn<>("Capacity");
         colCapacity.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().capacity()));
-        colCapacity.setPrefWidth(90);
+        colCapacity.setPrefWidth(85);
 
         TableColumn<AuditDb.AuditRecord, String> colStandard = new TableColumn<>("Sanitization Standard");
         colStandard.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().wipeStandard()));
-        colStandard.setPrefWidth(150);
+        colStandard.setPrefWidth(145);
 
         TableColumn<AuditDb.AuditRecord, String> colStatus = new TableColumn<>("Status");
         colStatus.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().status()));
-        colStatus.setPrefWidth(85);
+        colStatus.setPrefWidth(80);
 
         TableColumn<AuditDb.AuditRecord, String> colHealth = new TableColumn<>("S.M.A.R.T. Health Delta");
         colHealth.setCellValueFactory(data -> {
             AuditDb.AuditRecord r = data.getValue();
             return new SimpleStringProperty(String.format("%d -> %d (%s)", r.preHealthScore(), r.postHealthScore(), r.smartDeltaSummary()));
         });
-        colHealth.setPrefWidth(210);
+        colHealth.setPrefWidth(200);
 
         TableColumn<AuditDb.AuditRecord, String> colLedger = new TableColumn<>("SHA-256 Ledger Hash");
         colLedger.setCellValueFactory(data -> {
@@ -193,9 +214,9 @@ public class AuditView {
         TableColumn<AuditDb.AuditRecord, String> colSig = new TableColumn<>("RSA Digital Signature");
         colSig.setCellValueFactory(data -> {
             String s = data.getValue().digitalSignature();
-            return new SimpleStringProperty(s.length() > 28 ? s.substring(0, 28) + "..." : s);
+            return new SimpleStringProperty(s.length() > 24 ? s.substring(0, 24) + "..." : s);
         });
-        colSig.setPrefWidth(180);
+        colSig.setPrefWidth(170);
 
         tblAuditHistory.getColumns().addAll(colId, colTime, colModel, colSerial, colCapacity, colStandard, colStatus, colHealth, colLedger, colSig);
 
@@ -211,16 +232,114 @@ public class AuditView {
             });
             return row;
         });
-        // Enter key on selected row → export PDF
-        tblAuditHistory.setOnKeyPressed(ev -> {
-            if (ev.getCode() == KeyCode.ENTER && tblAuditHistory.getSelectionModel().getSelectedItem() != null) {
-                handleExportPdf();
-            }
-        });
 
         cardTable.getChildren().addAll(toolbar, tblAuditHistory);
+        container.getChildren().addAll(esgBanner, cardTable);
+        return container;
+    }
 
-        rootContainer.getChildren().addAll(titleBox, esgBanner, cardTable);
+    // ── Tab 2: Security Activity Trail ───────────────────────────────────────
+    @SuppressWarnings("unchecked")
+    private VBox buildSecurityTrailTab() {
+        VBox container = new VBox(14);
+        container.setPadding(new Insets(16, 0, 0, 0));
+        VBox.setVgrow(container, Priority.ALWAYS);
+
+        // Security Banner
+        HBox securityBanner = new HBox(12);
+        securityBanner.setAlignment(Pos.CENTER_LEFT);
+        securityBanner.setStyle("-fx-background-color: linear-gradient(to right, #1E1B4B, #0F172A); -fx-border-color: #6366F1; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 10 16;");
+
+        Label lblSecBannerText = new Label("🛡️ FISMA / HIPAA / NIST SP 800-53 Tamper-Evident Security Log (SHA-256 Cryptographic Block Chaining Active)");
+        lblSecBannerText.setStyle("-fx-text-fill: #C7D2FE; -fx-font-size: 11px; -fx-font-weight: bold;");
+
+        Region secRegion = new Region();
+        HBox.setHgrow(secRegion, Priority.ALWAYS);
+
+        Button btnVerifySecurityChain = new Button("🔒 Verify Security Event Chain");
+        btnVerifySecurityChain.setStyle("-fx-background-color: #6366F1; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 5 12; -fx-background-radius: 6px; -fx-cursor: hand;");
+        btnVerifySecurityChain.setTooltip(new Tooltip("Verify unbroken SHA-256 block hash chaining across all security & administrative events"));
+        btnVerifySecurityChain.setOnAction(e -> handleVerifySecurityEventChain());
+
+        securityBanner.getChildren().addAll(lblSecBannerText, secRegion, btnVerifySecurityChain);
+
+        // Toolbar
+        VBox cardTable = new VBox(12);
+        cardTable.getStyleClass().add("card");
+        VBox.setVgrow(cardTable, Priority.ALWAYS);
+
+        HBox toolbar = new HBox(10);
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+
+        TextField txtSearch = new TextField();
+        txtSearch.setPromptText("Filter security events, actors, actions...");
+        txtSearch.setPrefWidth(260);
+        txtSearch.textProperty().addListener((obs, oldVal, newVal) -> filterSecurityLog(newVal));
+
+        ComboBox<String> cmbEventType = new ComboBox<>();
+        cmbEventType.getItems().addAll("ALL EVENTS", "AUTH_LOGIN", "AUTH_LOGOUT", "AUTH_FAILED",
+                "SESSION_LOCKED", "SESSION_UNLOCKED", "CONFIG_MODIFIED", "WIPE_COMPLETED", "DATA_EXPORT", "RBAC_ACCESS_DENIED");
+        cmbEventType.setValue("ALL EVENTS");
+        cmbEventType.setOnAction(e -> filterSecurityLog(txtSearch.getText(), cmbEventType.getValue()));
+
+        Button btnRefresh = new Button("Refresh (F5)");
+        btnRefresh.setOnAction(e -> loadSecurityHistory());
+
+        toolbar.getChildren().addAll(txtSearch, cmbEventType, new Region(), btnRefresh);
+        HBox.setHgrow(toolbar.getChildren().get(2), Priority.ALWAYS);
+
+        // Table
+        tblSecurityHistory = new TableView<>();
+        VBox.setVgrow(tblSecurityHistory, Priority.ALWAYS);
+
+        TableColumn<SecurityAuditRecord, Integer> colSecId = new TableColumn<>("ID");
+        colSecId.setCellValueFactory(data -> new SimpleIntegerProperty(data.getValue().id()).asObject());
+        colSecId.setPrefWidth(50);
+
+        TableColumn<SecurityAuditRecord, String> colSecTime = new TableColumn<>("Timestamp");
+        colSecTime.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().timestamp()));
+        colSecTime.setPrefWidth(140);
+
+        TableColumn<SecurityAuditRecord, String> colSecType = new TableColumn<>("Event Type");
+        colSecType.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().eventType()));
+        colSecType.setPrefWidth(150);
+
+        TableColumn<SecurityAuditRecord, String> colSecActor = new TableColumn<>("Actor / Officer");
+        colSecActor.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().actorName()));
+        colSecActor.setPrefWidth(140);
+
+        TableColumn<SecurityAuditRecord, String> colSecRole = new TableColumn<>("Role Tier");
+        colSecRole.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().actorRole()));
+        colSecRole.setPrefWidth(110);
+
+        TableColumn<SecurityAuditRecord, String> colSecAction = new TableColumn<>("Action Summary & Scope");
+        colSecAction.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().actionSummary()));
+        colSecAction.setPrefWidth(280);
+
+        TableColumn<SecurityAuditRecord, String> colSecTarget = new TableColumn<>("Target Resource");
+        colSecTarget.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().targetResource()));
+        colSecTarget.setPrefWidth(150);
+
+        TableColumn<SecurityAuditRecord, String> colSecStatus = new TableColumn<>("Status");
+        colSecStatus.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().status()));
+        colSecStatus.setPrefWidth(85);
+
+        TableColumn<SecurityAuditRecord, String> colSecHash = new TableColumn<>("SHA-256 Event Hash");
+        colSecHash.setCellValueFactory(data -> {
+            String hash = data.getValue().eventHash();
+            return new SimpleStringProperty(hash.length() > 16 ? hash.substring(0, 16) + "..." : hash);
+        });
+        colSecHash.setPrefWidth(150);
+
+        tblSecurityHistory.getColumns().addAll(colSecId, colSecTime, colSecType, colSecActor, colSecRole, colSecAction, colSecTarget, colSecStatus, colSecHash);
+
+        securityData = FXCollections.observableArrayList();
+        filteredSecurityData = new FilteredList<>(securityData, p -> true);
+        tblSecurityHistory.setItems(filteredSecurityData);
+
+        cardTable.getChildren().addAll(toolbar, tblSecurityHistory);
+        container.getChildren().addAll(securityBanner, cardTable);
+        return container;
     }
 
     private void loadAuditHistory() {
@@ -236,6 +355,117 @@ public class AuditView {
                 esg.treesEquivalent(),
                 records.size()
         ));
+    }
+
+    private void loadSecurityHistory() {
+        List<SecurityAuditRecord> records = SecurityAuditLogger.getAllEvents();
+        securityData.setAll(records);
+    }
+
+    private void filterLog(String query) {
+        if (query == null || query.isBlank()) {
+            filteredData.setPredicate(p -> true);
+            return;
+        }
+        String q = query.toLowerCase();
+        filteredData.setPredicate(record ->
+                record.driveModel().toLowerCase().contains(q) ||
+                record.serialNumber().toLowerCase().contains(q) ||
+                record.wipeStandard().toLowerCase().contains(q) ||
+                record.status().toLowerCase().contains(q)
+        );
+    }
+
+    private void filterSecurityLog(String query) {
+        filterSecurityLog(query, "ALL EVENTS");
+    }
+
+    private void filterSecurityLog(String query, String selectedType) {
+        String q = (query != null) ? query.toLowerCase() : "";
+        boolean filterByType = (selectedType != null && !selectedType.equals("ALL EVENTS"));
+
+        filteredSecurityData.setPredicate(record -> {
+            boolean matchesType = !filterByType || record.eventType().equalsIgnoreCase(selectedType);
+            boolean matchesQuery = q.isEmpty()
+                    || record.eventType().toLowerCase().contains(q)
+                    || record.actorName().toLowerCase().contains(q)
+                    || record.actorRole().toLowerCase().contains(q)
+                    || record.actionSummary().toLowerCase().contains(q)
+                    || record.targetResource().toLowerCase().contains(q);
+            return matchesType && matchesQuery;
+        });
+    }
+
+    private void handleVerifySecurityEventChain() {
+        var res = SecurityAuditLogger.verifySecurityLedgerIntegrity();
+        showSecurityLedgerVerificationDialog(res);
+    }
+
+    public static void showSecurityLedgerVerificationDialog(SecurityAuditLogger.SecurityLedgerVerificationResult result) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Security Audit Trail — SHA-256 Block Chain Proof");
+        dialog.setHeaderText(null);
+
+        DialogPane dp = dialog.getDialogPane();
+        dp.getButtonTypes().add(ButtonType.CLOSE);
+        dp.setStyle("-fx-background-color: #0F172A;");
+
+        VBox content = new VBox(16);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(650);
+
+        HBox headerBox = new HBox(12);
+        headerBox.setAlignment(Pos.CENTER_LEFT);
+        headerBox.setPadding(new Insets(14, 16, 14, 16));
+
+        Label lblBadge = new Label(result.isFullyValid() ? "🔒 100% TAMPER-PROOF" : "⚠️ INTEGRITY BREACH DETECTED");
+        lblBadge.setStyle(result.isFullyValid()
+                ? "-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #10B981; -fx-background-color: rgba(16,185,129,0.15); -fx-padding: 6 12; -fx-background-radius: 6px;"
+                : "-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #EF4444; -fx-background-color: rgba(239,68,68,0.15); -fx-padding: 6 12; -fx-background-radius: 6px;");
+
+        Label lblTitle = new Label(result.isFullyValid()
+                ? "Security Activity SHA-256 Block Chain Authenticated"
+                : "Cryptographic Tampering / Anomaly Detected in Security Trail");
+        lblTitle.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #F8FAFC;");
+
+        headerBox.getChildren().addAll(lblBadge, lblTitle);
+        headerBox.setStyle(result.isFullyValid()
+                ? "-fx-background-color: #13271F; -fx-background-radius: 8px; -fx-border-color: #059669; -fx-border-radius: 8px; -fx-border-width: 1px;"
+                : "-fx-background-color: #311417; -fx-background-radius: 8px; -fx-border-color: #DC2626; -fx-border-radius: 8px; -fx-border-width: 1px;");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(14); grid.setVgap(12);
+        grid.add(createLedgerTile("Total Security Events", String.valueOf(result.totalEventsChecked()), "#818CF8"), 0, 0);
+        grid.add(createLedgerTile("Continuous Blocks", result.validChainLength() + " / " + result.totalEventsChecked(), result.isFullyValid() ? "#34D399" : "#F87171"), 1, 0);
+        grid.add(createLedgerTile("Genesis Hash Root", result.genesisHash().substring(0, Math.min(16, result.genesisHash().length())) + "...", "#94A3B8"), 0, 1);
+        grid.add(createLedgerTile("Latest Block Hash", result.latestBlockHash().substring(0, Math.min(16, result.latestBlockHash().length())) + "...", "#C084FC"), 1, 1);
+
+        ColumnConstraints c1 = new ColumnConstraints(); c1.setPercentWidth(50);
+        ColumnConstraints c2 = new ColumnConstraints(); c2.setPercentWidth(50);
+        grid.getColumnConstraints().addAll(c1, c2);
+
+        Label lblDetails = new Label(result.getSummaryMessage());
+        lblDetails.setWrapText(true);
+        lblDetails.setStyle("-fx-font-size: 12px; -fx-text-fill: #CBD5E1; -fx-line-spacing: 4px;");
+
+        content.getChildren().addAll(headerBox, grid, lblDetails);
+
+        if (!result.anomalies().isEmpty()) {
+            VBox anomalyBox = new VBox(8);
+            Label lblAnomTitle = new Label("Security Chain Anomalies Detected:");
+            lblAnomTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #FCA5A5;");
+            anomalyBox.getChildren().add(lblAnomTitle);
+
+            for (String a : result.anomalies()) {
+                Label lblA = new Label("• " + a);
+                lblA.setStyle("-fx-font-size: 11px; -fx-text-fill: #F87171;");
+                anomalyBox.getChildren().add(lblA);
+            }
+            content.getChildren().add(anomalyBox);
+        }
+
+        dp.setContent(content);
+        dialog.showAndWait();
     }
 
     private void handleExportEsgReport() {
@@ -271,6 +501,9 @@ public class AuditView {
                 esg.impactStatement()
         );
 
+        var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+        SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "ESG Corporate Sustainability Report", "In-App Dialog");
+        loadSecurityHistory();
         showAlert(Alert.AlertType.INFORMATION, "🌱 ESG Corporate Sustainability Audit Report", report);
     }
 
@@ -371,7 +604,10 @@ public class AuditView {
         };
 
         exportTask.setOnSucceeded(ev -> {
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
+            var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+            SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), format + " Batch Export", targetFile.getAbsolutePath());
+            loadSecurityHistory();
+            nav.showNotification(
                     format + " Export Successful",
                     "Exported " + exportList.size() + " records to: " + targetFile.getName(),
                     com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS
@@ -426,7 +662,10 @@ public class AuditView {
         };
 
         packageTask.setOnSucceeded(ev -> {
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
+            var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+            SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Full Audit Package", targetDir.getAbsolutePath());
+            loadSecurityHistory();
+            nav.showNotification(
                     "Audit Package Exported",
                     "Generated CSV, JSON, and Excel reports in " + targetDir.getName(),
                     com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS
@@ -449,20 +688,6 @@ public class AuditView {
         new Thread(packageTask, "audit-package-thread").start();
     }
 
-    private void filterLog(String query) {
-        if (query == null || query.isBlank()) {
-            filteredData.setPredicate(p -> true);
-            return;
-        }
-        String q = query.toLowerCase();
-        filteredData.setPredicate(record ->
-                record.driveModel().toLowerCase().contains(q) ||
-                record.serialNumber().toLowerCase().contains(q) ||
-                record.wipeStandard().toLowerCase().contains(q) ||
-                record.status().toLowerCase().contains(q)
-        );
-    }
-
     private void handleExportPdf() {
         AuditDb.AuditRecord selected = tblAuditHistory.getSelectionModel().getSelectedItem();
         if (selected == null) {
@@ -471,7 +696,6 @@ public class AuditView {
             return;
         }
 
-        // Run on background thread – keeps UI responsive during PDF generation
         Task<String> pdfTask = new Task<>() {
             @Override
             protected String call() {
@@ -481,7 +705,10 @@ public class AuditView {
         pdfTask.setOnSucceeded(ev -> {
             String pdfPath = pdfTask.getValue();
             if (pdfPath != null) {
-                com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("PDF Exported",
+                var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+                SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "PDF Sanitization Certificate", pdfPath);
+                loadSecurityHistory();
+                nav.showNotification("PDF Exported",
                         "Certificate generated at: " + pdfPath, com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
                 showAlert(Alert.AlertType.INFORMATION, "PDF Certificate Exported",
                         "Sanitization Proof Certificate created successfully:\n" + pdfPath);
@@ -526,7 +753,10 @@ public class AuditView {
         qTask.setOnSucceeded(ev -> {
             String qPath = qTask.getValue();
             if (qPath != null) {
-                com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Quarantine Report Exported",
+                var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+                SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Quarantine Destruction Order", qPath);
+                loadSecurityHistory();
+                nav.showNotification("Quarantine Report Exported",
                         "Order generated at: " + qPath, com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
                 showAlert(Alert.AlertType.INFORMATION, "Defective Hardware Quarantine Order",
                         "Physical Destruction Order generated successfully:\n\n" + qPath);
@@ -565,6 +795,11 @@ public class AuditView {
 
     private void handleVerifyLedgerIntegrity() {
         var result = AuditDb.verifyDatabaseIntegrity();
+        var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+        SecurityAuditLogger.logEvent(SecurityAuditLogger.EVENT_LEDGER_VERIFIED, nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
+                "Sanitization DB Ledger Verification: " + (result.isFullyValid() ? "PASSED (100% Tamper Proof)" : "FAILED"), "sanitizer_history.db",
+                result.isFullyValid() ? "SUCCESS" : "FAILED");
+        loadSecurityHistory();
         showLedgerVerificationDialog(result);
     }
 
@@ -622,7 +857,6 @@ public class AuditView {
 
         content.getChildren().addAll(headerBox, grid, lblDetails);
 
-        // If anomalies exist, display forensic inspection table/list
         if (result.hasAnomalies()) {
             VBox anomalyBox = new VBox(8);
             Label lblAnomTitle = new Label("Forensic Defect & Tamper Inspection:");
@@ -674,7 +908,6 @@ public class AuditView {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(content);
-        // Auto-focus OK button so Enter/Space dismisses the dialog
         alert.setOnShown(ev -> {
             Button ok = (Button) alert.getDialogPane().lookupButton(ButtonType.OK);
             if (ok != null) ok.requestFocus();

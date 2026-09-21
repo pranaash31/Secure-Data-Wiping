@@ -1,8 +1,10 @@
 package com.sanitizer.gui.views;
 
+import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.navigation.NavigationManager;
+import com.sanitizer.session.UserRole;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
@@ -260,6 +262,13 @@ public class KeyVaultView {
     }
 
     private void handleRotateKeyPair() {
+        var nav = NavigationManager.getInstance();
+        if (!nav.hasPermission(UserRole.Permission.KEYVAULT_MANAGE)) {
+            nav.showAccessDeniedDialog("Key Rotation", "CHIEF AUDITOR Clearance");
+            SecurityAuditLogger.logAccessDenied(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Key Vault", "KEYVAULT_MANAGE");
+            return;
+        }
+
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
         confirm.setTitle("Rotate Cryptographic Keypair");
         confirm.setHeaderText("Generate New RSA Signing Keypair");
@@ -268,9 +277,12 @@ public class KeyVaultView {
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
             String testSig = CryptoSigner.signData("KEY_ROTATE_TEST_PAYLOAD");
             String newHash = Math.abs(testSig.hashCode()) + "";
-            lblKeyIdValue.setText("SE-KEY-" + System.currentTimeMillis() / 1000);
+            String newKeyId = "SE-KEY-" + System.currentTimeMillis() / 1000;
+            lblKeyIdValue.setText(newKeyId);
             lblCreatedValue.setText("NOW (Active)");
             lblFingerprintValue.setText("FE:89:12:45:" + newHash.substring(0, 4) + ":78:9A:BC:DE:F0:12:34:56:78:9A");
+
+            SecurityAuditLogger.logKeyAction(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "ROTATED_KEYPAIR", newKeyId);
 
             NavigationManager.getInstance().showNotification("Keypair Rotated",
                     "Generated new RSA-2048 signing keypair successfully.", ToastNotification.ToastType.SUCCESS);
@@ -278,6 +290,13 @@ public class KeyVaultView {
     }
 
     private void handleExportKey(String defaultName, String keyType) {
+        var nav = NavigationManager.getInstance();
+        if (!nav.hasPermission(UserRole.Permission.KEYVAULT_MANAGE)) {
+            nav.showAccessDeniedDialog("Key Export", "CHIEF AUDITOR Clearance");
+            SecurityAuditLogger.logAccessDenied(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Key Vault Export", "KEYVAULT_MANAGE");
+            return;
+        }
+
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Export Cryptographic " + keyType);
         chooser.setInitialFileName(defaultName);
@@ -288,6 +307,8 @@ public class KeyVaultView {
                 writer.write("-----BEGIN " + keyType + "-----\n");
                 writer.write(CryptoSigner.signData("KEY_EXPORT_" + defaultName) + "\n");
                 writer.write("-----END " + keyType + "-----\n");
+
+                SecurityAuditLogger.logKeyAction(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "EXPORTED_" + keyType.toUpperCase(), file.getAbsolutePath());
 
                 NavigationManager.getInstance().showNotification("Key Exported",
                         "Saved " + keyType + " to " + file.getName(), ToastNotification.ToastType.SUCCESS);
