@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
         java: [ '17' ]
 
     steps:
@@ -30,6 +30,10 @@ jobs:
       - name: Build & Run Test Suite with JaCoCo Coverage
         working-directory: DataWiping
         run: mvn clean verify --batch-mode
+
+      - name: Package Standalone Uber-JAR
+        working-directory: DataWiping
+        run: mvn package -DskipTests=true --batch-mode
 
       - name: Upload JaCoCo Code Coverage Report
         if: always() && matrix.os == 'ubuntu-latest'

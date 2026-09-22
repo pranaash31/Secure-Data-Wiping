@@ -20,3 +20,9 @@ Thumbs.db
 .classpath
 .project
 .settings/
+
+# Packaging and distribution
+dist/
+dependency-reduced-pom.xml
+**/dependency-reduced-pom.xml
+

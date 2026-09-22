@@ -91,6 +91,16 @@ public class NavigationManager {
         primaryStage.setWidth(bounds.getWidth());
         primaryStage.setHeight(bounds.getHeight());
 
+        // Set Window Stage Icon
+        try {
+            URL iconUrl = getClass().getResource("/icons/icon.png");
+            if (iconUrl != null) {
+                primaryStage.getIcons().add(new javafx.scene.image.Image(iconUrl.toExternalForm()));
+            }
+        } catch (Exception e) {
+            AppLogger.warn(MODULE, "Could not load application window icon: " + e.getMessage());
+        }
+
         showHeroView();
         primaryStage.setMaximized(true);
     }
