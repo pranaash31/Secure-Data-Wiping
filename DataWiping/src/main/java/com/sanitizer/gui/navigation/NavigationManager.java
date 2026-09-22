@@ -173,6 +173,9 @@ public class NavigationManager {
 
         // Default landing — Dashboard
         navigateTo("dashboard");
+
+        // Asynchronous background update verification
+        com.sanitizer.update.UpdateManager.getInstance().checkForUpdatesAsync();
     }
 
     // ── Global Keyboard Shortcuts & Accessibility Accelerators ─────────────────

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.sanitizer.USBSanitizer</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <name>USB Sanitizer</name>
+  <summary>High-Assurance NIST SP 800-88 Rev. 1 Compliant Data Sanitization Utility</summary>
+  <description>
+    <p>
+      USB Sanitizer is an enterprise-grade storage wiping and cryptographic audit certification suite.
+      It implements multi-standard sanitization protocols including NIST SP 800-88 Rev. 1 Clear/Purge,
+      DoD 5220.22-M, and BSI-GS with real-time sector entropy read-back verification and Ed25519-signed PDF audit certificates.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.sanitizer.USBSanitizer.desktop</launchable>
+  <url type="homepage">https://github.com/pranaash31/Secure-Data-Wiping</url>
+  <categories>
+    <category>System</category>
+    <category>Security</category>
+    <category>Utility</category>
+  </categories>
+  <releases>
+    <release version="1.0.0" date="2026-09-22">
+      <description>
+        <p>Initial enterprise release with multi-pass wiping, real-time thermal telemetry, and digital certification.</p>
+      </description>
+    </release>
+  </releases>
+</component>

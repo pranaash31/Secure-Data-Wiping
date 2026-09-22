@@ -11,6 +11,8 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.util.StringConverter;
 
 import java.util.HashMap;
@@ -172,6 +174,38 @@ public class MainLayout {
         btnA11yHelp.setOnAction(e -> AccessibilityHelpDialog.show(rootPane.getScene().getWindow()));
         AccessibilityManager.setupAccessible(btnA11yHelp, "Accessibility & Keyboard Navigation Guide", "Opens keyboard navigation and WCAG accessibility guide", AccessibleRole.BUTTON);
 
+        // ── In-App Update Checker Button ──
+        Button btnUpdate = new Button("🔄 Updates");
+        btnUpdate.getStyleClass().add("button-theme-toggle");
+        btnUpdate.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #38bdf8;");
+        btnUpdate.setTooltip(new Tooltip("Check for latest updates and security patches"));
+        btnUpdate.setOnAction(e -> {
+            btnUpdate.setText("Checking...");
+            com.sanitizer.update.UpdateManager.getInstance().checkForUpdatesAsync().whenComplete((info, err) -> {
+                javafx.application.Platform.runLater(() -> {
+                    if (info != null && info.isNewerThan(com.sanitizer.update.UpdateManager.CURRENT_VERSION)) {
+                        btnUpdate.setText("🚀 Update v" + info.getVersion());
+                        btnUpdate.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: #0284c7; -fx-text-fill: #ffffff;");
+                        com.sanitizer.gui.components.UpdateDialog.show((Stage) rootPane.getScene().getWindow(), info);
+                    } else {
+                        btnUpdate.setText("✓ Up to Date");
+                        btnUpdate.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #10b981;");
+                    }
+                });
+            });
+        });
+        AccessibilityManager.setupAccessible(btnUpdate, "Software Updates", "Check for software updates and patches", AccessibleRole.BUTTON);
+
+        // Register UpdateManager listener for automatic background notification
+        com.sanitizer.update.UpdateManager.getInstance().addUpdateListener(info -> {
+            if (info != null && info.isNewerThan(com.sanitizer.update.UpdateManager.CURRENT_VERSION)) {
+                javafx.application.Platform.runLater(() -> {
+                    btnUpdate.setText("🚀 Update v" + info.getVersion());
+                    btnUpdate.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: #0284c7; -fx-text-fill: #ffffff;");
+                });
+            }
+        });
+
         // ── FISMA Session Lock Button ──
         btnLockSession = new Button("🔒 Lock");
         btnLockSession.getStyleClass().add("button-theme-toggle");
@@ -188,7 +222,7 @@ public class MainLayout {
 
         topBar.getChildren().addAll(
                 brandRow, lblBadge, lblRoleBadge, spacer,
-                lblUserInfo, cmbLanguage, zoomGroup, btnThemeToggle, btnA11yHelp, btnLockSession, btnLogoutTop
+                lblUserInfo, cmbLanguage, zoomGroup, btnThemeToggle, btnA11yHelp, btnUpdate, btnLockSession, btnLogoutTop
         );
         rootPane.setTop(topBar);
 

@@ -1,4 +1,4 @@
-name: Build Native Installers & Automated Release
+name: Build Native Installers, Sign & Publish Release
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   # ============================================================================
-  # 1. Build Multi-Platform Native Installers via Matrix
+  # 1. Build Multi-Platform Native Installers (.dmg, .deb, .msi) via Matrix
   # ============================================================================
   build-installers:
     name: Package Native Installer (${{ matrix.os }})
@@ -63,22 +63,62 @@ jobs:
         working-directory: DataWiping
         run: mvn clean package -DskipTests=true --batch-mode
 
-      - name: Build Native Installer (macOS)
+      # ── macOS: Codesign & Apple Notarytool ──
+      - name: Configure Apple Developer Certificate (macOS)
+        if: matrix.os == 'macos-latest' && env.APPLE_CERTIFICATE_BASE64 != ''
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'temporary-build-password' }}
+        run: |
+          echo "Importing Apple Developer Certificate into temporary keychain..."
+          CERT_PATH=$RUNNER_TEMP/build_cert.p12
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $CERT_PATH
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $CERT_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+      - name: Build Native Installer & Notarize (macOS)
         if: matrix.os == 'macos-latest'
+        env:
+          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           chmod +x packaging/package-mac.sh
           ./packaging/package-mac.sh "${{ steps.get_version.outputs.VERSION }}"
 
-      - name: Build Native Installer (Linux)
+      # ── Linux: DEB Package ──
+      - name: Build Native Installer (Linux .deb)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update && sudo apt-get install -y fakeroot alien
           chmod +x packaging/package-linux.sh
           ./packaging/package-linux.sh "${{ steps.get_version.outputs.VERSION }}"
 
-      - name: Build Native Installer (Windows)
+      # ── Windows: MSI & Authenticode Signing ──
+      - name: Configure Windows Code Signing Certificate
+        if: matrix.os == 'windows-latest' && env.WIN_CERTIFICATE_BASE64 != ''
+        id: win_cert
+        shell: pwsh
+        env:
+          WIN_CERTIFICATE_BASE64: ${{ secrets.WIN_CERTIFICATE_BASE64 }}
+        run: |
+          $CertBytes = [System.Convert]::FromBase64String($env:WIN_CERTIFICATE_BASE64)
+          $CertPath = Join-Path $env:RUNNER_TEMP "authenticode.pfx"
+          [System.IO.File]::WriteAllBytes($CertPath, $CertBytes)
+          echo "WIN_CERT_PATH=$CertPath" >> $env:GITHUB_OUTPUT
+
+      - name: Build Native Installer & Sign (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
+        env:
+          WIN_CERTIFICATE_PATH: ${{ steps.win_cert.outputs.WIN_CERT_PATH }}
+          WIN_CERTIFICATE_PASSWORD: ${{ secrets.WIN_CERTIFICATE_PASSWORD }}
         run: |
           .\packaging\package-win.ps1 -AppVersion "${{ steps.get_version.outputs.VERSION }}"
 
@@ -91,7 +131,66 @@ jobs:
           retention-days: 7
 
   # ============================================================================
-  # 2. Build Standalone Cross-Platform Shaded Uber-JAR
+  # 2. Build Universal Linux Packages (AppImage & Flatpak)
+  # ============================================================================
+  build-universal-linux:
+    name: Package Universal Linux (AppImage & Flatpak)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Extract Release Version
+        id: get_version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" =~ refs/tags/v(.*) ]]; then
+            echo "VERSION=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=1.0.0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Shaded Uber-JAR
+        working-directory: DataWiping
+        run: mvn clean package -DskipTests=true --batch-mode
+
+      - name: Build Linux AppImage
+        run: |
+          chmod +x packaging/package-appimage.sh
+          ./packaging/package-appimage.sh "${{ steps.get_version.outputs.VERSION }}"
+
+      - name: Setup Flatpak Builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || true
+
+      - name: Build Linux Flatpak Bundle
+        run: |
+          chmod +x packaging/package-flatpak.sh
+          ./packaging/package-flatpak.sh "${{ steps.get_version.outputs.VERSION }}"
+
+      - name: Upload Universal Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: USBSanitizer-Universal-Linux
+          path: |
+            dist/*.AppImage
+            dist/*.flatpak
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ============================================================================
+  # 3. Build Standalone Cross-Platform Shaded Uber-JAR
   # ============================================================================
   build-uber-jar:
     name: Build Standalone Uber-JAR
@@ -120,11 +219,11 @@ jobs:
           retention-days: 7
 
   # ============================================================================
-  # 3. Cryptographic Checksum Generation & GitHub Release Publication
+  # 4. Cryptographic Checksum Generation & GitHub Release Publication
   # ============================================================================
   publish-release:
     name: Publish Release & Cryptographic Signatures
-    needs: [build-installers, build-uber-jar]
+    needs: [build-installers, build-universal-linux, build-uber-jar]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -166,6 +265,13 @@ jobs:
           name: USBSanitizer-Windows-msi
           path: release_assets/
 
+      - name: Download Universal Linux Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: USBSanitizer-Universal-Linux
+          path: release_assets/
+        continue-on-error: true
+
       - name: Download Standalone Shaded JAR
         uses: actions/download-artifact@v4
         with:
@@ -195,9 +301,11 @@ jobs:
             High-Assurance, NIST SP 800-88 Rev. 1 compliant storage erasure and cryptographic sanitization suite.
 
             ### 📦 Distributable Binaries & Native Installers
-            - **macOS Disk Image (`.dmg`)**: Native bundled application for macOS.
+            - **macOS Disk Image (`.dmg`)**: Native bundled application with Apple Hardened Runtime notarization.
             - **Linux Debian Package (`.deb`)**: Native package with desktop menu and launcher integration.
-            - **Windows MSI Installer (`.msi`)**: Windows installer with shortcut and UAC elevation support.
+            - **Universal Linux AppImage (`.AppImage`)**: Single executable for all Linux distributions.
+            - **Universal Linux Flatpak (`.flatpak`)**: Sandboxed package with system storage permissions.
+            - **Windows MSI Installer (`.msi`)**: Windows installer with Authenticode signature and UAC elevation.
             - **Standalone Shaded Uber-JAR (`-all.jar`)**: Cross-platform executable JAR with bundled native bindings.
 
             ### 🔐 Integrity Verification (SHA-256)
@@ -211,3 +319,4 @@ jobs:
             - **DoD 5220.22-M** & **BSI-GS** Multi-Pass Erasure
             - **Ed25519** Digital Signatures & **Tamper-Evident SHA-256 QR Audit Certificates**
             - **FISMA / HIPAA / GDPR** Compliant Inactivity Auto-Lock & Role-Based Access Control
+            - **In-App Auto-Update**: Background update notification and seamless 1-click update installation.

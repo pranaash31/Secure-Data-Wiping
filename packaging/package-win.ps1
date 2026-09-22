@@ -1,8 +1,11 @@
 # ==============================================================================
-# USB Sanitizer — Windows Native Packaging (.msi & .exe) Script (PowerShell)
+# USB Sanitizer — Windows Native Packaging (.msi & .exe) with Authenticode Signing
 # ==============================================================================
 param (
-    [string]$AppVersion = "1.0.0"
+    [string]$AppVersion = "1.0.0",
+    [string]$CertificatePath = $env:WIN_CERTIFICATE_PATH,
+    [string]$CertificatePassword = $env:WIN_CERTIFICATE_PASSWORD,
+    [string]$TimestampServer = "http://timestamp.digicert.com"
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,6 +73,33 @@ $JPackageArgs = @(
 ) + $IconArgs
 
 & jpackage @JPackageArgs
+
+$MsiPath = Join-Path $DistDir "$AppName-$AppVersion.msi"
+
+# Authenticode Signing with signtool.exe
+if ($CertificatePath -and (Test-Path $CertificatePath) -and (Test-Path $MsiPath)) {
+    Write-Host "======================================================================" -ForegroundColor Green
+    Write-Host "  Signing MSI Installer with Authenticode Certificate ($CertificatePath)..." -ForegroundColor Green
+    Write-Host "======================================================================" -ForegroundColor Green
+
+    $SignArgs = @(
+        "sign",
+        "/f", $CertificatePath,
+        "/fd", "SHA256",
+        "/tr", $TimestampServer,
+        "/td", "SHA256",
+        "/d", $Description
+    )
+    if ($CertificatePassword) {
+        $SignArgs += @("/p", $CertificatePassword)
+    }
+    $SignArgs += $MsiPath
+
+    & signtool @SignArgs
+    Write-Host "MSI signing completed successfully!" -ForegroundColor Green
+} else {
+    Write-Host "Notice: Certificate not provided or signtool not found. Proceeding with unsigned MSI." -ForegroundColor Yellow
+}
 
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host " Windows Packaging completed successfully!" -ForegroundColor Cyan

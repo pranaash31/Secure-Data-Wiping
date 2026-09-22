@@ -1,0 +1,66 @@
+app-id: com.sanitizer.USBSanitizer
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.openjdk17
+command: usb-sanitizer
+finish-args:
+  # UI & Wayland / X11
+  - --share=ipc
+  - --socket=x11
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  # Direct Block & USB Storage Access
+  - --device=all
+  - --filesystem=host
+  - --filesystem=/dev
+  - --talk-name=org.freedesktop.UDisks2
+
+modules:
+  - name: openjdk
+    buildsystem: simple
+    build-commands:
+      - /usr/lib/sdk/openjdk17/install.sh
+
+  - name: usb-sanitizer
+    buildsystem: simple
+    build-commands:
+      # Install Application JAR
+      - install -Dm644 usb-sanitizer-1.0-SNAPSHOT-all.jar /app/lib/usb-sanitizer/usb-sanitizer.jar
+      
+      # Install Launcher Script
+      - install -Dm755 usb-sanitizer.sh /app/bin/usb-sanitizer
+      
+      # Install Desktop & Metainfo
+      - install -Dm644 com.sanitizer.USBSanitizer.desktop /app/share/applications/com.sanitizer.USBSanitizer.desktop
+      - install -Dm644 com.sanitizer.USBSanitizer.metainfo.xml /app/share/metainfo/com.sanitizer.USBSanitizer.metainfo.xml
+      
+      # Install Icons
+      - install -Dm644 USBSanitizer.png /app/share/icons/hicolor/256x256/apps/com.sanitizer.USBSanitizer.png
+    sources:
+      - type: file
+        path: ../../DataWiping/target/usb-sanitizer-1.0-SNAPSHOT-all.jar
+      - type: file
+        path: ../assets/USBSanitizer.png
+      - type: file
+        path: com.sanitizer.USBSanitizer.metainfo.xml
+      - type: script
+        dest-filename: usb-sanitizer.sh
+        commands:
+          - exec /app/jre/bin/java -Xmx2048m -Dfile.encoding=UTF-8 -jar /app/lib/usb-sanitizer/usb-sanitizer.jar "$@"
+      - type: script
+        dest-filename: com.sanitizer.USBSanitizer.desktop
+        commands:
+          - |
+            [Desktop Entry]
+            Type=Application
+            Name=USB Sanitizer
+            GenericName=Data Sanitization Tool
+            Comment=NIST SP 800-88 Rev. 1 Storage Sanitization Utility
+            Exec=usb-sanitizer %U
+            Icon=com.sanitizer.USBSanitizer
+            Categories=System;Security;Utility;
+            Terminal=false
+            StartupWMClass=com.sanitizer.gui.AppLauncher
