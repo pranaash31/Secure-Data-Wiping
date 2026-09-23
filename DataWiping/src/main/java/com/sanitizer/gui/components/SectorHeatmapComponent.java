@@ -1,11 +1,13 @@
 package com.sanitizer.gui.components;
 
+import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.engine.WipeMetrics;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.*;
@@ -17,18 +19,18 @@ import java.util.List;
 
 /**
  * High-performance, real-time Sector Heatmap / Matrix Grid visualizer (Defrag/Disk style).
- * Shows dynamic block-by-block transitions from:
- * 🔴 Raw Data (Dirty) -> 🟡 Active Write Head -> 🔵 Pattern Fill -> 🟢 Zeroed & Verified.
+ * Features Colorblind-Optimized Palettes for Deuteranopia, Protanopia, Tritanopia,
+ * and High-Contrast Monochrome (WCAG AAA ≥10:1).
  */
 public class SectorHeatmapComponent extends VBox {
 
     public enum BlockState {
-        DIRTY,       // 🔴 Raw data to be wiped
-        ACTIVE_HEAD, // 🟡 Live write head actively overwriting
-        PATTERN,     // 🔵 Cryptographic random pattern (DoD Pass 2)
-        ZEROED,      // 🟢 Verified zeroed / sanitized (0x00)
-        BAD_SECTOR,  // ⚠️ Defective Bad Sector (Hardware I/O Fault)
-        IDLE         // ⚪ Idle / Ready
+        DIRTY,       // Raw data to be wiped
+        ACTIVE_HEAD, // Live write head actively overwriting
+        PATTERN,     // Cryptographic random pattern (DoD Pass 2)
+        ZEROED,      // Verified zeroed / sanitized (0x00)
+        BAD_SECTOR,  // Defective Bad Sector (Hardware I/O Fault)
+        IDLE         // Idle / Ready
     }
 
     private final int totalBlocks;
@@ -38,8 +40,10 @@ public class SectorHeatmapComponent extends VBox {
 
     private final FlowPane gridPane = new FlowPane();
     private final Label lblHeaderInfo = new Label();
+    private final HBox legendBar = new HBox(12);
     private long totalDriveBytes = 100L * 1024 * 1024; // Default baseline 100MB
 
+    private HeatmapPalette currentPalette = AccessibilityManager.getHeatmapPalette();
     private int activeHeadIndex = -1;
     private Timeline pulseTimeline;
     private boolean pulseState = false;
@@ -74,12 +78,37 @@ public class SectorHeatmapComponent extends VBox {
             gridPane.getChildren().add(rect);
         }
 
-        // Mini legend bar
-        HBox legendBar = createLegendBar();
+        // Initialize Legend Bar
+        refreshLegendBar();
 
         getChildren().addAll(lblHeaderInfo, gridPane, legendBar);
         initPulseAnimation();
         reset(totalDriveBytes);
+
+        // Listen for global palette changes from AccessibilityManager
+        AccessibilityManager.addPaletteListener(this::setPalette);
+    }
+
+    public HeatmapPalette getPalette() {
+        return currentPalette;
+    }
+
+    /**
+     * Dynamically switches the active colorblind-optimized heatmap palette and re-renders all blocks.
+     */
+    public void setPalette(HeatmapPalette newPalette) {
+        if (newPalette == null || this.currentPalette == newPalette) {
+            return;
+        }
+        this.currentPalette = newPalette;
+
+        // Re-apply styles to all existing blocks
+        for (int i = 0; i < totalBlocks; i++) {
+            applyBlockStyle(blockNodes.get(i), blockStates.get(i));
+        }
+
+        // Re-render legend bar swatches
+        refreshLegendBar();
     }
 
     private void initPulseAnimation() {
@@ -88,11 +117,13 @@ public class SectorHeatmapComponent extends VBox {
                 pulseState = !pulseState;
                 Rectangle headNode = blockNodes.get(activeHeadIndex);
                 if (pulseState) {
-                    headNode.setStyle("-fx-fill: #F59E0B; -fx-stroke: #FEF08A; -fx-stroke-width: 1.5; " +
-                            "-fx-effect: dropshadow(three-pass-box, rgba(245, 158, 11, 0.8), 6, 0, 0, 0);");
+                    headNode.setStyle(String.format("-fx-fill: %s; -fx-stroke: %s; -fx-stroke-width: 1.5; " +
+                            "-fx-effect: dropshadow(three-pass-box, %s, 6, 0, 0, 0);",
+                            currentPalette.getActiveHeadFill(), currentPalette.getActiveHeadStroke(), currentPalette.getActiveHeadGlow()));
                 } else {
-                    headNode.setStyle("-fx-fill: #D97706; -fx-stroke: #FBBF24; -fx-stroke-width: 1; " +
-                            "-fx-effect: dropshadow(three-pass-box, rgba(245, 158, 11, 0.4), 3, 0, 0, 0);");
+                    headNode.setStyle(String.format("-fx-fill: %s; -fx-stroke: %s; -fx-stroke-width: 1.0; " +
+                            "-fx-effect: dropshadow(three-pass-box, %s, 3, 0, 0, 0);",
+                            currentPalette.getActiveHeadFill(), currentPalette.getActiveHeadStroke(), currentPalette.getActiveHeadGlow()));
                 }
             }
         }));
@@ -157,7 +188,8 @@ public class SectorHeatmapComponent extends VBox {
         pulseTimeline.stop();
         if (activeHeadIndex >= 0 && activeHeadIndex < totalBlocks) {
             Rectangle headNode = blockNodes.get(activeHeadIndex);
-            headNode.setStyle("-fx-fill: #DC2626; -fx-stroke: #EF4444; -fx-stroke-width: 1.5;");
+            headNode.setStyle(String.format("-fx-fill: %s; -fx-stroke: %s; -fx-stroke-width: 1.5;",
+                    currentPalette.getDirtyFill(), currentPalette.getDirtyStroke()));
         }
         lblHeaderInfo.setText("SECTOR LBA MATRIX: OPERATION HALTED (GRANULAR ABORT)");
     }
@@ -195,14 +227,30 @@ public class SectorHeatmapComponent extends VBox {
 
     private void applyBlockStyle(Rectangle rect, BlockState state) {
         switch (state) {
-            case DIRTY -> rect.setStyle("-fx-fill: #EF4444; -fx-stroke: #B91C1C; -fx-stroke-width: 0.8;");
-            case ACTIVE_HEAD -> rect.setStyle("-fx-fill: #F59E0B; -fx-stroke: #FBBF24; -fx-stroke-width: 1.2; " +
-                    "-fx-effect: dropshadow(three-pass-box, rgba(245, 158, 11, 0.7), 5, 0, 0, 0);");
-            case PATTERN -> rect.setStyle("-fx-fill: #0284C7; -fx-stroke: #38BDF8; -fx-stroke-width: 0.8;");
-            case ZEROED -> rect.setStyle("-fx-fill: #10B981; -fx-stroke: #059669; -fx-stroke-width: 0.8;");
-            case BAD_SECTOR -> rect.setStyle("-fx-fill: #9333EA; -fx-stroke: #EF4444; -fx-stroke-width: 1.6; " +
-                    "-fx-effect: dropshadow(three-pass-box, rgba(147, 51, 234, 0.85), 6, 0, 0, 0);");
-            case IDLE -> rect.setStyle("-fx-fill: #CBD5E1; -fx-stroke: #94A3B8; -fx-stroke-width: 0.8;");
+            case DIRTY -> rect.setStyle(String.format(
+                    "-fx-fill: %s; -fx-stroke: %s; -fx-stroke-width: 0.8;",
+                    currentPalette.getDirtyFill(), currentPalette.getDirtyStroke()
+            ));
+            case ACTIVE_HEAD -> rect.setStyle(String.format(
+                    "-fx-fill: %s; -fx-stroke: %s; -fx-stroke-width: 1.2; -fx-effect: dropshadow(three-pass-box, %s, 5, 0, 0, 0);",
+                    currentPalette.getActiveHeadFill(), currentPalette.getActiveHeadStroke(), currentPalette.getActiveHeadGlow()
+            ));
+            case PATTERN -> rect.setStyle(String.format(
+                    "-fx-fill: %s; -fx-stroke: %s; -fx-stroke-width: 0.8;",
+                    currentPalette.getPatternFill(), currentPalette.getPatternStroke()
+            ));
+            case ZEROED -> rect.setStyle(String.format(
+                    "-fx-fill: %s; -fx-stroke: %s; -fx-stroke-width: 0.8;",
+                    currentPalette.getZeroedFill(), currentPalette.getZeroedStroke()
+            ));
+            case BAD_SECTOR -> rect.setStyle(String.format(
+                    "-fx-fill: %s; -fx-stroke: %s; -fx-stroke-width: 1.6; -fx-effect: dropshadow(three-pass-box, %s, 6, 0, 0, 0);",
+                    currentPalette.getBadSectorFill(), currentPalette.getBadSectorStroke(), currentPalette.getBadSectorGlow()
+            ));
+            case IDLE -> rect.setStyle(String.format(
+                    "-fx-fill: %s; -fx-stroke: %s; -fx-stroke-width: 0.8;",
+                    currentPalette.getIdleFill(), currentPalette.getIdleStroke()
+            ));
         }
     }
 
@@ -214,31 +262,30 @@ public class SectorHeatmapComponent extends VBox {
         long endLba = endByte / 512;
 
         String stateStr = switch (state) {
-            case DIRTY -> "🔴 RAW DATA (UNSANITIZED)";
-            case ACTIVE_HEAD -> "🟡 ACTIVE WRITE HEAD (OVERWRITING)";
-            case PATTERN -> "🔵 PATTERN OVERWRITE (0xFF / PSEUDO-RANDOM)";
-            case ZEROED -> "🟢 VERIFIED ZEROED (0x00 FILL COMPLIANT)";
-            case BAD_SECTOR -> "⚠️ DEFECTIVE BAD LBA (UNRECOVERABLE HARDWARE FAULT)";
-            case IDLE -> "⚪ IDLE / READY";
+            case DIRTY -> "RAW DATA (UNSANITIZED)";
+            case ACTIVE_HEAD -> "ACTIVE WRITE HEAD (OVERWRITING)";
+            case PATTERN -> "PATTERN OVERWRITE (0xFF / PSEUDO-RANDOM)";
+            case ZEROED -> "VERIFIED ZEROED (0x00 FILL COMPLIANT)";
+            case BAD_SECTOR -> "⚠️ DEFECTIVE BAD LBA (HARDWARE FAULT)";
+            case IDLE -> "IDLE / READY";
         };
 
-        return String.format("Sector Block #%d\nLBA Range: 0x%08X - 0x%08X\nByte Offset: %s - %s\nStatus: %s",
-                blockIndex + 1, startLba, endLba, formatSize(startByte), formatSize(endByte), stateStr);
+        return String.format("Sector Block #%d\nLBA Range: 0x%08X - 0x%08X\nByte Offset: %s - %s\nStatus: %s\nPalette: %s",
+                blockIndex + 1, startLba, endLba, formatSize(startByte), formatSize(endByte), stateStr, currentPalette.getDisplayName());
     }
 
-    private HBox createLegendBar() {
-        HBox bar = new HBox(12);
-        bar.setAlignment(Pos.CENTER_LEFT);
-        bar.setPadding(new Insets(2, 0, 0, 0));
+    private void refreshLegendBar() {
+        legendBar.getChildren().clear();
+        legendBar.setAlignment(Pos.CENTER_LEFT);
+        legendBar.setPadding(new Insets(2, 0, 0, 0));
 
-        bar.getChildren().addAll(
-                createLegendItem("#EF4444", "Raw Data"),
-                createLegendItem("#F59E0B", "Write Head"),
-                createLegendItem("#0284C7", "Pattern Pass"),
-                createLegendItem("#10B981", "Zeroed 0x00"),
-                createLegendItem("#9333EA", "⚠️ Bad LBA (Defective)")
+        legendBar.getChildren().addAll(
+                createLegendItem(currentPalette.getDirtyFill(), "Raw Data"),
+                createLegendItem(currentPalette.getActiveHeadFill(), "Write Head"),
+                createLegendItem(currentPalette.getPatternFill(), "Pattern Pass"),
+                createLegendItem(currentPalette.getZeroedFill(), "Zeroed 0x00"),
+                createLegendItem(currentPalette.getBadSectorFill(), "⚠️ Bad LBA (Defect)")
         );
-        return bar;
     }
 
     private HBox createLegendItem(String colorHex, String text) {
@@ -255,6 +302,32 @@ public class SectorHeatmapComponent extends VBox {
 
         item.getChildren().addAll(box, label);
         return item;
+    }
+
+    /**
+     * Creates a compact palette switcher ComboBox for embedding in toolbar headers.
+     */
+    public HBox createPaletteSelectorWidget() {
+        HBox row = new HBox(6);
+        row.setAlignment(Pos.CENTER_LEFT);
+
+        Label lbl = new Label("🎨 Palette:");
+        lbl.setStyle("-fx-font-size: 10px; -fx-text-fill: #94A3B8; -fx-font-weight: bold;");
+
+        ComboBox<HeatmapPalette> cmb = new ComboBox<>();
+        cmb.getItems().addAll(HeatmapPalette.values());
+        cmb.setValue(this.currentPalette);
+        cmb.setStyle("-fx-font-size: 10px; -fx-pref-width: 220px;");
+
+        cmb.setOnAction(e -> {
+            HeatmapPalette p = cmb.getValue();
+            if (p != null) {
+                AccessibilityManager.setHeatmapPalette(p);
+            }
+        });
+
+        row.getChildren().addAll(lbl, cmb);
+        return row;
     }
 
     private static String formatSize(long bytes) {

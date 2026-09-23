@@ -56,11 +56,50 @@ public final class AccessibilityManager {
 
     private static Theme currentTheme = Theme.LIGHT;
     private static double currentFontScale = SCALE_100;
+    private static com.sanitizer.gui.components.HeatmapPalette currentPalette = com.sanitizer.gui.components.HeatmapPalette.STANDARD;
 
     private static final List<Consumer<Theme>> themeListeners = new CopyOnWriteArrayList<>();
     private static final List<Consumer<Double>> scaleListeners = new CopyOnWriteArrayList<>();
+    private static final List<Consumer<com.sanitizer.gui.components.HeatmapPalette>> paletteListeners = new CopyOnWriteArrayList<>();
 
     private AccessibilityManager() {}
+
+    /**
+     * Set active colorblind-optimized heatmap palette and notify listeners.
+     */
+    public static synchronized void setHeatmapPalette(com.sanitizer.gui.components.HeatmapPalette palette) {
+        if (palette == null) return;
+        if (currentPalette != palette) {
+            currentPalette = palette;
+            AppLogger.info(MODULE, "Sector heatmap palette set to: " + palette.name());
+            notifyPaletteListeners(currentPalette);
+        }
+    }
+
+    public static synchronized com.sanitizer.gui.components.HeatmapPalette getHeatmapPalette() {
+        return currentPalette;
+    }
+
+    public static void addPaletteListener(Consumer<com.sanitizer.gui.components.HeatmapPalette> listener) {
+        if (listener != null) {
+            paletteListeners.add(listener);
+            listener.accept(currentPalette);
+        }
+    }
+
+    public static void removePaletteListener(Consumer<com.sanitizer.gui.components.HeatmapPalette> listener) {
+        paletteListeners.remove(listener);
+    }
+
+    private static void notifyPaletteListeners(com.sanitizer.gui.components.HeatmapPalette palette) {
+        for (Consumer<com.sanitizer.gui.components.HeatmapPalette> listener : paletteListeners) {
+            try {
+                listener.accept(palette);
+            } catch (Exception e) {
+                AppLogger.warn(MODULE, "Error in palette listener: " + e.getMessage());
+            }
+        }
+    }
 
     /**
      * Set active visual theme and notify listeners.

@@ -13,6 +13,7 @@ import com.sanitizer.detector.ThermalPolicyManager;
 import com.sanitizer.util.SoundManager;
 import com.sanitizer.engine.WipeVerifier;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
+import com.sanitizer.gui.components.HeatmapPalette;
 import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
@@ -496,8 +497,80 @@ public class SettingsView {
         c2.setPercentWidth(50);
         a11yGrid.getColumnConstraints().addAll(c1, c2);
 
-        card.getChildren().addAll(header, new Separator(), a11yGrid);
+        // ── 5. Colorblind-Optimized Sector Heatmap Palette ──
+        VBox paletteSection = new VBox(10);
+        paletteSection.setPadding(new Insets(14));
+        paletteSection.setStyle("-fx-background-color: #1e293b; -fx-background-radius: 8px; -fx-border-color: #334155; -fx-border-radius: 8px;");
+
+        Label lblPaletteTitle = new Label("🎨 Colorblind-Optimized Sector Visualizer Palette (Deuteranopia, Protanopia, Tritanopia):");
+        lblPaletteTitle.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #e2e8f0;");
+
+        HBox paletteControls = new HBox(16);
+        paletteControls.setAlignment(Pos.CENTER_LEFT);
+
+        ComboBox<HeatmapPalette> cmbPalette = new ComboBox<>();
+        cmbPalette.getItems().addAll(HeatmapPalette.values());
+        cmbPalette.setValue(AccessibilityManager.getHeatmapPalette());
+        cmbPalette.setStyle("-fx-pref-width: 340px; -fx-font-size: 11px;");
+
+        HBox swatchBox = new HBox(10);
+        swatchBox.setAlignment(Pos.CENTER_LEFT);
+
+        Runnable updateSwatches = () -> {
+            swatchBox.getChildren().clear();
+            HeatmapPalette p = cmbPalette.getValue();
+            if (p == null) p = AccessibilityManager.getHeatmapPalette();
+
+            swatchBox.getChildren().addAll(
+                    createPaletteSwatch(p.getDirtyFill(), "Raw Data"),
+                    createPaletteSwatch(p.getActiveHeadFill(), "Write Head"),
+                    createPaletteSwatch(p.getPatternFill(), "Pattern"),
+                    createPaletteSwatch(p.getZeroedFill(), "Zeroed 0x00"),
+                    createPaletteSwatch(p.getBadSectorFill(), "⚠️ Bad LBA")
+            );
+        };
+
+        cmbPalette.setOnAction(e -> {
+            HeatmapPalette selected = cmbPalette.getValue();
+            if (selected != null) {
+                AccessibilityManager.setHeatmapPalette(selected);
+                updateSwatches.run();
+            }
+        });
+
+        AccessibilityManager.addPaletteListener(p -> {
+            if (p != null && !p.equals(cmbPalette.getValue())) {
+                cmbPalette.setValue(p);
+                updateSwatches.run();
+            }
+        });
+
+        updateSwatches.run();
+        paletteControls.getChildren().addAll(cmbPalette, swatchBox);
+
+        Label lblPaletteDesc = new Label("Provides high-contrast chromatic separation based on scientific Okabe-Ito and ColorBrewer scales to prevent red-green and blue-yellow confusion during live sanitization.");
+        lblPaletteDesc.setStyle("-fx-font-size: 11px; -fx-text-fill: #94a3b8;");
+
+        paletteSection.getChildren().addAll(lblPaletteTitle, paletteControls, lblPaletteDesc);
+
+        card.getChildren().addAll(header, new Separator(), a11yGrid, paletteSection);
         return card;
+    }
+
+    private HBox createPaletteSwatch(String colorHex, String labelText) {
+        HBox swatch = new HBox(5);
+        swatch.setAlignment(Pos.CENTER_LEFT);
+
+        javafx.scene.shape.Rectangle box = new javafx.scene.shape.Rectangle(12, 12);
+        box.setArcWidth(3);
+        box.setArcHeight(3);
+        box.setStyle("-fx-fill: " + colorHex + "; -fx-stroke: rgba(255,255,255,0.3); -fx-stroke-width: 0.8;");
+
+        Label label = new Label(labelText);
+        label.setStyle("-fx-font-size: 10px; -fx-text-fill: #cbd5e1; -fx-font-weight: bold;");
+
+        swatch.getChildren().addAll(box, label);
+        return swatch;
     }
 
     private VBox buildThermalPolicyCard() {

@@ -86,4 +86,49 @@ class SectorHeatmapTest {
         // Simulate Abort
         component.setAborted();
     }
+
+    @Test
+    @DisplayName("Verify HeatmapPalette enum and colorblind palette mappings")
+    void testHeatmapPalettes() {
+        assertThat(HeatmapPalette.values()).containsExactly(
+                HeatmapPalette.STANDARD,
+                HeatmapPalette.DEUTERANOPIA,
+                HeatmapPalette.PROTANOPIA,
+                HeatmapPalette.TRITANOPIA,
+                HeatmapPalette.HIGH_CONTRAST
+        );
+
+        for (HeatmapPalette palette : HeatmapPalette.values()) {
+            assertThat(palette.getDisplayName()).isNotEmpty();
+            assertThat(palette.getDirtyFill()).startsWith("#");
+            assertThat(palette.getActiveHeadFill()).startsWith("#");
+            assertThat(palette.getPatternFill()).startsWith("#");
+            assertThat(palette.getZeroedFill()).startsWith("#");
+            assertThat(palette.getBadSectorFill()).startsWith("#");
+            assertThat(palette.getIdleFill()).startsWith("#");
+            assertThat(palette.getActiveHeadGlow()).contains("rgba");
+        }
+    }
+
+    @Test
+    @DisplayName("Verify dynamic palette switching on SectorHeatmapComponent")
+    void testDynamicPaletteSwitching() {
+        SectorHeatmapComponent component = new SectorHeatmapComponent(20, 10, 10, 2, 2);
+        assertThat(component.getPalette()).isNotNull();
+
+        component.setPalette(HeatmapPalette.DEUTERANOPIA);
+        assertThat(component.getPalette()).isEqualTo(HeatmapPalette.DEUTERANOPIA);
+
+        component.setPalette(HeatmapPalette.PROTANOPIA);
+        assertThat(component.getPalette()).isEqualTo(HeatmapPalette.PROTANOPIA);
+
+        component.setPalette(HeatmapPalette.TRITANOPIA);
+        assertThat(component.getPalette()).isEqualTo(HeatmapPalette.TRITANOPIA);
+
+        component.setPalette(HeatmapPalette.HIGH_CONTRAST);
+        assertThat(component.getPalette()).isEqualTo(HeatmapPalette.HIGH_CONTRAST);
+
+        // Test palette selector widget creation
+        assertThat(component.createPaletteSelectorWidget()).isNotNull();
+    }
 }

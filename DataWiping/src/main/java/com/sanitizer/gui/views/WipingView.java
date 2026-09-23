@@ -227,8 +227,17 @@ public class WipingView {
         progressBar = new ProgressBar(0.0);
         progressBar.setMaxWidth(Double.MAX_VALUE);
 
-        // Large 100-Block Sector Heatmap Visualizer
+        // Large 100-Block Sector Heatmap Visualizer & Quick Palette Switcher
+        HBox matrixHeader = new HBox(12);
+        matrixHeader.setAlignment(Pos.CENTER_LEFT);
+        Label lblMatrix = new Label("Real-Time Sector LBA Overwrite Matrix:");
+        lblMatrix.getStyleClass().add("card-subtitle");
+        Region matrixSpacer = new Region();
+        HBox.setHgrow(matrixSpacer, Priority.ALWAYS);
+
         sectorMatrix = new SectorHeatmapComponent(100, 13, 16, 4, 4);
+        HBox paletteWidget = sectorMatrix.createPaletteSelectorWidget();
+        matrixHeader.getChildren().addAll(lblMatrix, matrixSpacer, paletteWidget);
 
         // Real-Time Thermal Sparkline & Temperature Graph
         thermalGraph = new ThermalGraphComponent();
@@ -243,7 +252,7 @@ public class WipingView {
         txtLogOutput.setPrefRowCount(7);
         VBox.setVgrow(txtLogOutput, Priority.ALWAYS);
 
-        cardExec.getChildren().addAll(execHeader, progressBar, sectorMatrix, thermalGraph, lblLogTitle, txtLogOutput);
+        cardExec.getChildren().addAll(execHeader, progressBar, matrixHeader, sectorMatrix, thermalGraph, lblLogTitle, txtLogOutput);
 
         rootContainer.getChildren().addAll(titleBox, topRow, cardExec);
     }
