@@ -336,9 +336,13 @@ public class BatchWipeView {
 
         // 2. Concurrency Utilization
         if (lblConcurrency != null) {
-            int pct = (int) Math.round(((double) activeCount / poolCap) * 100);
-            lblConcurrency.setText(activeCount + " / " + poolCap + " SLOTS");
-            lblConcurrencySub.setText(pct > 0 ? pct + "% Concurrency Utilization" : "Pool ready for dispatch");
+            com.sanitizer.shield.WorkerPoolGovernor gov = com.sanitizer.shield.WorkerPoolGovernor.getInstance();
+            int govActive = gov.getActiveSlotCount();
+            int displayActive = Math.max(activeCount, govActive);
+            int pct = (int) Math.round(((double) displayActive / poolCap) * 100);
+            lblConcurrency.setText(displayActive + " / " + poolCap + " SLOTS");
+            double cpuPct = gov.getCpuLoad() * 100.0;
+            lblConcurrencySub.setText(displayActive > 0 ? String.format("%d%% Active | Host CPU: %.1f%%", pct, cpuPct) : String.format("Pool Ready | Host CPU: %.1f%%", cpuPct));
         }
 
         // 3. Volume

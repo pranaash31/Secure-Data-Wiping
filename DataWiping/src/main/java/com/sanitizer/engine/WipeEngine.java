@@ -86,73 +86,79 @@ public class WipeEngine {
             policy = WipePolicyManager.getInstance().getDefaultPolicy();
         }
 
-        // HARD SAFETY GUARDRAIL: Block primary system disk
-        if (systemPath.contains("disk0") || systemPath.contains("rdisk0")) {
-            String err = "CRITICAL SAFETY SHIELD: Primary system drive (" + systemPath + ") blocked from wiping!";
-            AppLogger.shield(MODULE, err);
-            if (logCallback != null) logCallback.accept(err);
-            com.sanitizer.alert.AlertDispatcher.notifyShieldViolation(systemPath, "Low-level block overwrite", "Primary system disk protected");
+        // DEEP SAFETY SHIELD: Multi-OS Root & System Mount Inspection
+        com.sanitizer.shield.SystemDiskShield.SafetyVerdict shieldVerdict =
+                com.sanitizer.shield.SystemDiskShield.evaluate(systemPath);
+        if (!shieldVerdict.isSafe()) {
+            AppLogger.shield(MODULE, shieldVerdict.blockReason());
+            if (logCallback != null) logCallback.accept(shieldVerdict.blockReason());
+            com.sanitizer.alert.AlertDispatcher.notifyShieldViolation(systemPath, "Low-level block overwrite", shieldVerdict.blockReason());
             return false;
         }
 
-        MacUtil.unmountDiskIfMac(systemPath);
+        // Acquire Disk Lock and Unmount Logical Volumes
+        com.sanitizer.shield.DiskLockShield.prepareAndLockDisk(systemPath);
 
-        long targetBytes = isTestMode ? Math.min(totalBytes, TEST_CAP_BYTES) : totalBytes;
-        List<WipePass> passes = policy.getPasses();
-        if (passes == null || passes.isEmpty()) {
-            passes = List.of(new WipePass(1, WipePatternType.ZERO_FILL, 0x00, "Default Zero Fill"));
-        }
-
-        int totalPasses = passes.size();
-        log(logCallback, "═════════════════════════════════════════════════════════════════");
-        log(logCallback, String.format("Starting %s (%d-Pass Standard) on %s%s",
-                policy.getName(), totalPasses, systemPath, isTestMode ? " [TEST MODE: 1GB CAP]" : " [FULL WIPE]"));
-        log(logCallback, String.format("Standard Org: %s | Pattern Sequence: %s",
-                policy.getOrganization(), policy.getPatternSummary()));
-
-        double passSlice = 100.0 / totalPasses;
-
-        for (int i = 0; i < totalPasses; i++) {
-            WipePass pass = passes.get(i);
-            int currentPass = i + 1;
-            double startPct = i * passSlice;
-            double endPct = (i + 1) * passSlice;
-
-            String sourcePath = "/dev/zero";
-            if (pass.getPatternType() == WipePatternType.PSEUDO_RANDOM) {
-                sourcePath = "/dev/urandom";
+        try {
+            long targetBytes = isTestMode ? Math.min(totalBytes, TEST_CAP_BYTES) : totalBytes;
+            List<WipePass> passes = policy.getPasses();
+            if (passes == null || passes.isEmpty()) {
+                passes = List.of(new WipePass(1, WipePatternType.ZERO_FILL, 0x00, "Default Zero Fill"));
             }
 
-            log(logCallback, String.format("[%s] Pass %d/%d: %s (%s)...",
-                    policy.getStandardCode(), currentPass, totalPasses, pass.getDescription(), pass.getPatternHex()));
+            int totalPasses = passes.size();
+            log(logCallback, "═════════════════════════════════════════════════════════════════");
+            log(logCallback, String.format("Starting %s (%d-Pass Standard) on %s%s",
+                    policy.getName(), totalPasses, systemPath, isTestMode ? " [TEST MODE: 1GB CAP]" : " [FULL WIPE]"));
+            log(logCallback, String.format("Standard Org: %s | Pattern Sequence: %s",
+                    policy.getOrganization(), policy.getPatternSummary()));
 
-            boolean passSuccess = runDdCommand(
-                    systemPath,
-                    sourcePath,
-                    targetBytes,
-                    isTestMode,
-                    currentPass,
-                    totalPasses,
-                    pass.getDisplayName(),
-                    metricsCallback,
-                    logCallback,
-                    badSectorCallback,
-                    startPct,
-                    endPct
-            );
+            double passSlice = 100.0 / totalPasses;
 
-            if (!passSuccess) {
-                log(logCallback, String.format("[ERROR] Pass %d/%d failed on %s", currentPass, totalPasses, systemPath));
-                return false;
+            for (int i = 0; i < totalPasses; i++) {
+                WipePass pass = passes.get(i);
+                int currentPass = i + 1;
+                double startPct = i * passSlice;
+                double endPct = (i + 1) * passSlice;
+
+                String sourcePath = "/dev/zero";
+                if (pass.getPatternType() == WipePatternType.PSEUDO_RANDOM) {
+                    sourcePath = "/dev/urandom";
+                }
+
+                log(logCallback, String.format("[%s] Pass %d/%d: %s (%s)...",
+                        policy.getStandardCode(), currentPass, totalPasses, pass.getDescription(), pass.getPatternHex()));
+
+                boolean passSuccess = runDdCommand(
+                        systemPath,
+                        sourcePath,
+                        targetBytes,
+                        isTestMode,
+                        currentPass,
+                        totalPasses,
+                        pass.getDisplayName(),
+                        metricsCallback,
+                        logCallback,
+                        badSectorCallback,
+                        startPct,
+                        endPct
+                );
+
+                if (!passSuccess) {
+                    log(logCallback, String.format("[ERROR] Pass %d/%d failed on %s", currentPass, totalPasses, systemPath));
+                    return false;
+                }
             }
-        }
 
-        if (metricsCallback != null) {
-            metricsCallback.accept(new WipeMetrics(systemPath, 100.0, totalPasses, totalPasses, "Completed", targetBytes, targetBytes, 0.0, 0));
+            if (metricsCallback != null) {
+                metricsCallback.accept(new WipeMetrics(systemPath, 100.0, totalPasses, totalPasses, "Completed", targetBytes, targetBytes, 0.0, 0));
+            }
+            log(logCallback, String.format("[SUCCESS] All %d passes of %s successfully executed on %s.", totalPasses, policy.getName(), systemPath));
+            log(logCallback, "═════════════════════════════════════════════════════════════════");
+            return true;
+        } finally {
+            com.sanitizer.shield.DiskLockShield.releaseDiskLock(systemPath);
         }
-        log(logCallback, String.format("[SUCCESS] All %d passes of %s successfully executed on %s.", totalPasses, policy.getName(), systemPath));
-        log(logCallback, "═════════════════════════════════════════════════════════════════");
-        return true;
     }
 
     /**
@@ -206,11 +212,13 @@ public class WipeEngine {
     ) {
         Future<Boolean> future = batchExecutor.submit(() -> {
             boolean success = false;
+            com.sanitizer.shield.WorkerPoolGovernor.getInstance().acquireSlot(systemPath);
             try {
                 success = executeWipeWithPolicy(systemPath, totalBytes, policy, isTestMode, metricsCallback, logCallback);
             } catch (Exception e) {
                 AppLogger.error(MODULE, "Batch wipe error on " + systemPath, e);
             } finally {
+                com.sanitizer.shield.WorkerPoolGovernor.getInstance().releaseSlot(systemPath);
                 activeWipeTasks.remove(systemPath);
                 if (completionCallback != null) {
                     completionCallback.accept(success);
@@ -242,6 +250,9 @@ public class WipeEngine {
             future.cancel(true);
             cancelled = true;
         }
+
+        com.sanitizer.shield.WorkerPoolGovernor.getInstance().releaseSlot(systemPath);
+        com.sanitizer.shield.DiskLockShield.releaseDiskLock(systemPath);
 
         return cancelled;
     }
