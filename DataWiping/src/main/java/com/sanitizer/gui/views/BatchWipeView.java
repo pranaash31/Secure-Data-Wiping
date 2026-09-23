@@ -691,7 +691,7 @@ public class BatchWipeView {
             liveMetricsMap.remove(drive.systemPath());
 
             if (success) {
-                SoundManager.playSuccessChime();
+                SoundManager.playSanitizationComplete(drive.systemPath(), policy != null ? policy.getName() : "NIST SP 800-88", 0.0);
                 progressBar.setProgress(1.0);
                 pctLabel.setText("100.0% — Pass Verified");
                 speedLabel.setText("⚡ Speed: Done");
@@ -751,7 +751,7 @@ public class BatchWipeView {
                 NavigationManager.getInstance().showNotification("Drive Sanitized",
                         drive.model() + " sanitized & certified. S.M.A.R.T. Delta: " + deltaSummary, ToastNotification.ToastType.SUCCESS);
             } else {
-                SoundManager.playAlertSound();
+                SoundManager.playVerificationFailure(drive.systemPath(), "Batch sanitization failed.");
                 statusBadge.setText("FAILED");
                 statusBadge.getStyleClass().setAll("badge-danger");
                 passBadge.setText("Wipe Failed");

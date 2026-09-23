@@ -505,7 +505,8 @@ public class WipingView {
             TaskOutcome outcome = task.getValue();
             if (outcome != null && outcome.wipeSuccess()) {
                 WipeVerifier.VerificationResult vResult = outcome.verifyResult();
-                com.sanitizer.util.SoundManager.playSuccessChime();
+                double resEntropy = (vResult != null) ? vResult.entropyScore() : 0.0;
+                com.sanitizer.util.SoundManager.playSanitizationComplete(target.systemPath(), selectedPolicy.getName(), resEntropy);
                 lblStatusMessage.setText("Sanitization completed! Issuing digital seal...");
                 appendLog("\n[SUCCESS] Sanitization operation & verification completed successfully.");
                 sectorMatrix.setCompleted();
@@ -597,7 +598,7 @@ public class WipingView {
                 }
             } else {
                 // --- HARDWARE FAILURE & QUARANTINE ASSESSMENT BRANCH ---
-                com.sanitizer.util.SoundManager.playAlertSound();
+                com.sanitizer.util.SoundManager.playVerificationFailure(target.systemPath(), "Hardware defect or verification failure encountered.");
                 var nav = NavigationManager.getInstance();
                 SecurityAuditLogger.logWipeAction(SecurityAuditLogger.EVENT_WIPE_FAILED,
                         nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
