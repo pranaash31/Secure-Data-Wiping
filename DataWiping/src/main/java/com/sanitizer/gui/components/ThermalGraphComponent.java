@@ -41,6 +41,7 @@ public class ThermalGraphComponent extends VBox {
     // Stat Labels
     private final Label lblCurrentTemp = new Label("-- °C");
     private final Label lblCurrentStatusBadge = new Label("NORMAL");
+    private final Label lblThrottleBadge = new Label("⚡ 100% Speed");
     private final Label lblPeakTemp = new Label("Peak: -- °C");
     private final Label lblAvgTemp = new Label("Avg: -- °C");
     private final Label lblMinTemp = new Label("Min: -- °C");
@@ -55,6 +56,7 @@ public class ThermalGraphComponent extends VBox {
     private double sumTemp = 0;
     private int sampleCount = 0;
     private int pauseCount = 0;
+    private int currentThrottlePercent = 0;
 
     public ThermalGraphComponent() {
         this(ThermalPolicyManager.getInstance().getPolicy(DeviceType.USB_FLASH));
@@ -84,7 +86,8 @@ public class ThermalGraphComponent extends VBox {
         currentBox.setAlignment(Pos.CENTER_LEFT);
         lblCurrentTemp.setStyle("-fx-font-size: 17px; -fx-font-weight: bold; -fx-text-fill: #0F172A;");
         lblCurrentStatusBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-padding: 2 6; -fx-background-radius: 4px;");
-        currentBox.getChildren().addAll(lblCurrentTemp, lblCurrentStatusBadge);
+        lblThrottleBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-padding: 2 6; -fx-background-radius: 4px;");
+        currentBox.getChildren().addAll(lblCurrentTemp, lblCurrentStatusBadge, lblThrottleBadge);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -116,9 +119,9 @@ public class ThermalGraphComponent extends VBox {
         legend.setStyle("-fx-padding: 2 4;");
 
         Label legNormal = createLegendItem("#10B981", "Normal Range");
-        Label legElevated = createLegendItem("#F59E0B", "Elevated Thermal Zone");
+        Label legThrottle = createLegendItem("#F59E0B", "⚡ Throttle Limit (65°C)");
         Label legPause = createLegendItem("#EF4444", "Auto-Pause Safeguard");
-        Label legEvent = createLegendItem("#7C3AED", "⏸ Cooldown Milestone");
+        Label legEvent = createLegendItem("#7C3AED", "Milestones");
 
         Region legSpacer = new Region();
         HBox.setHgrow(legSpacer, Priority.ALWAYS);
@@ -126,7 +129,7 @@ public class ThermalGraphComponent extends VBox {
         Label lblRange = new Label("Scale: 20°C – 90°C");
         lblRange.setStyle("-fx-font-size: 10px; -fx-text-fill: #94A3B8;");
 
-        legend.getChildren().addAll(legNormal, legElevated, legPause, legEvent, legSpacer, lblRange);
+        legend.getChildren().addAll(legNormal, legThrottle, legPause, legEvent, legSpacer, lblRange);
 
         getChildren().addAll(header, canvasContainer, legend);
     }
@@ -141,6 +144,13 @@ public class ThermalGraphComponent extends VBox {
      * Appends a new live temperature sample to the time-series curve.
      */
     public synchronized void addSample(int tempCelsius) {
+        addSample(tempCelsius, 0, "NORMAL");
+    }
+
+    /**
+     * Appends a new live temperature sample along with throttle telemetry.
+     */
+    public synchronized void addSample(int tempCelsius, int throttlePercent, String throttleState) {
         long now = System.currentTimeMillis();
         String timeStr = LocalTime.now().format(TIME_FMT);
 
@@ -149,13 +159,15 @@ public class ThermalGraphComponent extends VBox {
             points.remove(0);
         }
 
+        this.currentThrottlePercent = throttlePercent;
+
         // Stats calculations
         sampleCount++;
         sumTemp += tempCelsius;
         if (tempCelsius > peakTemp) peakTemp = tempCelsius;
         if (tempCelsius < minTemp) minTemp = tempCelsius;
 
-        updateStats(tempCelsius);
+        updateStats(tempCelsius, throttlePercent, throttleState);
 
         if (Platform.isFxApplicationThread()) {
             redraw();
@@ -165,7 +177,7 @@ public class ThermalGraphComponent extends VBox {
     }
 
     /**
-     * Records a critical thermal event (e.g. AUTO_PAUSE, RESUME, WARNING).
+     * Records a critical thermal event (e.g. AUTO_PAUSE, RESUME, THROTTLE, RAMP_UP).
      */
     public synchronized void recordEvent(int tempCelsius, String type, String label) {
         long now = System.currentTimeMillis();
@@ -183,7 +195,7 @@ public class ThermalGraphComponent extends VBox {
             if (points.size() > MAX_DATA_POINTS) points.remove(0);
         }
 
-        updateStats(tempCelsius);
+        updateStats(tempCelsius, currentThrottlePercent, type);
 
         if (Platform.isFxApplicationThread()) {
             redraw();
@@ -212,10 +224,13 @@ public class ThermalGraphComponent extends VBox {
         sumTemp = 0;
         sampleCount = 0;
         pauseCount = 0;
+        currentThrottlePercent = 0;
 
         lblCurrentTemp.setText("-- °C");
         lblCurrentStatusBadge.setText("NORMAL");
         lblCurrentStatusBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-padding: 2 6; -fx-background-radius: 4px;");
+        lblThrottleBadge.setText("⚡ 100% Speed");
+        lblThrottleBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-padding: 2 6; -fx-background-radius: 4px;");
         lblPeakTemp.setText("Peak: -- °C");
         lblAvgTemp.setText("Avg: -- °C");
         lblMinTemp.setText("Min: -- °C");
@@ -225,6 +240,10 @@ public class ThermalGraphComponent extends VBox {
     }
 
     private void updateStats(int latestTemp) {
+        updateStats(latestTemp, currentThrottlePercent, "NORMAL");
+    }
+
+    private void updateStats(int latestTemp, int throttlePct, String stateName) {
         lblCurrentTemp.setText(latestTemp + " °C");
         lblPeakTemp.setText("Peak: " + peakTemp + " °C");
         lblMinTemp.setText("Min: " + (minTemp == 999 ? "--" : minTemp + " °C"));
@@ -232,10 +251,29 @@ public class ThermalGraphComponent extends VBox {
         lblAvgTemp.setText(String.format("Avg: %.1f °C", avg));
         lblPauseEvents.setText("Pauses: " + pauseCount);
 
+        // Throttle badge
+        if (latestTemp >= policy.autoPauseCelsius() || "AUTO_PAUSE".equalsIgnoreCase(stateName)) {
+            lblThrottleBadge.setText("⏸ 0% (Paused)");
+            lblThrottleBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #FEE2E2; -fx-text-fill: #DC2626; -fx-padding: 2 6; -fx-background-radius: 4px;");
+        } else if (throttlePct > 0 || latestTemp >= policy.throttleCelsius()) {
+            int speed = Math.max(10, 100 - throttlePct);
+            lblThrottleBadge.setText("⚡ Throttled " + throttlePct + "% (" + speed + "% Speed)");
+            lblThrottleBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #FEF3C7; -fx-text-fill: #D97706; -fx-padding: 2 6; -fx-background-radius: 4px;");
+        } else if ("RAMP_UP".equalsIgnoreCase(stateName) || "RAMPING_UP".equalsIgnoreCase(stateName)) {
+            lblThrottleBadge.setText("🚀 Recovering (75% Speed)");
+            lblThrottleBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #EFF6FF; -fx-text-fill: #2563EB; -fx-padding: 2 6; -fx-background-radius: 4px;");
+        } else {
+            lblThrottleBadge.setText("🚀 100% Speed");
+            lblThrottleBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-padding: 2 6; -fx-background-radius: 4px;");
+        }
+
         // Status badge
         if (latestTemp >= policy.autoPauseCelsius()) {
             lblCurrentStatusBadge.setText("CRITICAL (PAUSED)");
             lblCurrentStatusBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #FEE2E2; -fx-text-fill: #DC2626; -fx-padding: 2 6; -fx-background-radius: 4px;");
+        } else if (throttlePct > 0 || latestTemp >= policy.throttleCelsius()) {
+            lblCurrentStatusBadge.setText("THROTTLED");
+            lblCurrentStatusBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #FEF3C7; -fx-text-fill: #D97706; -fx-padding: 2 6; -fx-background-radius: 4px;");
         } else if (latestTemp >= policy.warningCelsius()) {
             lblCurrentStatusBadge.setText("ELEVATED");
             lblCurrentStatusBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #FEF3C7; -fx-text-fill: #D97706; -fx-padding: 2 6; -fx-background-radius: 4px;");
@@ -289,6 +327,18 @@ public class ThermalGraphComponent extends VBox {
         gc.setFill(Color.rgb(220, 38, 38));
         gc.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 9));
         gc.fillText("Auto-Pause: " + policy.autoPauseCelsius() + "°C", paddingLeft + 8, pauseY - 3);
+        gc.restore();
+
+        // 2.5 Draw Dynamic Throttle Reference Threshold Line (Amber/Orange Dashed)
+        double throttleY = paddingTop + graphH - ((policy.throttleCelsius() - minDisplayTemp) / (maxDisplayTemp - minDisplayTemp) * graphH);
+        gc.save();
+        gc.setStroke(Color.rgb(245, 158, 11, 0.8));
+        gc.setLineWidth(1.2);
+        gc.setLineDashes(3, 3);
+        gc.strokeLine(paddingLeft, throttleY, paddingLeft + graphW, throttleY);
+        gc.setFill(Color.rgb(217, 119, 6));
+        gc.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 9));
+        gc.fillText("Throttle: " + policy.throttleCelsius() + "°C", paddingLeft + (graphW / 2) - 35, throttleY - 3);
         gc.restore();
 
         // 3. Draw Safe Resume Reference Threshold Line (Green Dashed)
@@ -377,7 +427,8 @@ public class ThermalGraphComponent extends VBox {
             // Render dot for latest point or peak point
             if (i == count - 1 || p.tempCelsius() == peakTemp) {
                 Color dotColor = p.tempCelsius() >= policy.autoPauseCelsius() ? Color.rgb(239, 68, 68)
-                        : (p.tempCelsius() >= policy.warningCelsius() ? Color.rgb(245, 158, 11) : Color.rgb(37, 99, 235));
+                        : (p.tempCelsius() >= policy.throttleCelsius() ? Color.rgb(245, 158, 11)
+                        : (p.tempCelsius() >= policy.warningCelsius() ? Color.rgb(245, 158, 11) : Color.rgb(37, 99, 235)));
 
                 gc.setFill(Color.WHITE);
                 gc.fillOval(x - 4, y - 4, 8, 8);
@@ -402,7 +453,16 @@ public class ThermalGraphComponent extends VBox {
 
                     gc.save();
                     boolean isPause = "AUTO_PAUSE".equalsIgnoreCase(ev.type());
-                    Color pinColor = isPause ? Color.rgb(239, 68, 68) : Color.rgb(16, 185, 129);
+                    boolean isThrottle = "THROTTLE".equalsIgnoreCase(ev.type());
+                    boolean isRampUp = "RAMP_UP".equalsIgnoreCase(ev.type()) || "RAMPING_UP".equalsIgnoreCase(ev.type());
+
+                    Color pinColor = isPause ? Color.rgb(239, 68, 68)
+                            : (isThrottle ? Color.rgb(245, 158, 11)
+                            : (isRampUp ? Color.rgb(59, 130, 246) : Color.rgb(16, 185, 129)));
+
+                    String badgeText = isPause ? "⏸ PAUSE"
+                            : (isThrottle ? "⚡ THROTTLE"
+                            : (isRampUp ? "🚀 RAMP UP" : "▶ RESUME"));
 
                     // Vertical guideline
                     gc.setStroke(pinColor);
@@ -411,11 +471,12 @@ public class ThermalGraphComponent extends VBox {
                     gc.strokeLine(ex, paddingTop, ex, paddingTop + graphH);
 
                     // Badge marker
+                    int badgeW = isThrottle ? 58 : 46;
                     gc.setFill(pinColor);
-                    gc.fillRoundRect(ex - 22, paddingTop + 2, 44, 14, 4, 4);
+                    gc.fillRoundRect(ex - (badgeW / 2.0), paddingTop + 2, badgeW, 14, 4, 4);
                     gc.setFill(Color.WHITE);
                     gc.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 8));
-                    gc.fillText(isPause ? "⏸ PAUSE" : "▶ RESUME", ex - 18, paddingTop + 12);
+                    gc.fillText(badgeText, ex - (badgeW / 2.0) + 4, paddingTop + 12);
 
                     gc.restore();
                     break;

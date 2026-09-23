@@ -12,11 +12,17 @@ public record ThermalPolicy(
         DeviceType deviceType,
         int autoPauseCelsius,
         int resumeCelsius,
-        int warningCelsius
+        int warningCelsius,
+        int throttleCelsius
 ) {
     public static final int MIN_ALLOWED_TEMP = 35;
     public static final int MAX_ALLOWED_TEMP = 95;
     public static final int MIN_HYSTERESIS_GAP = 3; // Pause must be at least 3°C above Resume
+
+    public ThermalPolicy(DeviceType deviceType, int autoPauseCelsius, int resumeCelsius, int warningCelsius) {
+        this(deviceType, autoPauseCelsius, resumeCelsius, warningCelsius,
+                Math.max(warningCelsius, autoPauseCelsius - (deviceType == DeviceType.NVME_SSD ? 5 : 3)));
+    }
 
     public ThermalPolicy {
         if (deviceType == null) {
@@ -26,15 +32,25 @@ public record ThermalPolicy(
         autoPauseCelsius = Math.max(MIN_ALLOWED_TEMP + MIN_HYSTERESIS_GAP, Math.min(MAX_ALLOWED_TEMP, autoPauseCelsius));
         resumeCelsius = Math.max(MIN_ALLOWED_TEMP, Math.min(autoPauseCelsius - MIN_HYSTERESIS_GAP, resumeCelsius));
         warningCelsius = Math.max(resumeCelsius, Math.min(autoPauseCelsius, warningCelsius));
+        throttleCelsius = Math.max(resumeCelsius, Math.min(autoPauseCelsius, throttleCelsius));
     }
 
     /**
      * Creates a standard policy instance from auto-pause and resume temperatures,
-     * calculating a proportionate warning threshold.
+     * calculating proportionate warning and throttling thresholds.
      */
     public static ThermalPolicy of(DeviceType deviceType, int autoPauseCelsius, int resumeCelsius) {
         int warning = Math.max(resumeCelsius, autoPauseCelsius - 7);
-        return new ThermalPolicy(deviceType, autoPauseCelsius, resumeCelsius, warning);
+        int throttle = Math.max(warning, autoPauseCelsius - (deviceType == DeviceType.NVME_SSD ? 5 : 3));
+        return new ThermalPolicy(deviceType, autoPauseCelsius, resumeCelsius, warning, throttle);
+    }
+
+    /**
+     * Creates a policy instance with explicitly specified throttling threshold.
+     */
+    public static ThermalPolicy of(DeviceType deviceType, int autoPauseCelsius, int resumeCelsius, int throttleCelsius) {
+        int warning = Math.max(resumeCelsius, throttleCelsius - 4);
+        return new ThermalPolicy(deviceType, autoPauseCelsius, resumeCelsius, warning, throttleCelsius);
     }
 
     /**
@@ -45,7 +61,8 @@ public record ThermalPolicy(
                 type,
                 type.getDefaultAutoPauseCelsius(),
                 type.getDefaultResumeCelsius(),
-                type.getDefaultWarningCelsius()
+                type.getDefaultWarningCelsius(),
+                type.getDefaultThrottleCelsius()
         );
     }
 
@@ -60,7 +77,7 @@ public record ThermalPolicy(
     }
 
     public String summary() {
-        return String.format("Auto-Pause: %d°C | Resumes: %d°C (Warn: %d°C)",
-                autoPauseCelsius, resumeCelsius, warningCelsius);
+        return String.format("Auto-Pause: %d°C | Resumes: %d°C (Throttle: %d°C, Warn: %d°C)",
+                autoPauseCelsius, resumeCelsius, throttleCelsius, warningCelsius);
     }
 }

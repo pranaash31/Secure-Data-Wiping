@@ -17,8 +17,31 @@ public record WipeMetrics(
         long etaSeconds,
         int tempCelsius,
         SmartDiagnostics.ThermalStatus thermalStatus,
-        boolean isThermalPaused
+        boolean isThermalPaused,
+        int throttlePercent,
+        String throttleState
 ) {
+    public WipeMetrics(
+            String systemPath,
+            double overallPercent,
+            int currentPass,
+            int totalPasses,
+            String passName,
+            long bytesProcessedInPass,
+            long totalTargetBytesInPass,
+            double speedMBs,
+            long etaSeconds,
+            int tempCelsius,
+            SmartDiagnostics.ThermalStatus thermalStatus,
+            boolean isThermalPaused
+    ) {
+        this(systemPath, overallPercent, currentPass, totalPasses, passName,
+             bytesProcessedInPass, totalTargetBytesInPass, speedMBs, etaSeconds,
+             tempCelsius, thermalStatus, isThermalPaused,
+             isThermalPaused ? 100 : 0,
+             isThermalPaused ? "PAUSED" : "NORMAL");
+    }
+
     public WipeMetrics(
             String systemPath,
             double overallPercent,
@@ -32,7 +55,7 @@ public record WipeMetrics(
     ) {
         this(systemPath, overallPercent, currentPass, totalPasses, passName,
              bytesProcessedInPass, totalTargetBytesInPass, speedMBs, etaSeconds,
-             35, SmartDiagnostics.ThermalStatus.NORMAL, false);
+             35, SmartDiagnostics.ThermalStatus.NORMAL, false, 0, "NORMAL");
     }
 
     /**
@@ -80,5 +103,15 @@ public record WipeMetrics(
 
     public String formattedTemp() {
         return tempCelsius + " °C";
+    }
+
+    public boolean isThrottled() {
+        return throttlePercent > 0 && !isThermalPaused;
+    }
+
+    public String formattedThrottle() {
+        if (isThermalPaused) return "⏸ Paused (100%)";
+        if (throttlePercent > 0) return "⚡ Throttled " + throttlePercent + "%";
+        return "100% Throughput";
     }
 }

@@ -295,6 +295,7 @@ public class WipeEngine {
             Process process = pb.start();
 
             activeDdProcesses.put(systemPath, process);
+            com.sanitizer.detector.ThermalThrottleController throttleController = new com.sanitizer.detector.ThermalThrottleController();
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
@@ -324,18 +325,25 @@ public class WipeEngine {
                                 failingOffset, failingLba, line));
                     }
 
-                    // Device-Aware Thermal Safeguard Check
+                    // Device-Aware Thermal Safeguard & Dynamic Throttling Check
                     com.sanitizer.detector.DeviceType deviceType = com.sanitizer.detector.DeviceType.fromDrive(null, systemPath, targetBytes);
                     com.sanitizer.detector.ThermalPolicy policy = com.sanitizer.detector.ThermalPolicyManager.getInstance().getPolicy(deviceType);
                     int autoPauseThreshold = policy.autoPauseCelsius();
                     int resumeThreshold = policy.resumeCelsius();
 
                     int currentTemp = com.sanitizer.detector.SmartDiagnostics.getLiveTemperature(systemPath, null);
+                    com.sanitizer.detector.ThermalThrottleController.ThrottleDecision throttleDecision =
+                            throttleController.evaluate(currentTemp, policy);
+
+                    if (throttleDecision.logMessage() != null) {
+                        log(logCallback, throttleDecision.logMessage());
+                    }
+
                     com.sanitizer.detector.SmartDiagnostics.ThermalStatus thermalStatus =
                             com.sanitizer.detector.SmartDiagnostics.evaluateThermalStatus(currentTemp, deviceType);
 
-                    if (currentTemp >= autoPauseThreshold) {
-                        log(logCallback, String.format("[THERMAL SAFEGUARD - %s] Drive temperature reached %d°C (>= %d°C threshold)! Auto-pausing sanitization to prevent NAND/media degradation...", deviceType.getDisplayName(), currentTemp, autoPauseThreshold));
+                    if (throttleDecision.state() == com.sanitizer.detector.ThermalThrottleController.ThrottleState.PAUSED_CRITICAL) {
+                        log(logCallback, String.format("⏸ [THERMAL SAFEGUARD - %s] Drive temperature reached %d°C (>= %d°C threshold)! Auto-pausing sanitization to prevent NAND/media degradation...", deviceType.getDisplayName(), currentTemp, autoPauseThreshold));
                         com.sanitizer.util.SoundManager.playAlertSound();
                         com.sanitizer.alert.AlertDispatcher.notifyThermalAutoPause(systemPath, null, currentTemp, autoPauseThreshold, deviceType.getDisplayName());
 
@@ -355,7 +363,9 @@ public class WipeEngine {
                                     0,
                                     currentTemp,
                                     com.sanitizer.detector.SmartDiagnostics.ThermalStatus.AUTO_PAUSED,
-                                    true
+                                    true,
+                                    100,
+                                    throttleDecision.statusBadge()
                             );
                             metricsCallback.accept(pauseMetrics);
                         }
@@ -385,16 +395,27 @@ public class WipeEngine {
                                         0,
                                         currentTemp,
                                         com.sanitizer.detector.SmartDiagnostics.ThermalStatus.AUTO_PAUSED,
-                                        true
+                                        true,
+                                        100,
+                                        "⏸ Cooling (" + currentTemp + "°C)"
                                 );
                                 metricsCallback.accept(coolingMetrics);
                             }
                         }
 
-                        // Resume dd process
+                        // Resume dd process & initiate auto-recovery ramp-up
                         resumeProcess(process);
-                        log(logCallback, String.format("[THERMAL RESUMED - %s] Drive cooled down to %d°C (<= %d°C). Resuming data sanitization stream.", deviceType.getDisplayName(), currentTemp, resumeThreshold));
+                        throttleDecision = throttleController.evaluate(currentTemp, policy);
+                        log(logCallback, String.format("🚀 [THERMAL RESUMED - %s] Drive cooled down to %d°C (<= %d°C). Auto-recovery ramping up I/O throughput.", deviceType.getDisplayName(), currentTemp, resumeThreshold));
                         thermalStatus = com.sanitizer.detector.SmartDiagnostics.evaluateThermalStatus(currentTemp, deviceType);
+                    } else if (throttleDecision.delayMillis() > 0) {
+                        // Dynamic throttling pacing delay to allow passive heat dissipation
+                        try {
+                            Thread.sleep(throttleDecision.delayMillis());
+                        } catch (InterruptedException ie) {
+                            process.destroyForcibly();
+                            return false;
+                        }
                     }
 
                     if (line.contains("bytes")) {
@@ -426,7 +447,9 @@ public class WipeEngine {
                                         etaSeconds,
                                         currentTemp,
                                         thermalStatus,
-                                        false
+                                        false,
+                                        throttleDecision.throttlePercent(),
+                                        throttleDecision.statusBadge()
                                 );
                                 metricsCallback.accept(metrics);
                             }

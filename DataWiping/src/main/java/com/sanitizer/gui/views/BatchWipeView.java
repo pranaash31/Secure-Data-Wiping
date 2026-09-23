@@ -640,10 +640,16 @@ public class BatchWipeView {
                 statusBadge.getStyleClass().setAll("badge-danger");
                 passBadge.setText("⏸ Thermal Auto-Pause (" + metrics.tempCelsius() + "°C)");
                 passBadge.setStyle("-fx-font-size: 11px; -fx-background-color: #FEF2F2; -fx-text-fill: #991B1B; -fx-padding: 4 10; -fx-background-radius: 6px; -fx-font-weight: bold;");
+            } else if (metrics.isThrottled()) {
+                statusBadge.setText("THROTTLED (" + metrics.throttlePercent() + "%)");
+                statusBadge.setStyle("-fx-font-size: 10px; -fx-background-color: #FEF3C7; -fx-text-fill: #D97706; -fx-padding: 3 8; -fx-background-radius: 4px; -fx-font-weight: bold;");
+                passBadge.setText("⚡ " + metrics.formattedPassSummary() + " [Throttling: " + metrics.throttlePercent() + "%]");
+                passBadge.setStyle("-fx-font-size: 11px; -fx-background-color: #FFFBEB; -fx-text-fill: #B45309; -fx-padding: 4 10; -fx-background-radius: 6px; -fx-font-weight: bold;");
             } else {
                 statusBadge.setText("WIPING");
                 statusBadge.getStyleClass().setAll("badge-warning");
                 passBadge.setText(metrics.formattedPassSummary());
+                passBadge.setStyle("-fx-font-size: 11px; -fx-background-color: #EFF6FF; -fx-text-fill: #1E40AF; -fx-padding: 4 10; -fx-background-radius: 6px; -fx-font-weight: bold;");
             }
 
             heatmap.updateProgress(metrics);

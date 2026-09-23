@@ -56,20 +56,36 @@ class ThermalGraphComponentTest {
     }
 
     @Test
-    @DisplayName("Verify thermal event recording (Auto-Pause and Resume milestones)")
+    @DisplayName("Verify thermal event recording (Auto-Pause, Throttle, Ramp-Up and Resume milestones)")
     void testEventRecording() {
         ThermalGraphComponent graph = new ThermalGraphComponent();
 
         graph.addSample(40);
-        graph.recordEvent(56, "AUTO_PAUSE", "Auto-Pause Threshold Exceeded");
+        graph.recordEvent(65, "THROTTLE", "⚡ Throttle Engaged (30%)");
+        graph.recordEvent(70, "AUTO_PAUSE", "Auto-Pause Threshold Exceeded");
+        graph.recordEvent(50, "RAMP_UP", "🚀 Auto-Recovery Ramping Up (50% Speed)");
         graph.recordEvent(42, "RESUME", "Cooldown Complete - Sanitization Resumed");
 
         assertThat(graph.getPauseCount()).isEqualTo(1);
-        assertThat(graph.getEvents()).hasSize(2);
-        assertThat(graph.getEvents().get(0).type()).isEqualTo("AUTO_PAUSE");
-        assertThat(graph.getEvents().get(0).tempCelsius()).isEqualTo(56);
-        assertThat(graph.getEvents().get(1).type()).isEqualTo("RESUME");
-        assertThat(graph.getEvents().get(1).tempCelsius()).isEqualTo(42);
+        assertThat(graph.getEvents()).hasSize(4);
+        assertThat(graph.getEvents().get(0).type()).isEqualTo("THROTTLE");
+        assertThat(graph.getEvents().get(0).tempCelsius()).isEqualTo(65);
+        assertThat(graph.getEvents().get(1).type()).isEqualTo("AUTO_PAUSE");
+        assertThat(graph.getEvents().get(1).tempCelsius()).isEqualTo(70);
+        assertThat(graph.getEvents().get(2).type()).isEqualTo("RAMP_UP");
+        assertThat(graph.getEvents().get(2).tempCelsius()).isEqualTo(50);
+        assertThat(graph.getEvents().get(3).type()).isEqualTo("RESUME");
+        assertThat(graph.getEvents().get(3).tempCelsius()).isEqualTo(42);
+    }
+
+    @Test
+    @DisplayName("Verify sample ingestion with throttling telemetry")
+    void testSampleIngestionWithThrottleTelemetry() {
+        ThermalGraphComponent graph = new ThermalGraphComponent();
+
+        graph.addSample(66, 50, "THROTTLED");
+        assertThat(graph.getSampleCount()).isEqualTo(1);
+        assertThat(graph.getPeakTemp()).isEqualTo(66);
     }
 
     @Test

@@ -38,17 +38,19 @@ public class ThermalPolicyManager {
         for (DeviceType type : DeviceType.values()) {
             int defaultPause = type.getDefaultAutoPauseCelsius();
             int defaultResume = type.getDefaultResumeCelsius();
+            int defaultThrottle = type.getDefaultThrottleCelsius();
 
             int savedPause = prefs.getInt("thermal_pause_" + type.name(), defaultPause);
             int savedResume = prefs.getInt("thermal_resume_" + type.name(), defaultResume);
+            int savedThrottle = prefs.getInt("thermal_throttle_" + type.name(), defaultThrottle);
 
-            ThermalPolicy policy = ThermalPolicy.of(type, savedPause, savedResume);
+            ThermalPolicy policy = ThermalPolicy.of(type, savedPause, savedResume, savedThrottle);
             activePolicies.put(type, policy);
         }
         AppLogger.info(MODULE, "Thermal policies initialized: " +
-                "USB=" + getPolicy(DeviceType.USB_FLASH).autoPauseCelsius() + "/" + getPolicy(DeviceType.USB_FLASH).resumeCelsius() + "°C, " +
-                "NVMe=" + getPolicy(DeviceType.NVME_SSD).autoPauseCelsius() + "/" + getPolicy(DeviceType.NVME_SSD).resumeCelsius() + "°C, " +
-                "HDD=" + getPolicy(DeviceType.MAGNETIC_HDD).autoPauseCelsius() + "/" + getPolicy(DeviceType.MAGNETIC_HDD).resumeCelsius() + "°C");
+                "USB=" + getPolicy(DeviceType.USB_FLASH).autoPauseCelsius() + "/" + getPolicy(DeviceType.USB_FLASH).resumeCelsius() + "°C (Throttle: " + getPolicy(DeviceType.USB_FLASH).throttleCelsius() + "°C), " +
+                "NVMe=" + getPolicy(DeviceType.NVME_SSD).autoPauseCelsius() + "/" + getPolicy(DeviceType.NVME_SSD).resumeCelsius() + "°C (Throttle: " + getPolicy(DeviceType.NVME_SSD).throttleCelsius() + "°C), " +
+                "HDD=" + getPolicy(DeviceType.MAGNETIC_HDD).autoPauseCelsius() + "/" + getPolicy(DeviceType.MAGNETIC_HDD).resumeCelsius() + "°C (Throttle: " + getPolicy(DeviceType.MAGNETIC_HDD).throttleCelsius() + "°C)");
     }
 
     /**
@@ -64,20 +66,31 @@ public class ThermalPolicyManager {
      */
     public synchronized boolean setPolicy(DeviceType type, int autoPauseCelsius, int resumeCelsius) {
         if (type == null) return false;
+        int defaultThrottle = type.getDefaultThrottleCelsius();
+        int calculatedThrottle = Math.min(autoPauseCelsius - 2, Math.max(resumeCelsius + 2, defaultThrottle));
+        return setPolicy(type, autoPauseCelsius, resumeCelsius, calculatedThrottle);
+    }
 
-        ThermalPolicy updated = ThermalPolicy.of(type, autoPauseCelsius, resumeCelsius);
+    /**
+     * Updates and persists the thermal policy with explicit throttling threshold.
+     */
+    public synchronized boolean setPolicy(DeviceType type, int autoPauseCelsius, int resumeCelsius, int throttleCelsius) {
+        if (type == null) return false;
+
+        ThermalPolicy updated = ThermalPolicy.of(type, autoPauseCelsius, resumeCelsius, throttleCelsius);
         activePolicies.put(type, updated);
 
         try {
             prefs.putInt("thermal_pause_" + type.name(), updated.autoPauseCelsius());
             prefs.putInt("thermal_resume_" + type.name(), updated.resumeCelsius());
+            prefs.putInt("thermal_throttle_" + type.name(), updated.throttleCelsius());
             prefs.flush();
         } catch (Exception e) {
             AppLogger.warn(MODULE, "Failed to persist thermal policy preferences: " + e.getMessage());
         }
 
-        AppLogger.info(MODULE, String.format("Thermal Policy Updated for %s: Auto-Pause=%d°C, Resume=%d°C",
-                type.getDisplayName(), updated.autoPauseCelsius(), updated.resumeCelsius()));
+        AppLogger.info(MODULE, String.format("Thermal Policy Updated for %s: Auto-Pause=%d°C, Throttle=%d°C, Resume=%d°C",
+                type.getDisplayName(), updated.autoPauseCelsius(), updated.throttleCelsius(), updated.resumeCelsius()));
 
         notifyListeners();
         return true;
@@ -98,6 +111,13 @@ public class ThermalPolicyManager {
     }
 
     /**
+     * Gets the dynamic throttling threshold in °C for the given device type.
+     */
+    public int getThrottleThreshold(DeviceType type) {
+        return getPolicy(type).throttleCelsius();
+    }
+
+    /**
      * Resolves the device type and active thermal policy for a target drive.
      */
     public ThermalPolicy getPolicyForDrive(String model, String systemPath, long sizeBytes) {
@@ -115,6 +135,7 @@ public class ThermalPolicyManager {
             try {
                 prefs.putInt("thermal_pause_" + type.name(), def.autoPauseCelsius());
                 prefs.putInt("thermal_resume_" + type.name(), def.resumeCelsius());
+                prefs.putInt("thermal_throttle_" + type.name(), def.throttleCelsius());
             } catch (Exception ignored) {}
         }
         try {

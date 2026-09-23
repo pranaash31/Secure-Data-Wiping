@@ -421,6 +421,7 @@ public class WipingView {
                 com.sanitizer.detector.SmartDiagnostics.captureSnapshot(target);
 
         final boolean[] wasThermalPaused = {false};
+        final boolean[] wasThrottled = {false};
         final List<com.sanitizer.quarantine.LbaFailureRecord> detectedBadSectors =
                 java.util.Collections.synchronizedList(new java.util.ArrayList<>());
 
@@ -452,7 +453,20 @@ public class WipingView {
                                         thermalGraph.recordEvent(metrics.tempCelsius(), "AUTO_PAUSE", "Auto-Pause Safeguard");
                                     }
                                 } else if (thermalGraph != null) {
-                                    thermalGraph.addSample(metrics.tempCelsius());
+                                    thermalGraph.addSample(metrics.tempCelsius(), metrics.throttlePercent(), metrics.throttleState());
+                                }
+                            } else if (metrics.isThrottled()) {
+                                lblStatusMessage.setText(String.format("⚡ THERMAL THROTTLING (%d%%): %s | %s | %s | %d°C",
+                                        metrics.throttlePercent(), metrics.formattedPassSummary(), metrics.formattedSpeed(), metrics.formattedEta(), metrics.tempCelsius()));
+                                lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #D97706;");
+
+                                if (!wasThrottled[0]) {
+                                    wasThrottled[0] = true;
+                                    if (thermalGraph != null) {
+                                        thermalGraph.recordEvent(metrics.tempCelsius(), "THROTTLE", "⚡ Throttle Engaged (" + metrics.throttlePercent() + "%)");
+                                    }
+                                } else if (thermalGraph != null) {
+                                    thermalGraph.addSample(metrics.tempCelsius(), metrics.throttlePercent(), metrics.throttleState());
                                 }
                             } else {
                                 lblStatusMessage.setText(String.format("Wiping: %s | %s | %s | %d°C",
@@ -464,13 +478,19 @@ public class WipingView {
                                     if (thermalGraph != null) {
                                         thermalGraph.recordEvent(metrics.tempCelsius(), "RESUME", "Resumed Sanitization");
                                     }
+                                } else if (wasThrottled[0]) {
+                                    wasThrottled[0] = false;
+                                    if (thermalGraph != null) {
+                                        thermalGraph.recordEvent(metrics.tempCelsius(), "RAMP_UP", "🚀 Auto-Recovery 100% Speed");
+                                    }
                                 } else if (thermalGraph != null) {
-                                    thermalGraph.addSample(metrics.tempCelsius());
+                                    thermalGraph.addSample(metrics.tempCelsius(), metrics.throttlePercent(), metrics.throttleState());
                                 }
                             }
 
                             if (lblLiveTempBadge != null) {
-                                lblLiveTempBadge.setText(String.format("Temp: %d °C (%s)", metrics.tempCelsius(), metrics.thermalStatus().name()));
+                                String throttleSuffix = metrics.isThrottled() ? " [⚡ Throttled " + metrics.throttlePercent() + "%]" : "";
+                                lblLiveTempBadge.setText(String.format("Temp: %d °C (%s)%s", metrics.tempCelsius(), metrics.thermalStatus().name(), throttleSuffix));
                                 lblLiveTempBadge.setStyle(String.format(
                                         "-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 4 10; -fx-background-radius: 4px;",
                                         metrics.thermalStatus().getBgColor(), metrics.thermalStatus().getTextColor()

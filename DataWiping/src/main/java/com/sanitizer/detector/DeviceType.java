@@ -12,6 +12,7 @@ public enum DeviceType {
             55, // Default Auto-Pause at 55°C
             42, // Default Resume at 42°C
             48, // Warning threshold at 48°C
+            52, // Default Thermal Throttling threshold at 52°C
             "USB",
             "#F59E0B",
             "#FEF3C7"
@@ -23,6 +24,7 @@ public enum DeviceType {
             70, // Default Auto-Pause at 70°C
             52, // Default Resume at 52°C
             60, // Warning threshold at 60°C
+            65, // Default Thermal Throttling threshold at 65°C
             "NVMe/SSD",
             "#3B82F6",
             "#EFF6FF"
@@ -34,6 +36,7 @@ public enum DeviceType {
             50, // Default Auto-Pause at 50°C
             40, // Default Resume at 40°C
             45, // Warning threshold at 45°C
+            48, // Default Thermal Throttling threshold at 48°C
             "HDD",
             "#10B981",
             "#ECFDF5"
@@ -44,18 +47,21 @@ public enum DeviceType {
     private final int defaultAutoPauseCelsius;
     private final int defaultResumeCelsius;
     private final int defaultWarningCelsius;
+    private final int defaultThrottleCelsius;
     private final String shortBadge;
     private final String accentColor;
     private final String bgColor;
 
     DeviceType(String displayName, String description,
                int defaultAutoPauseCelsius, int defaultResumeCelsius, int defaultWarningCelsius,
+               int defaultThrottleCelsius,
                String shortBadge, String accentColor, String bgColor) {
         this.displayName = displayName;
         this.description = description;
         this.defaultAutoPauseCelsius = defaultAutoPauseCelsius;
         this.defaultResumeCelsius = defaultResumeCelsius;
         this.defaultWarningCelsius = defaultWarningCelsius;
+        this.defaultThrottleCelsius = defaultThrottleCelsius;
         this.shortBadge = shortBadge;
         this.accentColor = accentColor;
         this.bgColor = bgColor;
@@ -66,6 +72,7 @@ public enum DeviceType {
     public int getDefaultAutoPauseCelsius() { return defaultAutoPauseCelsius; }
     public int getDefaultResumeCelsius() { return defaultResumeCelsius; }
     public int getDefaultWarningCelsius() { return defaultWarningCelsius; }
+    public int getDefaultThrottleCelsius() { return defaultThrottleCelsius; }
     public String getShortBadge() { return shortBadge; }
     public String getAccentColor() { return accentColor; }
     public String getBgColor() { return bgColor; }
