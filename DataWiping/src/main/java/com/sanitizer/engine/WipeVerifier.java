@@ -4,10 +4,8 @@ import com.sanitizer.util.AppLogger;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
-import java.util.Random;
 import java.util.function.Consumer;
 
 /**

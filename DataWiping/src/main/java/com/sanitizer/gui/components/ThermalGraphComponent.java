@@ -239,10 +239,6 @@ public class ThermalGraphComponent extends VBox {
         redraw();
     }
 
-    private void updateStats(int latestTemp) {
-        updateStats(latestTemp, currentThrottlePercent, "NORMAL");
-    }
-
     private void updateStats(int latestTemp, int throttlePct, String stateName) {
         lblCurrentTemp.setText(latestTemp + " °C");
         lblPeakTemp.setText("Peak: " + peakTemp + " °C");
@@ -449,7 +445,6 @@ public class ThermalGraphComponent extends VBox {
             for (int i = 0; i < count; i++) {
                 if (Math.abs(ptsCopy.get(i).timestampMillis() - ev.timestampMillis()) < 3000 || i == count - 1) {
                     double ex = xs[i];
-                    double ey = ys[i];
 
                     gc.save();
                     boolean isPause = "AUTO_PAUSE".equalsIgnoreCase(ev.type());

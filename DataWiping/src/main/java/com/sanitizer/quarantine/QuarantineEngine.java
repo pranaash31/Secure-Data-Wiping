@@ -1,7 +1,6 @@
 package com.sanitizer.quarantine;
 
 import com.sanitizer.crypto.CryptoSigner;
-import com.sanitizer.detector.DeviceType;
 import com.sanitizer.util.AppLogger;
 
 import java.time.Instant;
@@ -39,7 +38,6 @@ public class QuarantineEngine {
         String quarantineId = generateQuarantineId();
 
         // Deduce Media & Interface Type
-        DeviceType deviceType = DeviceType.fromDrive(driveModel, systemPath, 0L);
         String mediaType = "SSD / NAND Flash";
         String interfaceType = "NVMe / PCIe";
 

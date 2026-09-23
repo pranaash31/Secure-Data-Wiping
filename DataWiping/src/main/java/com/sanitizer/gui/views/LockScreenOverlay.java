@@ -2,7 +2,6 @@ package com.sanitizer.gui.views;
 
 import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.gui.navigation.NavigationManager;
-import com.sanitizer.i18n.I18n;
 import com.sanitizer.session.SessionAutoLockManager;
 import javafx.animation.FadeTransition;
 import javafx.geometry.Insets;

@@ -2,7 +2,6 @@ package com.sanitizer.report;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.util.AppLogger;
@@ -12,7 +11,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 

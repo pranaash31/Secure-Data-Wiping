@@ -16,7 +16,6 @@ import java.util.List;
  * block wiping, RSA-2048 signing, SQLite persistence, and PDF certificate generation
  * without launching the JavaFX GUI runtime.
  */
-@SuppressWarnings("unused")
 public class Maintest {
 
     private static final String MODULE = "Maintest";

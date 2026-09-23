@@ -4,7 +4,6 @@ import com.sanitizer.util.AppLogger;
 import javafx.scene.AccessibleRole;
 import javafx.scene.Node;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;

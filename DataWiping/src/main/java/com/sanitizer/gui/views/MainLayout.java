@@ -12,7 +12,6 @@ import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
-import javafx.stage.Window;
 import javafx.util.StringConverter;
 
 import java.util.HashMap;
@@ -55,6 +54,7 @@ public class MainLayout {
     }
 
     public Parent getRoot() { return rootPane; }
+    public String getCurrentActiveView() { return currentActiveView; }
 
     public void setContent(Node content, String activeView) {
         this.currentActiveView = activeView;

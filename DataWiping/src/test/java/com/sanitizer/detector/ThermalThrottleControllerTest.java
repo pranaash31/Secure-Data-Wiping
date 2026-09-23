@@ -14,15 +14,12 @@ class ThermalThrottleControllerTest {
 
     private ThermalThrottleController controller;
     private ThermalPolicy nvmePolicy;
-    private ThermalPolicy usbPolicy;
 
     @BeforeEach
     void setUp() {
         controller = new ThermalThrottleController();
         // NVMe: Auto-Pause=70°C, Throttle=65°C, Resume=52°C
         nvmePolicy = ThermalPolicy.of(DeviceType.NVME_SSD, 70, 52, 65);
-        // USB: Auto-Pause=55°C, Throttle=52°C, Resume=42°C
-        usbPolicy = ThermalPolicy.of(DeviceType.USB_FLASH, 55, 42, 52);
     }
 
     @Test

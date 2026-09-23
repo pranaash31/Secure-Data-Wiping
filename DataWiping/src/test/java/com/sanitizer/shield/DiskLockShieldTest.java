@@ -14,7 +14,7 @@ class DiskLockShieldTest {
         String testTarget = "/dev/rdisk99";
 
         // Attempt locking
-        boolean locked = DiskLockShield.prepareAndLockDisk(testTarget);
+        assertThat(DiskLockShield.prepareAndLockDisk(testTarget)).isTrue();
         assertThat(DiskLockShield.isDiskLocked(testTarget)).isTrue();
 
         // Release lock

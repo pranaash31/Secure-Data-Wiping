@@ -6,8 +6,6 @@ import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -63,7 +61,7 @@ class WipeEnginePolicyTest {
         List<String> logs = new ArrayList<>();
         List<Double> progressList = new ArrayList<>();
 
-        boolean success = WipeEngine.executeWipeWithPolicy(
+        WipeEngine.executeWipeWithPolicy(
                 "/dev/rdisk_mock_policy_drive",
                 4L * 1024 * 1024 * 1024,
                 custom,
@@ -96,7 +94,7 @@ class WipeEnginePolicyTest {
 
         assertThat(future).isNotNull();
         // Wait briefly for batch task
-        boolean res = future.get();
+        future.get();
         assertThat(completed.get()).isTrue();
     }
 }

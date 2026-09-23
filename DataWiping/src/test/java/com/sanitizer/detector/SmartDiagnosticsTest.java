@@ -1,6 +1,5 @@
 package com.sanitizer.detector;
 
-import com.sanitizer.detector.UsbDetector;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

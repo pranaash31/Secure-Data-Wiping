@@ -75,7 +75,7 @@ class WipeEngineSafetyTest {
         List<String> logMessages = new ArrayList<>();
 
         // Test mode attempt on dummy non-existing device path (will execute dd or fail gracefully at dd execution, NOT blocked by shield)
-        boolean result = WipeEngine.executeWipe(
+        WipeEngine.executeWipe(
                 "/dev/rdisk999",
                 1L * 1024 * 1024 * 1024,
                 WipeEngine.WipeStandard.NIST_800_88_CLEAR,

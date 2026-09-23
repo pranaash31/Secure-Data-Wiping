@@ -1,7 +1,6 @@
 package com.sanitizer.alert;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.sanitizer.util.AppLogger;
 
 import java.net.URI;

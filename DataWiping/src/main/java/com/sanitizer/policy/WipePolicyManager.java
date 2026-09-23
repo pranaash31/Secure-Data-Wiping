@@ -2,19 +2,14 @@ package com.sanitizer.policy;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import com.sanitizer.engine.WipeVerifier;
 import com.sanitizer.util.AppLogger;
 
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Registry & Lifecycle Manager for Wipe Policies (International Standards & Custom User Profiles).

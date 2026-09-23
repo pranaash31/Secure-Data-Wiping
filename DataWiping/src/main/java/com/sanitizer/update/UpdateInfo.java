@@ -1,8 +1,5 @@
 package com.sanitizer.update;
 
-import java.time.Instant;
-import java.util.Objects;
-
 /**
  * Encapsulates release metadata retrieved from the GitHub Releases API.
  */

@@ -1,15 +1,11 @@
 package com.sanitizer.detector;
 
-import com.sanitizer.util.AppLogger;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class SmartDiagnostics {
-
-    private static final String MODULE = "SmartDiagnostics";
 
     public enum HealthStatus {
         HEALTHY("Healthy", "#10B981", "#ECFDF5"),

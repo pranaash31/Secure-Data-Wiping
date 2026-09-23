@@ -1,7 +1,6 @@
 package com.sanitizer.audit;
 
 import com.sanitizer.db.AuditDb;
-import com.sanitizer.session.UserRole;
 import com.sanitizer.util.AppLogger;
 
 import java.nio.charset.StandardCharsets;

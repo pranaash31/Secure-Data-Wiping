@@ -445,7 +445,6 @@ public class BatchWipeView {
      * Inner controller managing state, real-time metrics, live sector heatmap, and granular abort for an individual drive card.
      */
     private class DriveCardController {
-        private final int index;
         private final UsbDetector.UsbDriveInfo drive;
         private final VBox cardRoot;
 
@@ -469,7 +468,6 @@ public class BatchWipeView {
         private int preWipeCrcErrors = 0;
 
         public DriveCardController(int index, UsbDetector.UsbDriveInfo drive) {
-            this.index = index;
             this.drive = drive;
 
             cardRoot = new VBox(12);
@@ -663,7 +661,7 @@ public class BatchWipeView {
         private void handleGranularAbort() {
             btnAbort.setDisable(true);
             SoundManager.playAbortTone();
-            boolean cancelled = WipeEngine.cancelWipeTask(drive.systemPath());
+            WipeEngine.cancelWipeTask(drive.systemPath());
             activeTasks.remove(drive.systemPath());
             liveMetricsMap.remove(drive.systemPath());
 
