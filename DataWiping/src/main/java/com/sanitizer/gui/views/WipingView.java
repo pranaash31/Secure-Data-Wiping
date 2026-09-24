@@ -14,6 +14,9 @@ import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
@@ -21,8 +24,11 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.util.Duration;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,10 +48,16 @@ public class WipingView {
     private ComboBox<WipeVerifier.VerificationMode> cmbVerifyMode;
     private CheckBox chkTestMode;
 
+    private VBox cardExec;
     private Button btnExecuteWipe;
     private ProgressBar progressBar;
     private Label lblProgressPercent;
     private Label lblStatusMessage;
+    private Label lblLiveSpeed;
+    private Label lblLiveEta;
+    private Label lblCurrentPass;
+    private Timeline completionGlowTimeline;
+
     private SectorHeatmapComponent sectorMatrix;
     private ThermalGraphComponent thermalGraph;
     private TextArea txtLogOutput;
@@ -195,7 +207,7 @@ public class WipingView {
         topRow.getChildren().addAll(cardDrive, cardConfig);
 
         // --- Card 3: Execution, Live Sector Matrix & Terminal ---
-        VBox cardExec = new VBox(14);
+        cardExec = new VBox(14);
         cardExec.getStyleClass().add("card");
         VBox.setVgrow(cardExec, Priority.ALWAYS);
 
@@ -227,6 +239,21 @@ public class WipingView {
         progressBar = new ProgressBar(0.0);
         progressBar.setMaxWidth(Double.MAX_VALUE);
 
+        // ── Live Speedometer, Dynamic ETA & Current Pass Telemetry Row ──
+        HBox metricsRow = new HBox(12);
+        metricsRow.setAlignment(Pos.CENTER_LEFT);
+
+        lblLiveSpeed = new Label("⚡ Speed: -- MB/s");
+        lblLiveSpeed.getStyleClass().setAll("telemetry-chip", "telemetry-chip-blue");
+
+        lblLiveEta = new Label("⏳ Remaining: --");
+        lblLiveEta.getStyleClass().setAll("telemetry-chip", "telemetry-chip-purple");
+
+        lblCurrentPass = new Label("📋 Pass: Standby");
+        lblCurrentPass.getStyleClass().setAll("telemetry-chip", "telemetry-chip-dim");
+
+        metricsRow.getChildren().addAll(lblLiveSpeed, lblLiveEta, lblCurrentPass);
+
         // Large 100-Block Sector Heatmap Visualizer & Quick Palette Switcher
         HBox matrixHeader = new HBox(12);
         matrixHeader.setAlignment(Pos.CENTER_LEFT);
@@ -252,7 +279,7 @@ public class WipingView {
         txtLogOutput.setPrefRowCount(7);
         VBox.setVgrow(txtLogOutput, Priority.ALWAYS);
 
-        cardExec.getChildren().addAll(execHeader, progressBar, matrixHeader, sectorMatrix, thermalGraph, lblLogTitle, txtLogOutput);
+        cardExec.getChildren().addAll(execHeader, progressBar, metricsRow, matrixHeader, sectorMatrix, thermalGraph, lblLogTitle, txtLogOutput);
 
         rootContainer.getChildren().addAll(titleBox, topRow, cardExec);
     }
@@ -405,9 +432,14 @@ public class WipingView {
         }
 
         setUiControlsDisabled(true);
+        resetCompletionGlow();
         progressBar.setProgress(0.0);
         lblProgressPercent.setText("0.00%");
         lblStatusMessage.setText("Executing sanitization passes...");
+        lblLiveSpeed.setText("⚡ Speed: 0.0 MB/s");
+        lblLiveEta.setText("⏳ Estimating...");
+        lblCurrentPass.setText("📋 Initializing...");
+        lblCurrentPass.getStyleClass().setAll("telemetry-chip", "telemetry-chip-dim");
         sectorMatrix.reset(target.sizeBytes());
         if (thermalGraph != null) {
             thermalGraph.reset();
@@ -442,6 +474,14 @@ public class WipingView {
                             double p = metrics.overallPercent() / 100.0;
                             progressBar.setProgress(p);
                             lblProgressPercent.setText(metrics.formattedProgress());
+                            lblLiveSpeed.setText("⚡ " + metrics.formattedSpeed());
+                            lblLiveEta.setText("⏳ ~" + metrics.formattedEta() + " remaining");
+                            lblCurrentPass.setText(metrics.formattedPassSummary());
+                            lblCurrentPass.getStyleClass().setAll("telemetry-chip", "telemetry-chip-green");
+
+                            if (metrics.overallPercent() >= 100.0) {
+                                triggerCompletionGlow();
+                            }
 
                             if (metrics.isThermalPaused()) {
                                 lblStatusMessage.setText("⏸ THERMAL PAUSE: Cooling down drive (" + metrics.tempCelsius() + "°C)...");
@@ -533,6 +573,12 @@ public class WipingView {
         task.setOnSucceeded(e -> {
             TaskOutcome outcome = task.getValue();
             if (outcome != null && outcome.wipeSuccess()) {
+                triggerCompletionGlow();
+                lblLiveSpeed.setText("⚡ 0.0 MB/s (Complete)");
+                lblLiveEta.setText("⏳ 00:00 (Complete)");
+                lblCurrentPass.setText("✓ " + selectedPolicy.getName() + " Finished");
+                lblCurrentPass.getStyleClass().setAll("telemetry-chip", "telemetry-chip-green");
+
                 WipeVerifier.VerificationResult vResult = outcome.verifyResult();
                 double resEntropy = (vResult != null) ? vResult.entropyScore() : 0.0;
                 com.sanitizer.util.SoundManager.playSanitizationComplete(target.systemPath(), selectedPolicy.getName(), resEntropy);
@@ -732,6 +778,11 @@ public class WipingView {
 
         task.setOnFailed(e -> {
             com.sanitizer.util.SoundManager.playAlertSound();
+            resetCompletionGlow();
+            lblLiveSpeed.setText("⚡ Speed: 0.0 MB/s");
+            lblLiveEta.setText("⏳ Halted");
+            lblCurrentPass.setText("❌ Failed");
+            lblCurrentPass.getStyleClass().setAll("telemetry-chip", "telemetry-chip-dim");
             lblStatusMessage.setText("Task error occurred!");
             appendLog("\n[CRITICAL ERROR] Task failed: " + task.getException().getMessage());
             sectorMatrix.setAborted();
@@ -740,6 +791,39 @@ public class WipingView {
         });
 
         new Thread(task).start();
+    }
+
+    private void triggerCompletionGlow() {
+        if (cardExec == null) return;
+        if (completionGlowTimeline != null) {
+            completionGlowTimeline.stop();
+        }
+        DropShadow glow = new DropShadow();
+        glow.setColor(Color.rgb(16, 185, 129, 0.75));
+        glow.setRadius(20);
+        glow.setSpread(0.25);
+        cardExec.setEffect(glow);
+
+        completionGlowTimeline = new Timeline(
+                new KeyFrame(Duration.ZERO,
+                        new KeyValue(glow.radiusProperty(), 10),
+                        new KeyValue(glow.colorProperty(), Color.rgb(16, 185, 129, 0.35))),
+                new KeyFrame(Duration.millis(700),
+                        new KeyValue(glow.radiusProperty(), 28),
+                        new KeyValue(glow.colorProperty(), Color.rgb(16, 185, 129, 0.90)))
+        );
+        completionGlowTimeline.setAutoReverse(true);
+        completionGlowTimeline.setCycleCount(6);
+        completionGlowTimeline.play();
+    }
+
+    private void resetCompletionGlow() {
+        if (completionGlowTimeline != null) {
+            completionGlowTimeline.stop();
+        }
+        if (cardExec != null) {
+            cardExec.setEffect(null);
+        }
     }
 
     private void appendLog(String line) {
