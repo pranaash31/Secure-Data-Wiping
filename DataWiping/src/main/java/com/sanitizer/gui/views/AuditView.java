@@ -610,8 +610,6 @@ public class AuditView {
                     "Exported " + exportList.size() + " records to: " + targetFile.getName(),
                     com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS
             );
-            showAlert(Alert.AlertType.INFORMATION, format + " Audit Export Complete",
-                    "Audit log successfully exported (" + exportList.size() + " records):\n\n" + targetFile.getAbsolutePath());
         });
 
         exportTask.setOnFailed(ev -> {
@@ -668,11 +666,6 @@ public class AuditView {
                     "Generated CSV, JSON, and Excel reports in " + targetDir.getName(),
                     com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS
             );
-            showAlert(Alert.AlertType.INFORMATION, "Audit Package Export Complete",
-                    "Full Compliance Audit Package exported successfully:\n\n"
-                    + "• CSV:   " + csvFile.getAbsolutePath() + "\n"
-                    + "• JSON:  " + jsonFile.getAbsolutePath() + "\n"
-                    + "• Excel: " + excelFile.getAbsolutePath());
         });
 
         packageTask.setOnFailed(ev -> {
@@ -708,8 +701,6 @@ public class AuditView {
                 loadSecurityHistory();
                 nav.showNotification("PDF Exported",
                         "Certificate generated at: " + pdfPath, com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
-                showAlert(Alert.AlertType.INFORMATION, "PDF Certificate Exported",
-                        "Sanitization Proof Certificate created successfully:\n" + pdfPath);
             } else {
                 com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Export Error",
                         "Failed to generate PDF Certificate.", com.sanitizer.gui.components.ToastNotification.ToastType.ERROR);
@@ -756,8 +747,6 @@ public class AuditView {
                 loadSecurityHistory();
                 nav.showNotification("Quarantine Report Exported",
                         "Order generated at: " + qPath, com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
-                showAlert(Alert.AlertType.INFORMATION, "Defective Hardware Quarantine Order",
-                        "Physical Destruction Order generated successfully:\n\n" + qPath);
             }
         });
 

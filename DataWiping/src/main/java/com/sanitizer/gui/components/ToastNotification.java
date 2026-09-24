@@ -13,6 +13,10 @@ import javafx.stage.Popup;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
+/**
+ * ToastNotification — Non-intrusive floating toast notifications that slide in
+ * at the bottom-right corner for 3 seconds with a smooth fade-out animation.
+ */
 public class ToastNotification {
 
     public enum ToastType {
@@ -43,7 +47,7 @@ public class ToastNotification {
             toastContainer.setStyle(String.format(
                     "-fx-background-color: #0F172A; -fx-background-radius: 10px; " +
                     "-fx-border-color: %s; -fx-border-radius: 10px; -fx-border-width: 1.5px; " +
-                    "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.35), 12, 0, 0, 4);",
+                    "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.35), 14, 0, 0, 4);",
                     type.colorHex
             ));
 
@@ -69,38 +73,76 @@ public class ToastNotification {
 
             popup.getContent().add(toastContainer);
 
+            // Position at bottom-right corner of owner window
             double x = ownerWindow.getX() + ownerWindow.getWidth() - 360;
-            double y = ownerWindow.getY() + 60;
+            double y = ownerWindow.getY() + ownerWindow.getHeight() - 105;
             popup.show(ownerWindow, x, y);
 
+            // Initial animation state
             toastContainer.setOpacity(0);
-            toastContainer.setTranslateY(-10);
+            toastContainer.setTranslateX(40);
 
+            // Slide in & Fade in (300ms)
             FadeTransition fadeIn = new FadeTransition(Duration.millis(300), toastContainer);
             fadeIn.setFromValue(0);
             fadeIn.setToValue(1);
 
             TranslateTransition transIn = new TranslateTransition(Duration.millis(300), toastContainer);
-            transIn.setFromY(-10);
-            transIn.setToY(0);
+            transIn.setFromX(40);
+            transIn.setToX(0);
 
             ParallelTransition showAnim = new ParallelTransition(fadeIn, transIn);
             showAnim.play();
 
+            // Auto dismiss after 3 seconds with smooth slide-out and fade-out
             Thread dismissThread = new Thread(() -> {
                 try {
-                    Thread.sleep(3500);
+                    Thread.sleep(3000);
                 } catch (InterruptedException ignored) {}
                 Platform.runLater(() -> {
-                    FadeTransition fadeOut = new FadeTransition(Duration.millis(400), toastContainer);
+                    FadeTransition fadeOut = new FadeTransition(Duration.millis(350), toastContainer);
                     fadeOut.setFromValue(1);
                     fadeOut.setToValue(0);
-                    fadeOut.setOnFinished(e -> popup.hide());
-                    fadeOut.play();
+
+                    TranslateTransition transOut = new TranslateTransition(Duration.millis(350), toastContainer);
+                    transOut.setFromX(0);
+                    transOut.setToX(40);
+
+                    ParallelTransition hideAnim = new ParallelTransition(fadeOut, transOut);
+                    hideAnim.setOnFinished(e -> popup.hide());
+                    hideAnim.play();
                 });
             });
             dismissThread.setDaemon(true);
             dismissThread.start();
         });
+    }
+
+    public static void show(String title, String message, ToastType type) {
+        Platform.runLater(() -> {
+            Window window = Window.getWindows().stream()
+                    .filter(Window::isShowing)
+                    .findFirst()
+                    .orElse(null);
+            if (window != null) {
+                show(window, title, message, type);
+            }
+        });
+    }
+
+    public static void success(String title, String message) {
+        show(title, message, ToastType.SUCCESS);
+    }
+
+    public static void info(String title, String message) {
+        show(title, message, ToastType.INFO);
+    }
+
+    public static void warning(String title, String message) {
+        show(title, message, ToastType.WARNING);
+    }
+
+    public static void error(String title, String message) {
+        show(title, message, ToastType.ERROR);
     }
 }

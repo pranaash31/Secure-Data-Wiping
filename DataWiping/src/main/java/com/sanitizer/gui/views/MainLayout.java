@@ -3,6 +3,7 @@ package com.sanitizer.gui.views;
 import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
+import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
 import com.sanitizer.session.UserRole;
@@ -335,13 +336,18 @@ public class MainLayout {
         );
         rootPane.setBottom(statusBar);
 
-        // Register USB Poller for Live Drive Count
+        // Register USB Poller for Live Drive Count & Toast Notifications
+        final int[] prevDriveCount = {-1};
         usbListener = drives -> {
             int count = (drives != null) ? drives.size() : 0;
             if (count == 0) {
                 lblDrivesStatus.setText("⚪ 0 Drives Connected");
                 lblDrivesStatus.getStyleClass().setAll("telemetry-chip", "telemetry-chip-dim");
                 lblDrivesStatus.setTooltip(new Tooltip("No external USB pen drives detected"));
+
+                if (prevDriveCount[0] > 0) {
+                    ToastNotification.warning("Drive Disconnected", "Storage device was safely detached.");
+                }
             } else {
                 String text = (count == 1) ? "🟢 1 Drive Connected" : "🟢 " + count + " Drives Connected";
                 lblDrivesStatus.setText(text);
@@ -350,7 +356,13 @@ public class MainLayout {
                         .map(d -> d.model() + " (" + d.formattedSize() + ")")
                         .collect(Collectors.joining(", "));
                 lblDrivesStatus.setTooltip(new Tooltip("Connected Drives: " + driveNames));
+
+                if (prevDriveCount[0] >= 0 && count > prevDriveCount[0]) {
+                    var newest = drives.get(drives.size() - 1);
+                    ToastNotification.info("Drive Plugged In", newest.model() + " (" + newest.formattedSize() + ") detected.");
+                }
             }
+            prevDriveCount[0] = count;
         };
         UsbDetector.registerListener(usbListener);
     }
