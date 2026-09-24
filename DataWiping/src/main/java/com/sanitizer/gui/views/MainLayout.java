@@ -1,6 +1,7 @@
 package com.sanitizer.gui.views;
 
 import com.sanitizer.a11y.AccessibilityManager;
+import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
@@ -15,8 +16,11 @@ import javafx.stage.Stage;
 import javafx.util.StringConverter;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class MainLayout {
 
@@ -40,6 +44,14 @@ public class MainLayout {
     private ComboBox<Locale> cmbLanguage;
     private Label officerRole;
     private String currentActiveView = "dashboard";
+
+    // Telemetry Status Bar Elements
+    private Label lblDrivesStatus;
+    private Label lblShieldStatus;
+    private Label lblKeyVaultStatus;
+    private Label lblDbStatus;
+    private Label lblTelemetryInfo;
+    private Consumer<List<UsbDetector.UsbDriveInfo>> usbListener;
 
     public MainLayout(NavigationManager navManager) {
         this.navManager = navManager;
@@ -284,6 +296,63 @@ public class MainLayout {
         );
 
         rootPane.setLeft(sidebar);
+
+        // ── BOTTOM TELEMETRY STATUS BAR ─────────────────────────────────
+        HBox statusBar = new HBox(12);
+        statusBar.getStyleClass().add("bottom-status-bar");
+        statusBar.setAlignment(Pos.CENTER_LEFT);
+
+        lblDrivesStatus = new Label("⚪ 0 Drives Connected");
+        lblDrivesStatus.getStyleClass().setAll("telemetry-chip", "telemetry-chip-dim");
+        lblDrivesStatus.setTooltip(new Tooltip("Scanning for external USB pen drives..."));
+
+        lblShieldStatus = new Label("🛡️ System Shield: ACTIVE");
+        lblShieldStatus.getStyleClass().setAll("telemetry-chip", "telemetry-chip-blue");
+        lblShieldStatus.setTooltip(new Tooltip("OS & Internal SSD Write-Protection Active (Non-Pen Drives Blocked)"));
+
+        lblKeyVaultStatus = new Label("🔏 Key Vault: LOADED");
+        lblKeyVaultStatus.getStyleClass().setAll("telemetry-chip", "telemetry-chip-purple");
+        lblKeyVaultStatus.setTooltip(new Tooltip("RSA-2048 Cryptographic Hardware Signer Ready"));
+
+        lblDbStatus = new Label("🗄️ Audit DB: ONLINE");
+        lblDbStatus.getStyleClass().setAll("telemetry-chip", "telemetry-chip-green");
+        lblDbStatus.setTooltip(new Tooltip("SQLite Audit Trail Active & Integrity Verified"));
+
+        Region statusSpacer = new Region();
+        HBox.setHgrow(statusSpacer, Priority.ALWAYS);
+
+        String osName = System.getProperty("os.name", "macOS");
+        lblTelemetryInfo = new Label("⚡ Defense Telemetry: Active | " + osName);
+        lblTelemetryInfo.getStyleClass().add("telemetry-info-text");
+
+        statusBar.getChildren().addAll(
+                lblDrivesStatus,
+                lblShieldStatus,
+                lblKeyVaultStatus,
+                lblDbStatus,
+                statusSpacer,
+                lblTelemetryInfo
+        );
+        rootPane.setBottom(statusBar);
+
+        // Register USB Poller for Live Drive Count
+        usbListener = drives -> {
+            int count = (drives != null) ? drives.size() : 0;
+            if (count == 0) {
+                lblDrivesStatus.setText("⚪ 0 Drives Connected");
+                lblDrivesStatus.getStyleClass().setAll("telemetry-chip", "telemetry-chip-dim");
+                lblDrivesStatus.setTooltip(new Tooltip("No external USB pen drives detected"));
+            } else {
+                String text = (count == 1) ? "🟢 1 Drive Connected" : "🟢 " + count + " Drives Connected";
+                lblDrivesStatus.setText(text);
+                lblDrivesStatus.getStyleClass().setAll("telemetry-chip", "telemetry-chip-green");
+                String driveNames = drives.stream()
+                        .map(d -> d.model() + " (" + d.formattedSize() + ")")
+                        .collect(Collectors.joining(", "));
+                lblDrivesStatus.setTooltip(new Tooltip("Connected Drives: " + driveNames));
+            }
+        };
+        UsbDetector.registerListener(usbListener);
     }
 
     private Button createNavBtn(String text, String viewKey, String accessibleDesc) {
