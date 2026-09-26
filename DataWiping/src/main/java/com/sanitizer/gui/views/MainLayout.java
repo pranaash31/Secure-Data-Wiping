@@ -219,6 +219,14 @@ public class MainLayout {
             }
         });
 
+        // ── Spotlight Command Palette Button (Cmd+K) ──
+        Button btnSpotlight = new Button("🔍 Search (⌘K)");
+        btnSpotlight.getStyleClass().add("button-theme-toggle");
+        btnSpotlight.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #0284C7; -fx-background-color: #F0F9FF; -fx-border-color: #BAE6FD; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+        btnSpotlight.setTooltip(new Tooltip("Spotlight Quick Search & Command Palette (Ctrl/Cmd + K)"));
+        btnSpotlight.setOnAction(e -> navManager.showCommandPalette());
+        AccessibilityManager.setupAccessible(btnSpotlight, "Command Palette Quick Search", "Opens spotlight search and command runner (Ctrl/Cmd + K)", AccessibleRole.BUTTON);
+
         // ── FISMA Session Lock Button ──
         btnLockSession = new Button("🔒 Lock");
         btnLockSession.getStyleClass().add("button-theme-toggle");
@@ -235,7 +243,7 @@ public class MainLayout {
 
         topBar.getChildren().addAll(
                 brandRow, lblBadge, lblRoleBadge, spacer,
-                lblUserInfo, cmbLanguage, zoomGroup, btnThemeToggle, btnA11yHelp, btnUpdate, btnLockSession, btnLogoutTop
+                btnSpotlight, lblUserInfo, cmbLanguage, zoomGroup, btnThemeToggle, btnA11yHelp, btnUpdate, btnLockSession, btnLogoutTop
         );
         rootPane.setTop(topBar);
 

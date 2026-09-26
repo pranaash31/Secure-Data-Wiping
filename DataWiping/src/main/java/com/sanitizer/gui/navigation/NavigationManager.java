@@ -3,6 +3,7 @@ package com.sanitizer.gui.navigation;
 import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
+import com.sanitizer.gui.components.CommandPaletteDialog;
 import com.sanitizer.gui.views.*;
 import com.sanitizer.i18n.I18n;
 import com.sanitizer.session.SessionAutoLockManager;
@@ -236,6 +237,15 @@ public class NavigationManager {
                     return;
                 }
 
+                // Spotlight Command Palette: Ctrl/Cmd + K
+                if (event.getCode() == KeyCode.K) {
+                    if (isAuthenticated && !SessionAutoLockManager.getInstance().isLocked()) {
+                        showCommandPalette();
+                        event.consume();
+                        return;
+                    }
+                }
+
                 // View Navigation Shortcuts (Ctrl/Cmd + Key)
                 if (isAuthenticated && !SessionAutoLockManager.getInstance().isLocked()) {
                     if (event.getCode() == KeyCode.D || event.getCode() == KeyCode.DIGIT1) navigateTo("dashboard");
@@ -243,12 +253,16 @@ public class NavigationManager {
                     else if (event.getCode() == KeyCode.B || event.getCode() == KeyCode.DIGIT3) navigateTo("batchWipe");
                     else if (event.getCode() == KeyCode.DIGIT4) navigateTo("diagnostics");
                     else if (event.getCode() == KeyCode.DIGIT5) navigateTo("clients");
-                    else if (event.getCode() == KeyCode.K || event.getCode() == KeyCode.DIGIT6) navigateTo("keyvault");
+                    else if (event.getCode() == KeyCode.DIGIT6) navigateTo("keyvault");
                     else if (event.getCode() == KeyCode.A || event.getCode() == KeyCode.DIGIT7) navigateTo("audit");
                     else if (event.getCode() == KeyCode.COMMA || event.getCode() == KeyCode.DIGIT8) navigateTo("settings");
                 }
             }
         });
+    }
+
+    public void showCommandPalette() {
+        CommandPaletteDialog.show(primaryStage, this);
     }
 
     // ── Lock Screen Overlay ──────────────────────────────────────────────────
