@@ -320,6 +320,7 @@ public class NavigationManager {
     private Node createViewNode(String key) {
         return switch (key) {
             case "dashboard"   -> new DashboardView().getRoot();
+            case "wizard", "wipewizard" -> new WipeWizardView().getRoot();
             case "wiping"      -> new WipingView().getRoot();
             case "batchwipe"   -> new BatchWipeView().getRoot();
             case "diagnostics" -> new DiskDiagnosticView().getRoot();

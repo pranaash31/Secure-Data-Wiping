@@ -330,6 +330,9 @@ public class CommandPaletteDialog {
         items.add(new CommandItem("nav_dashboard", "Go to Executive Dashboard", "Real-time sanitization telemetry, throughput & ESG metrics",
                 Category.NAVIGATION, "📊", "Ctrl+D / 1", List.of("home", "stats", "overview"), () -> navManager.navigateTo("dashboard")));
 
+        items.add(new CommandItem("nav_wizard", "Go to Guided Wipe Wizard (Step-by-Step)", "Simplified 5-step guided sanitization workflow with safety confirmations",
+                Category.NAVIGATION, "✨", "", List.of("wizard", "guided", "simple", "step", "easy", "technician"), () -> navManager.navigateTo("wizard")));
+
         items.add(new CommandItem("nav_wiping", "Go to Single Drive Sanitizer", "High-assurance sector overwrite console with live heatmaps & oscilloscope",
                 Category.NAVIGATION, "⚡", "Ctrl+W / 2", List.of("wipe", "erase", "sanitize", "clear", "purge"), () -> navManager.navigateTo("wiping")));
 

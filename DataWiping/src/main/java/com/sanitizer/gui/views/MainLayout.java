@@ -259,6 +259,7 @@ public class MainLayout {
         // OPERATIONS section
         opsLabel = new Label(I18n.get("nav.operations"));
         opsLabel.getStyleClass().add("sidebar-section-label");
+        Button btnWizard    = createNavBtn("  ✨ Guided Wipe Wizard", "wizard", "Simplified 5-step guided sanitization mode for technicians");
         Button btnWiping    = createNavBtn("  " + I18n.get("nav.wiping"), "wiping", "Data Wiping Workplace (Ctrl/Cmd + W)");
         Button btnBatch     = createNavBtn("  " + I18n.get("nav.batch_wipe"), "batchWipe", "Batch Wipe Queue (Ctrl/Cmd + B)");
         Button btnDiag      = createNavBtn("  " + I18n.get("nav.diagnostics"), "diagnostics", "Drive Diagnostics");
@@ -297,7 +298,7 @@ public class MainLayout {
 
         sidebar.getChildren().addAll(
                 mainLabel, btnDashboard,
-                opsLabel, btnWiping, btnBatch, btnDiag,
+                opsLabel, btnWizard, btnWiping, btnBatch, btnDiag,
                 mgmtLabel, btnClients, btnKeyVault,
                 compLabel, btnAudit, btnVerify, btnSettings,
                 sidebarSpacer,
