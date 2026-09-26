@@ -1452,3 +1452,30 @@
     -fx-border-width: 3.5px;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   I/O OSCILLOSCOPE & TELEMETRY CONTROLS
+   ══════════════════════════════════════════════════════════════════════════ */
+.filter-chip-button {
+    -fx-background-color: #F1F5F9;
+    -fx-text-fill: #475569;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+    -fx-padding: 4 10;
+    -fx-cursor: hand;
+}
+.filter-chip-button:hover {
+    -fx-background-color: #E2E8F0;
+    -fx-text-fill: #0F172A;
+}
+
+.dark-theme .filter-chip-button {
+    -fx-background-color: #1E293B;
+    -fx-text-fill: #94A3B8;
+}
+.dark-theme .filter-chip-button:hover {
+    -fx-background-color: #334155;
+    -fx-text-fill: #F8FAFC;
+}
+

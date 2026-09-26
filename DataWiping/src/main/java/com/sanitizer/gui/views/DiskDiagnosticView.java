@@ -4,6 +4,7 @@ import com.sanitizer.detector.SmartDiagnostics;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.detector.ThermalPolicy;
 import com.sanitizer.detector.ThermalPolicyManager;
+import com.sanitizer.gui.components.IoOscilloscopeComponent;
 import com.sanitizer.gui.components.ThermalGraphComponent;
 import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.navigation.NavigationManager;
@@ -30,8 +31,9 @@ public class DiskDiagnosticView {
     private Button btnLoad;
     private Button btnSelfTest;
 
-    // Thermal Graph Component
+    // Thermal & I/O Telemetry Components
     private ThermalGraphComponent thermalGraph;
+    private IoOscilloscopeComponent ioOscilloscope;
 
     // Stat card value labels
     private Label lblHealthValue;
@@ -356,6 +358,7 @@ public class DiskDiagnosticView {
         specsRow.getChildren().addAll(specsCard, smartCard);
 
         thermalGraph = new ThermalGraphComponent();
+        ioOscilloscope = new IoOscilloscopeComponent();
 
         // ── Interface Anomaly & Port Degradation Banner ──────────────────
         interfaceAnomalyBox = new HBox(16);
@@ -381,7 +384,7 @@ public class DiskDiagnosticView {
 
         interfaceAnomalyBox.getChildren().addAll(anomalyIcon, anomalyContent);
 
-        rootContainer.getChildren().addAll(header, selectorRow, preWipeAssessmentBox, interfaceAnomalyBox, healthRow, thermalGraph, specsRow);
+        rootContainer.getChildren().addAll(header, selectorRow, preWipeAssessmentBox, interfaceAnomalyBox, healthRow, ioOscilloscope, thermalGraph, specsRow);
     }
 
     private Label createSpecLabel(String text) {
@@ -434,6 +437,7 @@ public class DiskDiagnosticView {
             lblTotalBlocksValue.setText("--");
             lblPathValue.setText("--");
             smartData.clear();
+            if (ioOscilloscope != null) ioOscilloscope.reset();
             if (thermalGraph != null) thermalGraph.reset();
         } else {
             if (current != null && drives.contains(current)) {
@@ -466,6 +470,9 @@ public class DiskDiagnosticView {
             ThermalPolicy policy = ThermalPolicyManager.getInstance().getPolicyForDrive(drive.model(), drive.systemPath(), drive.sizeBytes());
             thermalGraph.setPolicy(policy);
             thermalGraph.addSample(report.temperatureCelsius());
+        }
+        if (ioOscilloscope != null) {
+            ioOscilloscope.setDeviceContext(drive.model(), drive.systemPath(), drive.sizeBytes());
         }
 
         // Health Score & Status
@@ -581,13 +588,19 @@ public class DiskDiagnosticView {
 
         loadSelectedDriveDiagnostics();
 
-        // Simulate a mini diagnostic telemetry check into the thermal graph
+        // Simulate a mini diagnostic telemetry check into thermal and I/O graphs
         if (thermalGraph != null) {
             int base = SmartDiagnostics.getLiveTemperature(drive.systemPath(), drive.serial());
             thermalGraph.addSample(base);
             thermalGraph.addSample(base + 1);
             thermalGraph.addSample(base + 2);
             thermalGraph.addSample(base);
+        }
+        if (ioOscilloscope != null) {
+            ioOscilloscope.addSample(42.5, 10880, 2.1, 9.4);
+            ioOscilloscope.addSample(58.3, 14920, 1.8, 12.9);
+            ioOscilloscope.addSample(64.1, 16400, 1.6, 14.2);
+            ioOscilloscope.addSample(52.0, 13312, 1.9, 11.5);
         }
     }
 }

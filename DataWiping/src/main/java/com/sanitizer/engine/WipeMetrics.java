@@ -3,7 +3,8 @@ package com.sanitizer.engine;
 import com.sanitizer.detector.SmartDiagnostics;
 
 /**
- * Encapsulates real-time telemetry, thermal status, and progress metrics for an ongoing storage drive wipe operation.
+ * Encapsulates real-time telemetry, thermal status, I/O oscilloscope metrics, and progress
+ * for an ongoing storage drive wipe operation.
  */
 public record WipeMetrics(
         String systemPath,
@@ -19,8 +20,36 @@ public record WipeMetrics(
         SmartDiagnostics.ThermalStatus thermalStatus,
         boolean isThermalPaused,
         int throttlePercent,
-        String throttleState
+        String throttleState,
+        double iops,
+        double latencyMs,
+        double busSaturationPercent
 ) {
+    public WipeMetrics(
+            String systemPath,
+            double overallPercent,
+            int currentPass,
+            int totalPasses,
+            String passName,
+            long bytesProcessedInPass,
+            long totalTargetBytesInPass,
+            double speedMBs,
+            long etaSeconds,
+            int tempCelsius,
+            SmartDiagnostics.ThermalStatus thermalStatus,
+            boolean isThermalPaused,
+            int throttlePercent,
+            String throttleState
+    ) {
+        this(systemPath, overallPercent, currentPass, totalPasses, passName,
+             bytesProcessedInPass, totalTargetBytesInPass, speedMBs, etaSeconds,
+             tempCelsius, thermalStatus, isThermalPaused,
+             throttlePercent, throttleState,
+             calculateDefaultIops(speedMBs),
+             calculateDefaultLatency(speedMBs),
+             calculateDefaultSaturation(speedMBs));
+    }
+
     public WipeMetrics(
             String systemPath,
             double overallPercent,
@@ -58,6 +87,25 @@ public record WipeMetrics(
              35, SmartDiagnostics.ThermalStatus.NORMAL, false, 0, "NORMAL");
     }
 
+    private static double calculateDefaultIops(double speedMBs) {
+        if (speedMBs <= 0.0) return 0.0;
+        // Standard 4KB sector ops equivalent: (speedMBs * 1024 * 1024) / 4096
+        return (speedMBs * 1024.0 * 1024.0) / 4096.0;
+    }
+
+    private static double calculateDefaultLatency(double speedMBs) {
+        if (speedMBs <= 0.0) return 0.0;
+        // 2MB buffer block transfer time: (2MB / speedMBs) * 1000 ms, with realistic controller overhead (0.5ms - 25ms)
+        double rawMs = (2.0 / Math.max(0.1, speedMBs)) * 100.0;
+        return Math.min(250.0, Math.max(0.8, rawMs));
+    }
+
+    private static double calculateDefaultSaturation(double speedMBs) {
+        if (speedMBs <= 0.0) return 0.0;
+        // Baseline against USB 3.0 / SATA standard ~450 MB/s
+        return Math.min(100.0, (speedMBs / 450.0) * 100.0);
+    }
+
     /**
      * Returns a human-friendly string for the live throughput speed (e.g. "45.2 MB/s").
      */
@@ -66,6 +114,24 @@ public record WipeMetrics(
             return "-- MB/s";
         }
         return String.format("%.1f MB/s", speedMBs);
+    }
+
+    public String formattedIops() {
+        if (iops <= 0.0) return "-- IOPS";
+        if (iops >= 1000.0) {
+            return String.format("%,.0f IOPS", iops);
+        }
+        return String.format("%.1f IOPS", iops);
+    }
+
+    public String formattedLatency() {
+        if (latencyMs <= 0.0) return "-- ms";
+        return String.format("%.1f ms", latencyMs);
+    }
+
+    public String formattedBusSaturation() {
+        if (busSaturationPercent <= 0.0) return "0.0%";
+        return String.format("%.1f%%", busSaturationPercent);
     }
 
     /**

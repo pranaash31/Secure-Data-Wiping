@@ -8,6 +8,7 @@ import com.sanitizer.detector.ThermalPolicyManager;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
 import com.sanitizer.engine.WipeVerifier;
+import com.sanitizer.gui.components.IoOscilloscopeComponent;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ThermalGraphComponent;
 import com.sanitizer.gui.navigation.NavigationManager;
@@ -59,6 +60,7 @@ public class WipingView {
     private Timeline completionGlowTimeline;
 
     private SectorHeatmapComponent sectorMatrix;
+    private IoOscilloscopeComponent ioOscilloscope;
     private ThermalGraphComponent thermalGraph;
     private TextArea txtLogOutput;
 
@@ -266,6 +268,9 @@ public class WipingView {
         HBox paletteWidget = sectorMatrix.createPaletteSelectorWidget();
         matrixHeader.getChildren().addAll(lblMatrix, matrixSpacer, paletteWidget);
 
+        // Real-Time Multi-Channel I/O Oscilloscope & Waveform Visualizer
+        ioOscilloscope = new IoOscilloscopeComponent();
+
         // Real-Time Thermal Sparkline & Temperature Graph
         thermalGraph = new ThermalGraphComponent();
 
@@ -279,7 +284,7 @@ public class WipingView {
         txtLogOutput.setPrefRowCount(7);
         VBox.setVgrow(txtLogOutput, Priority.ALWAYS);
 
-        cardExec.getChildren().addAll(execHeader, progressBar, metricsRow, matrixHeader, sectorMatrix, thermalGraph, lblLogTitle, txtLogOutput);
+        cardExec.getChildren().addAll(execHeader, progressBar, metricsRow, matrixHeader, sectorMatrix, ioOscilloscope, thermalGraph, lblLogTitle, txtLogOutput);
 
         rootContainer.getChildren().addAll(titleBox, topRow, cardExec);
     }
@@ -301,6 +306,7 @@ public class WipingView {
             lblSelectedDriveInfo.setText("Scanning... Insert a USB drive to begin.");
             if (lblPreWipeHealthBadge != null) lblPreWipeHealthBadge.setText("Health Score: --/100");
             if (lblLiveTempBadge != null) lblLiveTempBadge.setText("Temp: -- °C");
+            if (ioOscilloscope != null) ioOscilloscope.reset();
             if (thermalGraph != null) thermalGraph.reset();
             btnExecuteWipe.setDisable(true);
         } else {
@@ -350,9 +356,13 @@ public class WipingView {
                     thermalGraph.setPolicy(policy);
                     thermalGraph.addSample(report.temperatureCelsius());
                 }
+                if (ioOscilloscope != null) {
+                    ioOscilloscope.setDeviceContext(target.model(), target.systemPath(), target.sizeBytes());
+                }
             }
         } else {
             lblSelectedDriveInfo.setText("No drive selected.");
+            if (ioOscilloscope != null) ioOscilloscope.reset();
             if (thermalGraph != null) thermalGraph.reset();
         }
     }
@@ -441,6 +451,10 @@ public class WipingView {
         lblCurrentPass.setText("📋 Initializing...");
         lblCurrentPass.getStyleClass().setAll("telemetry-chip", "telemetry-chip-dim");
         sectorMatrix.reset(target.sizeBytes());
+        if (ioOscilloscope != null) {
+            ioOscilloscope.reset();
+            ioOscilloscope.setDeviceContext(target.model(), target.systemPath(), target.sizeBytes());
+        }
         if (thermalGraph != null) {
             thermalGraph.reset();
             thermalGraph.setPolicy(ThermalPolicyManager.getInstance().getPolicyForDrive(target.model(), target.systemPath(), target.sizeBytes()));
@@ -535,6 +549,9 @@ public class WipingView {
                                         "-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 4 10; -fx-background-radius: 4px;",
                                         metrics.thermalStatus().getBgColor(), metrics.thermalStatus().getTextColor()
                                 ));
+                            }
+                            if (ioOscilloscope != null) {
+                                ioOscilloscope.addSample(metrics);
                             }
                             sectorMatrix.updateProgress(metrics);
                         }),
