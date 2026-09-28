@@ -10,11 +10,11 @@ import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.DeviceType;
 import com.sanitizer.detector.ThermalPolicy;
 import com.sanitizer.detector.ThermalPolicyManager;
-import com.sanitizer.util.SoundManager;
 import com.sanitizer.engine.WipeVerifier;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.components.HeatmapPalette;
 import com.sanitizer.gui.components.ToastNotification;
+import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
 import com.sanitizer.policy.WipePass;
@@ -23,6 +23,7 @@ import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
 import com.sanitizer.session.SessionAutoLockManager;
 import com.sanitizer.session.UserRole;
+import com.sanitizer.util.SoundManager;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -319,7 +320,7 @@ public class SettingsView {
                         "Session Auto-Lock Timeout", val == 0 ? "Disabled" : val + "s");
                 nav.showNotification("Auto-Lock Policy Updated",
                         "Inactivity timeout set to: " + cmbTimeout.getConverter().toString(val),
-                        ToastNotification.ToastType.SUCCESS);
+                        ToastType.SUCCESS);
             }
         });
         timeoutBox.getChildren().addAll(lblTimeout, cmbTimeout);
@@ -766,7 +767,7 @@ public class SettingsView {
         NavigationManager.getInstance().showNotification(
                 "Thermal Policies Saved",
                 "Hardware temperature limits and throttling thresholds updated successfully.",
-                ToastNotification.ToastType.SUCCESS
+                ToastType.SUCCESS
         );
     }
 
@@ -787,7 +788,7 @@ public class SettingsView {
         NavigationManager.getInstance().showNotification(
                 "Defaults Restored",
                 "Thermal throttling thresholds reset to factory default standards (USB: 55/42°C, NVMe: 70/52°C, HDD: 50/40°C).",
-                ToastNotification.ToastType.INFO
+                ToastType.INFO
         );
     }
 
@@ -803,10 +804,10 @@ public class SettingsView {
             try {
                 AuditDb.saveRecord("SYSTEM_RESET", "N/A", "0 GB", "LOG_CLEAR", "RESET", "N/A");
                 NavigationManager.getInstance().showNotification("Audit Log Cleared",
-                        "Database history has been cleared.", ToastNotification.ToastType.WARNING);
+                        "Database history has been cleared.", ToastType.WARNING);
             } catch (Exception ex) {
                 NavigationManager.getInstance().showNotification("Clear Error",
-                        ex.getMessage(), ToastNotification.ToastType.ERROR);
+                        ex.getMessage(), ToastType.ERROR);
             }
         }
     }
@@ -821,7 +822,7 @@ public class SettingsView {
             File src = new File("sanitizer_history.db");
             if (!src.exists()) {
                 NavigationManager.getInstance().showNotification("Backup Error",
-                        "Database file sanitizer_history.db not found on disk.", ToastNotification.ToastType.ERROR);
+                        "Database file sanitizer_history.db not found on disk.", ToastType.ERROR);
                 return;
             }
 
@@ -833,10 +834,10 @@ public class SettingsView {
                     out.write(buffer, 0, bytesRead);
                 }
                 NavigationManager.getInstance().showNotification("Backup Created",
-                        "Successfully exported database backup to " + dest.getName(), ToastNotification.ToastType.SUCCESS);
+                        "Successfully exported database backup to " + dest.getName(), ToastType.SUCCESS);
             } catch (IOException ex) {
                 NavigationManager.getInstance().showNotification("Backup Failed",
-                        "Error copying database file: " + ex.getMessage(), ToastNotification.ToastType.ERROR);
+                        "Error copying database file: " + ex.getMessage(), ToastType.ERROR);
             }
         }
     }
@@ -1203,7 +1204,7 @@ public class SettingsView {
         refreshPolicySelectorItems();
         cmbPolicySelector.setValue(newPolicy);
         loadPolicyIntoForm(newPolicy);
-        NavigationManager.getInstance().showNotification("New Policy Created", "Configure passes and click Save.", ToastNotification.ToastType.SUCCESS);
+        NavigationManager.getInstance().showNotification("New Policy Created", "Configure passes and click Save.", ToastType.SUCCESS);
     }
 
     private void handleSaveCurrentPolicy() {
@@ -1219,7 +1220,7 @@ public class SettingsView {
 
         String name = txtPolicyName.getText().trim();
         if (name.isEmpty()) {
-            NavigationManager.getInstance().showNotification("Validation Error", "Policy name cannot be empty.", ToastNotification.ToastType.ERROR);
+            NavigationManager.getInstance().showNotification("Validation Error", "Policy name cannot be empty.", ToastType.ERROR);
             return;
         }
 
@@ -1243,7 +1244,7 @@ public class SettingsView {
             refreshPolicySelectorItems();
             cmbPolicySelector.setValue(customFork);
             loadPolicyIntoForm(customFork);
-            NavigationManager.getInstance().showNotification("Policy Forked & Saved", "Saved as custom policy profile: " + customFork.getName(), ToastNotification.ToastType.SUCCESS);
+            NavigationManager.getInstance().showNotification("Policy Forked & Saved", "Saved as custom policy profile: " + customFork.getName(), ToastType.SUCCESS);
             return;
         }
 
@@ -1258,7 +1259,7 @@ public class SettingsView {
         SecurityAuditLogger.logPolicyChange(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Saved / Modified", current.getName());
         refreshPolicySelectorItems();
         cmbPolicySelector.setValue(current);
-        NavigationManager.getInstance().showNotification("Policy Saved", "Wipe policy profile updated successfully.", ToastNotification.ToastType.SUCCESS);
+        NavigationManager.getInstance().showNotification("Policy Saved", "Wipe policy profile updated successfully.", ToastType.SUCCESS);
     }
 
     private void handleDeleteCurrentPolicy() {
@@ -1277,7 +1278,7 @@ public class SettingsView {
             SecurityAuditLogger.logPolicyChange(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Deleted", current.getName());
             refreshPolicySelectorItems();
             loadPolicyIntoForm(WipePolicyManager.getInstance().getDefaultPolicy());
-            NavigationManager.getInstance().showNotification("Policy Deleted", "Policy profile removed.", ToastNotification.ToastType.WARNING);
+            NavigationManager.getInstance().showNotification("Policy Deleted", "Policy profile removed.", ToastType.WARNING);
         }
     }
 
@@ -1286,7 +1287,7 @@ public class SettingsView {
         if (current == null) return;
         WipePolicyManager.getInstance().setDefaultPolicy(current);
         NavigationManager.getInstance().showNotification("Default Standard Updated",
-                current.getName() + " is now set as the active default wiping standard.", ToastNotification.ToastType.SUCCESS);
+                current.getName() + " is now set as the active default wiping standard.", ToastType.SUCCESS);
     }
 
     private void handleExportPolicyJson() {
@@ -1303,10 +1304,10 @@ public class SettingsView {
             try {
                 WipePolicyManager.exportPolicyToFile(current, dest);
                 NavigationManager.getInstance().showNotification("Policy Exported",
-                        "Exported policy profile to: " + dest.getName(), ToastNotification.ToastType.SUCCESS);
+                        "Exported policy profile to: " + dest.getName(), ToastType.SUCCESS);
             } catch (Exception ex) {
                 NavigationManager.getInstance().showNotification("Export Error",
-                        "Failed to export policy: " + ex.getMessage(), ToastNotification.ToastType.ERROR);
+                        "Failed to export policy: " + ex.getMessage(), ToastType.ERROR);
             }
         }
     }
@@ -1326,10 +1327,10 @@ public class SettingsView {
                 loadPolicyIntoForm(imported);
                 NavigationManager.getInstance().showNotification("Policy Imported",
                         "Successfully imported: " + imported.getName() + " (" + imported.getPassCount() + " passes)",
-                        ToastNotification.ToastType.SUCCESS);
+                        ToastType.SUCCESS);
             } catch (Exception ex) {
                 NavigationManager.getInstance().showNotification("Import Error",
-                        "Failed to import JSON policy: " + ex.getMessage(), ToastNotification.ToastType.ERROR);
+                        "Failed to import JSON policy: " + ex.getMessage(), ToastType.ERROR);
             }
         }
     }
@@ -1482,7 +1483,7 @@ public class SettingsView {
                 NavigationManager.getInstance().showNotification(
                         "Test Alert Dispatched",
                         "Dispatched diagnostic test alert to configured channels.",
-                        ToastNotification.ToastType.SUCCESS
+                        ToastType.SUCCESS
                 );
             });
         });
@@ -1509,7 +1510,7 @@ public class SettingsView {
             NavigationManager.getInstance().showNotification(
                     "Alert Settings Saved",
                     "Real-time email and webhook alert settings updated successfully.",
-                    ToastNotification.ToastType.SUCCESS
+                    ToastType.SUCCESS
             );
         });
 
@@ -1659,7 +1660,7 @@ public class SettingsView {
             NavigationManager.getInstance().showNotification(
                     "Audio Alarm Preview",
                     "Triggered preview alarm for mode: " + cmbMode.getValue().getDisplayName(),
-                    ToastNotification.ToastType.INFO
+                    ToastType.INFO
             );
         });
 
@@ -1681,7 +1682,7 @@ public class SettingsView {
             NavigationManager.getInstance().showNotification(
                     "Audio Alarms Saved",
                     "Operator bench audio alarm settings updated and active.",
-                    ToastNotification.ToastType.SUCCESS
+                    ToastType.SUCCESS
             );
         });
 

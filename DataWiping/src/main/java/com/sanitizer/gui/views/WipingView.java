@@ -343,10 +343,9 @@ public class WipingView {
             sectorMatrix.reset(target.sizeBytes());
 
             // Automated Pre-Wipe Health Assessment Check
-            com.sanitizer.detector.SmartDiagnostics.SmartReport report =
-                    com.sanitizer.detector.SmartDiagnostics.inspectDrive(target);
+            SmartReport report = SmartDiagnostics.inspectDrive(target);
             if (report != null) {
-                com.sanitizer.detector.SmartDiagnostics.HealthScoreResult health = report.healthScore();
+                HealthScoreResult health = report.healthScore();
                 if (lblPreWipeHealthBadge != null) {
                     lblPreWipeHealthBadge.setText(String.format("Health Score: %d/100 (%s)", health.score(), health.status().name()));
                     lblPreWipeHealthBadge.setStyle(String.format(
@@ -387,8 +386,7 @@ public class WipingView {
         }
 
         // Automated Pre-Wipe Health Check Gate
-        com.sanitizer.detector.SmartDiagnostics.SmartReport report =
-                com.sanitizer.detector.SmartDiagnostics.inspectDrive(target);
+        SmartReport report = SmartDiagnostics.inspectDrive(target);
         if (report != null && !report.healthScore().isWipePermittedWithoutOverride()) {
             Alert healthAlert = new Alert(Alert.AlertType.WARNING);
             healthAlert.setTitle("PRE-WIPE HEALTH SAFEGUARD WARNING");
@@ -473,14 +471,14 @@ public class WipingView {
         }
         txtLogOutput.clear();
         appendLog("[SYSTEM] Launching low-level block sanitization background task...");
-        com.sanitizer.util.SoundManager.playStartTone();
+        SoundManager.playStartTone();
 
-        final com.sanitizer.detector.SmartDiagnostics.SmartSnapshot preWipeSnapshot =
-                com.sanitizer.detector.SmartDiagnostics.captureSnapshot(target);
+        final SmartSnapshot preWipeSnapshot =
+                SmartDiagnostics.captureSnapshot(target);
 
         final boolean[] wasThermalPaused = {false};
         final boolean[] wasThrottled = {false};
-        final List<com.sanitizer.quarantine.LbaFailureRecord> detectedBadSectors =
+        final List<LbaFailureRecord> detectedBadSectors =
                 java.util.Collections.synchronizedList(new java.util.ArrayList<>());
 
         final WipeVerifier.VerificationMode verifyMode = cmbVerifyMode.getValue() != null
@@ -610,16 +608,16 @@ public class WipingView {
 
                 WipeVerifier.VerificationResult vResult = outcome.verifyResult();
                 double resEntropy = (vResult != null) ? vResult.entropyScore() : 0.0;
-                com.sanitizer.util.SoundManager.playSanitizationComplete(target.systemPath(), selectedPolicy.getName(), resEntropy);
+                SoundManager.playSanitizationComplete(target.systemPath(), selectedPolicy.getName(), resEntropy);
                 lblStatusMessage.setText("Sanitization completed! Issuing digital seal...");
                 appendLog("\n[SUCCESS] Sanitization operation & verification completed successfully.");
                 sectorMatrix.setCompleted();
 
                 // Capture Post-Wipe S.M.A.R.T. Snapshot & Compute Delta
-                com.sanitizer.detector.SmartDiagnostics.SmartSnapshot postWipeSnapshot =
-                        com.sanitizer.detector.SmartDiagnostics.captureSnapshot(target);
-                com.sanitizer.detector.SmartDiagnostics.SmartDelta smartDelta =
-                        com.sanitizer.detector.SmartDiagnostics.compareSnapshots(preWipeSnapshot, postWipeSnapshot);
+                SmartSnapshot postWipeSnapshot =
+                        SmartDiagnostics.captureSnapshot(target);
+                SmartDelta smartDelta =
+                        SmartDiagnostics.compareSnapshots(preWipeSnapshot, postWipeSnapshot);
 
                 if (smartDelta != null) {
                     appendLog("[S.M.A.R.T. INTEGRITY] " + smartDelta.integrityVerdict());
@@ -642,7 +640,7 @@ public class WipingView {
                 int certCrcErrors = (preWipeSnapshot != null) ? preWipeSnapshot.crcErrors() : 0;
                 String ifaceSummary = "OPTIMAL";
                 if (report != null && report.interfaceAnomaly() != null) {
-                    com.sanitizer.detector.SmartDiagnostics.InterfaceAnomalyResult ia = report.interfaceAnomaly();
+                    InterfaceAnomalyResult ia = report.interfaceAnomaly();
                     ifaceSummary = ia.severity().getLabel() + ": " + ia.rootCauseDiagnosis();
                 }
 
@@ -684,7 +682,7 @@ public class WipingView {
                     if (!records.isEmpty()) {
                         AuditDb.AuditRecord latest = records.get(0);
                         String pdfPath = CertificateGenerator.generateCertificate(latest);
-                        com.sanitizer.alert.AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), stdString, true, pdfPath);
+                        AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), stdString, true, pdfPath);
                         if (pdfPath != null) {
                             appendLog("[PDF] Exported PDF Certificate: " + pdfPath);
                             showAlert(Alert.AlertType.INFORMATION, "Sanitization Complete",
@@ -697,12 +695,12 @@ public class WipingView {
                                      "\n\nRSA Signature: " + signature.substring(0, 30) + "...");
                         }
                     } else {
-                        com.sanitizer.alert.AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), stdString, true, null);
+                        AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), stdString, true, null);
                     }
                 }
             } else {
                 // --- HARDWARE FAILURE & QUARANTINE ASSESSMENT BRANCH ---
-                com.sanitizer.util.SoundManager.playVerificationFailure(target.systemPath(), "Hardware defect or verification failure encountered.");
+                SoundManager.playVerificationFailure(target.systemPath(), "Hardware defect or verification failure encountered.");
                 var nav = NavigationManager.getInstance();
                 SecurityAuditLogger.logWipeAction(SecurityAuditLogger.EVENT_WIPE_FAILED,
                         nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
@@ -711,16 +709,16 @@ public class WipingView {
                 lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #EF4444;");
                 appendLog("\n⚠️ [CRITICAL DEFECT] Sector wiping encountered unrecoverable hardware I/O fault.");
 
-                com.sanitizer.detector.SmartDiagnostics.SmartSnapshot postFailSnapshot =
-                        com.sanitizer.detector.SmartDiagnostics.captureSnapshot(target);
-                com.sanitizer.detector.SmartDiagnostics.SmartDelta failDelta =
-                        com.sanitizer.detector.SmartDiagnostics.compareSnapshots(preWipeSnapshot, postFailSnapshot);
+                SmartSnapshot postFailSnapshot =
+                        SmartDiagnostics.captureSnapshot(target);
+                SmartDelta failDelta =
+                        SmartDiagnostics.compareSnapshots(preWipeSnapshot, postFailSnapshot);
 
                 int preScore = (failDelta != null && failDelta.preWipe() != null) ? failDelta.preWipe().healthScore() : 90;
                 int postScore = (failDelta != null && failDelta.postWipe() != null) ? failDelta.postWipe().healthScore() : 40;
                 String deltaSummary = failDelta != null ? failDelta.formattedSummary() : "Critical I/O Defect: Bad Sectors Encountered";
 
-                com.sanitizer.quarantine.QuarantineRecord qRecord = com.sanitizer.quarantine.QuarantineEngine.assessHardwareFailure(
+                QuarantineRecord qRecord = QuarantineEngine.assessHardwareFailure(
                         target.model(),
                         target.serial(),
                         target.formattedSize(),
@@ -733,12 +731,12 @@ public class WipingView {
                         deltaSummary
                 );
 
-                com.sanitizer.alert.AlertDispatcher.notifyQuarantineDefect(
+                AlertDispatcher.notifyQuarantineDefect(
                         target.model(), target.serial(), qRecord.quarantineId(),
                         "Unrecoverable Hardware I/O Fault (" + detectedBadSectors.size() + " bad LBAs)",
                         qRecord.destructionRecommendation().getTitle()
                 );
-                com.sanitizer.alert.AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), selectedPolicy.getName(), false, null);
+                AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), selectedPolicy.getName(), false, null);
 
                 // Save Quarantined Record to SQLite
                 AuditDb.saveRecord(
@@ -763,7 +761,7 @@ public class WipingView {
                         "SHA256:HARDWARE_QUARANTINE_NON_COMPLIANT"
                 );
 
-                String quarantinePdfPath = com.sanitizer.quarantine.QuarantineReportGenerator.generatePdfReport(qRecord);
+                String quarantinePdfPath = QuarantineReportGenerator.generatePdfReport(qRecord);
                 if (quarantinePdfPath != null) {
                     appendLog("[QUARANTINE REPORT] Generated Physical Destruction Order: " + quarantinePdfPath);
                 }
@@ -806,7 +804,7 @@ public class WipingView {
         });
 
         task.setOnFailed(e -> {
-            com.sanitizer.util.SoundManager.playAlertSound();
+            SoundManager.playAlertSound();
             resetCompletionGlow();
             lblLiveSpeed.setText("⚡ Speed: 0.0 MB/s");
             lblLiveEta.setText("⏳ Halted");

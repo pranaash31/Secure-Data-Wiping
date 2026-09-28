@@ -566,8 +566,8 @@ public class AuditView {
             records = AuditDb.getAllRecords();
         }
         if (records.isEmpty()) {
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
-                    "No Records", "No audit records found to export.", com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
+            NavigationManager.getInstance().showNotification(
+                    "No Records", "No audit records found to export.", ToastType.WARNING);
             return;
         }
 
@@ -608,21 +608,21 @@ public class AuditView {
         };
 
         exportTask.setOnSucceeded(ev -> {
-            var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+            var nav = NavigationManager.getInstance();
             SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), format + " Batch Export", targetFile.getAbsolutePath());
             loadSecurityHistory();
             nav.showNotification(
                     format + " Export Successful",
                     "Exported " + exportList.size() + " records to: " + targetFile.getName(),
-                    com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS
+                    ToastType.SUCCESS
             );
         });
 
         exportTask.setOnFailed(ev -> {
             Throwable ex = exportTask.getException();
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
+            NavigationManager.getInstance().showNotification(
                     "Export Failed", ex != null ? ex.getMessage() : "Unknown export error",
-                    com.sanitizer.gui.components.ToastNotification.ToastType.ERROR
+                    ToastType.ERROR
             );
         });
 
@@ -635,8 +635,8 @@ public class AuditView {
             records = AuditDb.getAllRecords();
         }
         if (records.isEmpty()) {
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
-                    "No Records", "No audit records found to export.", com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
+            NavigationManager.getInstance().showNotification(
+                    "No Records", "No audit records found to export.", ToastType.WARNING);
             return;
         }
 
@@ -664,21 +664,21 @@ public class AuditView {
         };
 
         packageTask.setOnSucceeded(ev -> {
-            var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+            var nav = NavigationManager.getInstance();
             SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Full Audit Package", targetDir.getAbsolutePath());
             loadSecurityHistory();
             nav.showNotification(
                     "Audit Package Exported",
                     "Generated CSV, JSON, and Excel reports in " + targetDir.getName(),
-                    com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS
+                    ToastType.SUCCESS
             );
         });
 
         packageTask.setOnFailed(ev -> {
             Throwable ex = packageTask.getException();
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification(
+            NavigationManager.getInstance().showNotification(
                     "Package Export Failed", ex != null ? ex.getMessage() : "Unknown error",
-                    com.sanitizer.gui.components.ToastNotification.ToastType.ERROR
+                    ToastType.ERROR
             );
         });
 
@@ -688,8 +688,8 @@ public class AuditView {
     private void handleExportPdf() {
         AuditDb.AuditRecord selected = tblAuditHistory.getSelectionModel().getSelectedItem();
         if (selected == null) {
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("No Selection",
-                    "Select an audit log entry from the table first.", com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
+            NavigationManager.getInstance().showNotification("No Selection",
+                    "Select an audit log entry from the table first.", ToastType.WARNING);
             return;
         }
 
@@ -702,34 +702,34 @@ public class AuditView {
         pdfTask.setOnSucceeded(ev -> {
             String pdfPath = pdfTask.getValue();
             if (pdfPath != null) {
-                var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+                var nav = NavigationManager.getInstance();
                 SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "PDF Sanitization Certificate", pdfPath);
                 loadSecurityHistory();
                 nav.showNotification("PDF Exported",
-                        "Certificate generated at: " + pdfPath, com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
+                        "Certificate generated at: " + pdfPath, ToastType.SUCCESS);
             } else {
-                com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Export Error",
-                        "Failed to generate PDF Certificate.", com.sanitizer.gui.components.ToastNotification.ToastType.ERROR);
+                NavigationManager.getInstance().showNotification("Export Error",
+                        "Failed to generate PDF Certificate.", ToastType.ERROR);
             }
         });
         pdfTask.setOnFailed(ev ->
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Export Error",
-                    pdfTask.getException().getMessage(), com.sanitizer.gui.components.ToastNotification.ToastType.ERROR));
+            NavigationManager.getInstance().showNotification("Export Error",
+                    pdfTask.getException().getMessage(), ToastType.ERROR));
         new Thread(pdfTask, "audit-pdf-export-thread").start();
     }
 
     private void handleExportQuarantineReport() {
         AuditDb.AuditRecord selected = tblAuditHistory.getSelectionModel().getSelectedItem();
         if (selected == null) {
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("No Selection",
-                    "Select an audit record to generate Quarantine Report.", com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
+            NavigationManager.getInstance().showNotification("No Selection",
+                    "Select an audit record to generate Quarantine Report.", ToastType.WARNING);
             return;
         }
 
         Task<String> qTask = new Task<>() {
             @Override
             protected String call() {
-                com.sanitizer.quarantine.QuarantineRecord qRecord = com.sanitizer.quarantine.QuarantineEngine.assessHardwareFailure(
+                QuarantineRecord qRecord = QuarantineEngine.assessHardwareFailure(
                         selected.driveModel(),
                         selected.serialNumber(),
                         selected.capacity(),
@@ -741,32 +741,32 @@ public class AuditView {
                         selected.postHealthScore(),
                         selected.smartDeltaSummary()
                 );
-                return com.sanitizer.quarantine.QuarantineReportGenerator.generatePdfReport(qRecord);
+                return QuarantineReportGenerator.generatePdfReport(qRecord);
             }
         };
 
         qTask.setOnSucceeded(ev -> {
             String qPath = qTask.getValue();
             if (qPath != null) {
-                var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+                var nav = NavigationManager.getInstance();
                 SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Quarantine Destruction Order", qPath);
                 loadSecurityHistory();
                 nav.showNotification("Quarantine Report Exported",
-                        "Order generated at: " + qPath, com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
+                        "Order generated at: " + qPath, ToastType.SUCCESS);
             }
         });
 
         qTask.setOnFailed(ev ->
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Report Error",
-                    qTask.getException().getMessage(), com.sanitizer.gui.components.ToastNotification.ToastType.ERROR));
+            NavigationManager.getInstance().showNotification("Report Error",
+                    qTask.getException().getMessage(), ToastType.ERROR));
         new Thread(qTask, "quarantine-pdf-thread").start();
     }
 
     private void handleVerifySignature() {
         AuditDb.AuditRecord selected = tblAuditHistory.getSelectionModel().getSelectedItem();
         if (selected == null) {
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("No Selection",
-                    "Select an audit record to verify signature.", com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
+            NavigationManager.getInstance().showNotification("No Selection",
+                    "Select an audit record to verify signature.", ToastType.WARNING);
             return;
         }
 
@@ -774,13 +774,13 @@ public class AuditView {
         boolean valid = CryptoSigner.verifySignature(payload, selected.digitalSignature());
 
         if (valid) {
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Signature Authenticated",
-                    "SHA256withRSA signature matches payload!", com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
+            NavigationManager.getInstance().showNotification("Signature Authenticated",
+                    "SHA256withRSA signature matches payload!", ToastType.SUCCESS);
             showAlert(Alert.AlertType.INFORMATION, "Signature Authenticated",
                     "VERIFICATION SUCCESSFUL\n\nThe SHA256withRSA signature matches the record payload.\nThis record is authentic and tamper-free!");
         } else {
-            com.sanitizer.gui.navigation.NavigationManager.getInstance().showNotification("Signature Mismatch",
-                    "Verification failed!", com.sanitizer.gui.components.ToastNotification.ToastType.ERROR);
+            NavigationManager.getInstance().showNotification("Signature Mismatch",
+                    "Verification failed!", ToastType.ERROR);
             showAlert(Alert.AlertType.ERROR, "Verification Failed",
                     "SIGNATURE MISMATCH\n\nThe digital signature could not be verified against the current keypair or record payload.");
         }
