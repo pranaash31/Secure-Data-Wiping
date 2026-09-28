@@ -5,7 +5,6 @@ import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
-import com.sanitizer.session.SessionAutoLockManager;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -208,7 +207,6 @@ public class CommandPaletteDialog {
             }
 
             for (int i = 0; i < currentFiltered.size(); i++) {
-                final int idx = i;
                 CommandItem cmd = currentFiltered.get(i);
                 boolean isSelected = (i == selectedIndex[0]);
                 Node row = buildCommandRow(cmd, isSelected, () -> {

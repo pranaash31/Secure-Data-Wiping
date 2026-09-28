@@ -298,6 +298,7 @@ public class IoOscilloscopeComponent extends VBox {
         sumThroughput += s;
         sumIops += i;
         sumLatency += l;
+        totalBytesRecorded += (long)(s * 1024 * 1024);
         if (s > peakThroughput) peakThroughput = s;
         if (i > peakIops) peakIops = i;
         if (l > peakLatency) peakLatency = l;
@@ -680,6 +681,7 @@ public class IoOscilloscopeComponent extends VBox {
     public synchronized double getAvgLatency() { return sampleCount > 0 ? (sumLatency / sampleCount) : 0.0; }
     public synchronized double getPeakSaturation() { return peakSaturation; }
     public synchronized int getSampleCount() { return sampleCount; }
+    public synchronized long getTotalBytesRecorded() { return totalBytesRecorded; }
     public synchronized String getBusInterfaceName() { return busInterfaceName; }
     public synchronized double getInterfaceMaxMBs() { return interfaceMaxMBs; }
     public synchronized List<IoSample> getSamples() { return java.util.Collections.unmodifiableList(new ArrayList<>(samples)); }
