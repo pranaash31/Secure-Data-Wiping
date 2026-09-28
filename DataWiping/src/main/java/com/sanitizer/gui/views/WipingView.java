@@ -1,8 +1,15 @@
 package com.sanitizer.gui.views;
 
+import com.sanitizer.alert.AlertDispatcher;
 import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
+import com.sanitizer.detector.SmartDiagnostics;
+import com.sanitizer.detector.SmartDiagnostics.HealthScoreResult;
+import com.sanitizer.detector.SmartDiagnostics.InterfaceAnomalyResult;
+import com.sanitizer.detector.SmartDiagnostics.SmartDelta;
+import com.sanitizer.detector.SmartDiagnostics.SmartReport;
+import com.sanitizer.detector.SmartDiagnostics.SmartSnapshot;
 import com.sanitizer.detector.ThermalPolicy;
 import com.sanitizer.detector.ThermalPolicyManager;
 import com.sanitizer.detector.UsbDetector;
@@ -15,6 +22,11 @@ import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
+import com.sanitizer.quarantine.LbaFailureRecord;
+import com.sanitizer.quarantine.QuarantineEngine;
+import com.sanitizer.quarantine.QuarantineRecord;
+import com.sanitizer.quarantine.QuarantineReportGenerator;
+import com.sanitizer.util.SoundManager;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
