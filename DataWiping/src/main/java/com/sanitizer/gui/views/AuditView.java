@@ -5,7 +5,6 @@ import com.sanitizer.audit.SecurityAuditRecord;
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.esg.EsgCalculator;
-import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.pdf.CertificateGenerator;

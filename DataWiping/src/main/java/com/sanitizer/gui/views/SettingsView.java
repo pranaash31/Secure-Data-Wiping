@@ -13,7 +13,6 @@ import com.sanitizer.detector.ThermalPolicyManager;
 import com.sanitizer.engine.WipeVerifier;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.components.HeatmapPalette;
-import com.sanitizer.gui.components.ToastNotification;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;

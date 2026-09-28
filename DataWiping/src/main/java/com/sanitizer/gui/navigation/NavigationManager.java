@@ -4,11 +4,25 @@ import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.components.CommandPaletteDialog;
-import com.sanitizer.gui.views.*;
+import com.sanitizer.gui.views.AuditView;
+import com.sanitizer.gui.views.BatchWipeView;
+import com.sanitizer.gui.views.ClientManagerView;
+import com.sanitizer.gui.views.DashboardView;
+import com.sanitizer.gui.views.DiskDiagnosticView;
+import com.sanitizer.gui.views.HeroView;
+import com.sanitizer.gui.views.KeyVaultView;
+import com.sanitizer.gui.views.LockScreenOverlay;
+import com.sanitizer.gui.views.LoginView;
+import com.sanitizer.gui.views.MainLayout;
+import com.sanitizer.gui.views.SettingsView;
+import com.sanitizer.gui.views.VerificationPortalView;
+import com.sanitizer.gui.views.WipeWizardView;
+import com.sanitizer.gui.views.WipingView;
 import com.sanitizer.i18n.I18n;
 import com.sanitizer.session.SessionAutoLockManager;
 import com.sanitizer.session.SessionContext;
 import com.sanitizer.session.UserRole;
+import com.sanitizer.update.UpdateManager;
 import com.sanitizer.util.AppLogger;
 import javafx.application.Platform;
 import javafx.geometry.Rectangle2D;
@@ -175,7 +189,7 @@ public class NavigationManager {
         navigateTo("dashboard");
 
         // Asynchronous background update verification
-        com.sanitizer.update.UpdateManager.getInstance().checkForUpdatesAsync();
+        UpdateManager.getInstance().checkForUpdatesAsync();
     }
 
     // ── Global Keyboard Shortcuts & Accessibility Accelerators ─────────────────
