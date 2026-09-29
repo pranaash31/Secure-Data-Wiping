@@ -3,8 +3,10 @@ package com.sanitizer.gui.components;
 import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.UsbDetector;
+import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
+import com.sanitizer.update.UpdateManager;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -359,57 +361,57 @@ public class CommandPaletteDialog {
         items.add(new CommandItem("wipe_nist", "Start NIST SP 800-88 Rev. 1 Clear (1-Pass)", "Switch to Sanitizer view configured with NIST 800-88 Clear policy",
                 Category.WIPE_ACTION, "🛡️", "", List.of("nist", "800-88", "clear", "single", "zero"), () -> {
             navManager.navigateTo("wiping");
-            navManager.showNotification("NIST SP 800-88 Ready", "Configured for NIST SP 800-88 Rev. 1 Clear", ToastNotification.ToastType.INFO);
+            navManager.showNotification("NIST SP 800-88 Ready", "Configured for NIST SP 800-88 Rev. 1 Clear", ToastType.INFO);
         }));
 
         items.add(new CommandItem("wipe_dod_3p", "Start DoD 5220.22-M Standard (3-Pass)", "Switch to Sanitizer configured with US Department of Defense 3-pass overwrite",
                 Category.WIPE_ACTION, "🛡️", "", List.of("dod", "5220.22", "3-pass", "military"), () -> {
             navManager.navigateTo("wiping");
-            navManager.showNotification("DoD 5220.22-M Ready", "Configured for DoD 5220.22-M (3-Pass Standard)", ToastNotification.ToastType.INFO);
+            navManager.showNotification("DoD 5220.22-M Ready", "Configured for DoD 5220.22-M (3-Pass Standard)", ToastType.INFO);
         }));
 
         items.add(new CommandItem("wipe_dod_7p", "Start DoD 5220.22-M ECE (7-Pass Enhanced)", "Switch to Sanitizer configured with 7-pass military grade sanitization",
                 Category.WIPE_ACTION, "🛡️", "", List.of("dod", "ece", "7-pass", "deep", "military"), () -> {
             navManager.navigateTo("wiping");
-            navManager.showNotification("DoD 5220.22-M ECE Ready", "Configured for DoD 5220.22-M ECE (7-Pass Enhanced)", ToastNotification.ToastType.INFO);
+            navManager.showNotification("DoD 5220.22-M ECE Ready", "Configured for DoD 5220.22-M ECE (7-Pass Enhanced)", ToastType.INFO);
         }));
 
         items.add(new CommandItem("wipe_crypto", "Start Cryptographic Erase / Random Fill", "1-Pass cryptographic pseudorandom high-entropy overwrite",
                 Category.WIPE_ACTION, "🎲", "", List.of("crypto", "random", "pseudo", "entropy"), () -> {
             navManager.navigateTo("wiping");
-            navManager.showNotification("Crypto Erase Ready", "Configured for Cryptographic Pseudo-Random Erase", ToastNotification.ToastType.INFO);
+            navManager.showNotification("Crypto Erase Ready", "Configured for Cryptographic Pseudo-Random Erase", ToastType.INFO);
         }));
 
         // ── 🔌 HARDWARE & DISK TOOLS ─────────────────────────────────────
         items.add(new CommandItem("hw_rescan", "Rescan & Detect Connected Drives", "Trigger hardware bus inspection for USB flash, NVMe and external storage",
                 Category.HARDWARE, "🔄", "", List.of("rescan", "refresh", "drives", "detect", "usb", "nvme"), () -> {
             List<UsbDetector.UsbDriveInfo> drives = UsbDetector.getConnectedUsbDrives();
-            navManager.showNotification("Hardware Scan Complete", drives.size() + " storage drive(s) detected.", ToastNotification.ToastType.SUCCESS);
+            navManager.showNotification("Hardware Scan Complete", drives.size() + " storage drive(s) detected.", ToastType.SUCCESS);
         }));
 
         // ── 🎨 THEMES & DISPLAY ──────────────────────────────────────────
         items.add(new CommandItem("theme_light", "Switch Theme: Executive Light Theme", "Clean, high-contrast modern startup theme",
                 Category.THEME, "☀️", "", List.of("theme", "light", "white", "executive"), () -> {
             AccessibilityManager.setTheme(AccessibilityManager.Theme.LIGHT);
-            navManager.showNotification("Theme Updated", "Executive Light Theme activated", ToastNotification.ToastType.INFO);
+            navManager.showNotification("Theme Updated", "Executive Light Theme activated", ToastType.INFO);
         }));
 
         items.add(new CommandItem("theme_dark", "Switch Theme: Government Dark Mode", "Sleek obsidian dark UI with reduced eye fatigue",
                 Category.THEME, "🌙", "Ctrl+T", List.of("theme", "dark", "night", "obsidian", "black"), () -> {
             AccessibilityManager.setTheme(AccessibilityManager.Theme.DARK);
-            navManager.showNotification("Theme Updated", "Government Dark Theme activated", ToastNotification.ToastType.INFO);
+            navManager.showNotification("Theme Updated", "Government Dark Theme activated", ToastType.INFO);
         }));
 
         items.add(new CommandItem("theme_hc_dark", "Switch Theme: High-Contrast Dark (WCAG AAA)", "Pitch-black background with vivid yellow focus (≥7:1 contrast)",
                 Category.THEME, "⚡", "Ctrl+H", List.of("theme", "contrast", "wcag", "aaa", "yellow"), () -> {
             AccessibilityManager.setTheme(AccessibilityManager.Theme.HIGH_CONTRAST_DARK);
-            navManager.showNotification("High-Contrast Mode", "High-Contrast Dark Theme (WCAG AAA) activated", ToastNotification.ToastType.INFO);
+            navManager.showNotification("High-Contrast Mode", "High-Contrast Dark Theme (WCAG AAA) activated", ToastType.INFO);
         }));
 
         items.add(new CommandItem("theme_hc_light", "Switch Theme: High-Contrast Light (WCAG AAA)", "Pure white background with deep black borders (≥7:1 contrast)",
                 Category.THEME, "👁️", "", List.of("theme", "contrast", "wcag", "aaa", "high"), () -> {
             AccessibilityManager.setTheme(AccessibilityManager.Theme.HIGH_CONTRAST_LIGHT);
-            navManager.showNotification("High-Contrast Mode", "High-Contrast Light Theme (WCAG AAA) activated", ToastNotification.ToastType.INFO);
+            navManager.showNotification("High-Contrast Mode", "High-Contrast Light Theme (WCAG AAA) activated", ToastType.INFO);
         }));
 
         items.add(new CommandItem("a11y_zoom_in", "Increase Font Size & Zoom (A+)", "Scale text up to 125%, 150%, 175%, or 200%",
@@ -442,9 +444,9 @@ public class CommandPaletteDialog {
                 Category.AUDIT, "⛓️", "", List.of("verify", "ledger", "tamper", "blockchain", "sha256"), () -> {
             var result = AuditDb.verifyDatabaseIntegrity();
             if (result.isFullyValid()) {
-                navManager.showNotification("Ledger Integrity Verified", "All " + result.totalRecordsChecked() + " audit records cryptographically verified (0 defects).", ToastNotification.ToastType.SUCCESS);
+                navManager.showNotification("Ledger Integrity Verified", "All " + result.totalRecordsChecked() + " audit records cryptographically verified (0 defects).", ToastType.SUCCESS);
             } else {
-                navManager.showNotification("Ledger Warning", "Ledger anomalies detected: " + result.anomalies().size() + " issue(s)", ToastNotification.ToastType.WARNING);
+                navManager.showNotification("Ledger Warning", "Ledger anomalies detected: " + result.anomalies().size() + " issue(s)", ToastType.WARNING);
             }
         }));
 
@@ -459,8 +461,8 @@ public class CommandPaletteDialog {
 
         items.add(new CommandItem("sec_updates", "Check for Application Updates", "Verify signature and download latest security patches",
                 Category.SECURITY, "🔄", "", List.of("update", "version", "patch", "upgrade"), () -> {
-            com.sanitizer.update.UpdateManager.getInstance().checkForUpdatesAsync();
-            navManager.showNotification("Checking Updates", "Querying central repository for security patches...", ToastNotification.ToastType.INFO);
+            UpdateManager.getInstance().checkForUpdatesAsync();
+            navManager.showNotification("Checking Updates", "Querying central repository for security patches...", ToastType.INFO);
         }));
 
         items.add(new CommandItem("sec_logout", "Sign Out / Terminate Session", "End current officer session and return to landing page",
@@ -489,7 +491,7 @@ public class CommandPaletteDialog {
                         List.of(d.systemPath(), d.model(), d.serial(), "wipe", "sanitize"),
                         () -> {
                             navManager.navigateTo("wiping");
-                            navManager.showNotification("Target Selected", "Selected " + d.model() + " (" + d.systemPath() + ")", ToastNotification.ToastType.INFO);
+                            navManager.showNotification("Target Selected", "Selected " + d.model() + " (" + d.systemPath() + ")", ToastType.INFO);
                         }
                 ));
 
@@ -503,7 +505,7 @@ public class CommandPaletteDialog {
                         List.of(d.systemPath(), d.model(), d.serial(), "smart", "diagnostic", "health"),
                         () -> {
                             navManager.navigateTo("diagnostics");
-                            navManager.showNotification("Diagnostic Target", "Loaded " + d.model() + " (" + d.systemPath() + ")", ToastNotification.ToastType.INFO);
+                            navManager.showNotification("Diagnostic Target", "Loaded " + d.model() + " (" + d.systemPath() + ")", ToastType.INFO);
                         }
                 ));
             }
@@ -534,7 +536,7 @@ public class CommandPaletteDialog {
                                 List.of("audit", "log", idStr, rec.serialNumber(), rec.driveModel()),
                                 () -> {
                                     navManager.navigateTo("audit");
-                                    navManager.showNotification("Audit Record #" + rec.id(), "Navigated to compliance record #" + rec.id(), ToastNotification.ToastType.INFO);
+                                    navManager.showNotification("Audit Record #" + rec.id(), "Navigated to compliance record #" + rec.id(), ToastType.INFO);
                                 }
                         ));
                     }

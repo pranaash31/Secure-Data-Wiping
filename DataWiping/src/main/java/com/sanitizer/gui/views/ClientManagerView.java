@@ -1,6 +1,7 @@
 package com.sanitizer.gui.views;
 
-import com.sanitizer.gui.components.ToastNotification;
+import com.sanitizer.db.AuditDb;
+import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -52,7 +53,7 @@ public class ClientManagerView {
     }
 
     private void initDefaultData() {
-        int totalAuditWipes = com.sanitizer.db.AuditDb.getAllRecords().size();
+        int totalAuditWipes = AuditDb.getAllRecords().size();
         masterClientList.addAll(
                 new ClientRecord("Ministry of Defense, India", "Defense", List.of("DoD 5220.22-M", "NIST 800-88", "FIPS 140-2"), "ACTIVE", (totalAuditWipes + 12) + " wipes", "badge-success"),
                 new ClientRecord("National Cyber Security Centre", "Government", List.of("NIST 800-88", "ISO 27001"), "ACTIVE", "8 wipes", "badge-success"),
@@ -283,7 +284,7 @@ public class ClientManagerView {
             masterClientList.add(0, c);
             renderFilteredClients();
             NavigationManager.getInstance().showNotification("Client Registered",
-                    "Added " + c.name + " to Client Registry.", ToastNotification.ToastType.SUCCESS);
+                    "Added " + c.name + " to Client Registry.", ToastType.SUCCESS);
         });
     }
 
@@ -310,7 +311,7 @@ public class ClientManagerView {
                 record.name = newName.trim();
                 renderFilteredClients();
                 NavigationManager.getInstance().showNotification("Profile Updated",
-                        "Updated organization name to: " + newName, ToastNotification.ToastType.INFO);
+                        "Updated organization name to: " + newName, ToastType.INFO);
             }
         });
     }
@@ -326,13 +327,13 @@ public class ClientManagerView {
             masterClientList.remove(record);
             renderFilteredClients();
             NavigationManager.getInstance().showNotification("Client Removed",
-                    "Removed " + record.name + " from registry.", ToastNotification.ToastType.WARNING);
+                    "Removed " + record.name + " from registry.", ToastType.WARNING);
         }
     }
 
     private void handleExportReport() {
         NavigationManager.getInstance().showNotification("Report Exported",
-                "Client compliance metrics report exported to PDF.", ToastNotification.ToastType.SUCCESS);
+                "Client compliance metrics report exported to PDF.", ToastType.SUCCESS);
     }
 
     private VBox makeStatMini(String label, String value, String color) {

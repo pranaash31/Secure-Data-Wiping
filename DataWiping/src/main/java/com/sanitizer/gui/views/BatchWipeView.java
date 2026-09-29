@@ -1,17 +1,20 @@
 package com.sanitizer.gui.views;
 
+import com.sanitizer.alert.AlertDispatcher;
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
+import com.sanitizer.detector.SmartDiagnostics;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
 import com.sanitizer.engine.WipeMetrics;
 import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
-import com.sanitizer.gui.components.ToastNotification;
+import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
+import com.sanitizer.shield.WorkerPoolGovernor;
 import com.sanitizer.util.SoundManager;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -246,7 +249,7 @@ public class BatchWipeView {
                 NavigationManager.getInstance().showNotification(
                         "CRITICAL: DRIVE DISCONNECTED MID-WIPE",
                         "Target device (" + activePath + ") was disconnected prematurely during active sector sanitization!",
-                        ToastNotification.ToastType.ERROR
+                        ToastType.ERROR
                 );
             }
         }
@@ -336,7 +339,7 @@ public class BatchWipeView {
 
         // 2. Concurrency Utilization
         if (lblConcurrency != null) {
-            com.sanitizer.shield.WorkerPoolGovernor gov = com.sanitizer.shield.WorkerPoolGovernor.getInstance();
+            WorkerPoolGovernor gov = WorkerPoolGovernor.getInstance();
             int govActive = gov.getActiveSlotCount();
             int displayActive = Math.max(activeCount, govActive);
             int pct = (int) Math.round(((double) displayActive / poolCap) * 100);
@@ -404,7 +407,7 @@ public class BatchWipeView {
 
         SoundManager.playStartTone();
         NavigationManager.getInstance().showNotification("Batch Sanitization Dispatched",
-                "Spawning parallel wiping threads for " + drives.size() + " drives.", ToastNotification.ToastType.INFO);
+                "Spawning parallel wiping threads for " + drives.size() + " drives.", ToastType.INFO);
 
         btnRunAll.setDisable(true);
         btnStopAll.setDisable(false);
@@ -436,7 +439,7 @@ public class BatchWipeView {
         btnStopAll.setDisable(true);
 
         NavigationManager.getInstance().showNotification("EMERGENCY STOP EXECUTED",
-                "Successfully halted " + stopped + " active background wipe operation(s).", ToastNotification.ToastType.WARNING);
+                "Successfully halted " + stopped + " active background wipe operation(s).", ToastType.WARNING);
         updateSummaryStatus();
         updateAmbientDashboard();
     }
@@ -463,7 +466,7 @@ public class BatchWipeView {
         private final Button btnInspect;
 
         private WipeMetrics lastMetrics;
-        private com.sanitizer.detector.SmartDiagnostics.SmartSnapshot preWipeSnapshot;
+        private SmartDiagnostics.SmartSnapshot preWipeSnapshot;
         private String preWipeIfaceSummary = "OPTIMAL"; // Populated from pre-wipe SMART report
         private int preWipeCrcErrors = 0;
 
@@ -493,13 +496,13 @@ public class BatchWipeView {
             HBox.setHgrow(infoBox, Priority.ALWAYS);
 
             // Pre-Wipe Health Assessment Check
-            com.sanitizer.detector.SmartDiagnostics.SmartReport report =
-                    com.sanitizer.detector.SmartDiagnostics.inspectDrive(drive);
+            SmartDiagnostics.SmartReport report =
+                    SmartDiagnostics.inspectDrive(drive);
             int healthScore = report != null ? report.healthScore().score() : 100;
-            com.sanitizer.detector.SmartDiagnostics.HealthStatus hStatus = report != null ? report.healthScore().status() : com.sanitizer.detector.SmartDiagnostics.HealthStatus.HEALTHY;
+            SmartDiagnostics.HealthStatus hStatus = report != null ? report.healthScore().status() : SmartDiagnostics.HealthStatus.HEALTHY;
             // Capture interface anomaly summary for certificate
             if (report != null && report.interfaceAnomaly() != null) {
-                com.sanitizer.detector.SmartDiagnostics.InterfaceAnomalyResult ia = report.interfaceAnomaly();
+                SmartDiagnostics.InterfaceAnomalyResult ia = report.interfaceAnomaly();
                 preWipeIfaceSummary = ia.severity().getLabel() + ": " + ia.rootCauseDiagnosis();
                 preWipeCrcErrors = ia.crcErrors();
             }
@@ -604,7 +607,7 @@ public class BatchWipeView {
             heatmap.reset(drive.sizeBytes());
 
             // Capture Point-in-time Pre-Wipe S.M.A.R.T. Snapshot
-            preWipeSnapshot = com.sanitizer.detector.SmartDiagnostics.captureSnapshot(drive);
+            preWipeSnapshot = SmartDiagnostics.captureSnapshot(drive);
 
             WipePolicy selectedPolicy = cmbStandard.getValue() != null
                     ? cmbStandard.getValue() : WipePolicyManager.getInstance().getDefaultPolicy();
@@ -670,7 +673,7 @@ public class BatchWipeView {
             NavigationManager.getInstance().showNotification(
                     "Granular Abort Executed",
                     drive.model() + " (" + drive.systemPath() + ") sanitization halted. Other active wipes remain running.",
-                    ToastNotification.ToastType.WARNING
+                    ToastType.WARNING
             );
             updateSummaryStatus();
             updateAmbientDashboard();
@@ -712,10 +715,10 @@ public class BatchWipeView {
                 heatmap.setCompleted();
 
                 // Compute S.M.A.R.T. Wear & Integrity Delta
-                com.sanitizer.detector.SmartDiagnostics.SmartSnapshot postWipeSnapshot =
-                        com.sanitizer.detector.SmartDiagnostics.captureSnapshot(drive);
-                com.sanitizer.detector.SmartDiagnostics.SmartDelta smartDelta =
-                        com.sanitizer.detector.SmartDiagnostics.compareSnapshots(preWipeSnapshot, postWipeSnapshot);
+                SmartDiagnostics.SmartSnapshot postWipeSnapshot =
+                        SmartDiagnostics.captureSnapshot(drive);
+                SmartDiagnostics.SmartDelta smartDelta =
+                        SmartDiagnostics.compareSnapshots(preWipeSnapshot, postWipeSnapshot);
 
                 int preScore = (smartDelta != null && smartDelta.preWipe() != null) ? smartDelta.preWipe().healthScore() : 100;
                 int postScore = (smartDelta != null && smartDelta.postWipe() != null) ? smartDelta.postWipe().healthScore() : 100;
@@ -753,11 +756,11 @@ public class BatchWipeView {
                     pdfPath = CertificateGenerator.generateCertificate(recs.get(0));
                 }
 
-                com.sanitizer.alert.AlertDispatcher.notifySingleWipeCompleted(
+                AlertDispatcher.notifySingleWipeCompleted(
                         drive.model(), drive.serial(), policy.getName(), true, pdfPath);
 
                 NavigationManager.getInstance().showNotification("Drive Sanitized",
-                        drive.model() + " sanitized & certified. S.M.A.R.T. Delta: " + deltaSummary, ToastNotification.ToastType.SUCCESS);
+                        drive.model() + " sanitized & certified. S.M.A.R.T. Delta: " + deltaSummary, ToastType.SUCCESS);
             } else {
                 SoundManager.playVerificationFailure(drive.systemPath(), "Batch sanitization failed.");
                 statusBadge.setText("FAILED");
@@ -766,11 +769,11 @@ public class BatchWipeView {
                 passBadge.setStyle("-fx-font-size: 11px; -fx-background-color: #FEE2E2; -fx-text-fill: #991B1B; -fx-padding: 4 10; -fx-background-radius: 6px; -fx-font-weight: bold;");
                 heatmap.setAborted();
 
-                com.sanitizer.alert.AlertDispatcher.notifySingleWipeCompleted(
+                AlertDispatcher.notifySingleWipeCompleted(
                         drive.model(), drive.serial(), policy.getName(), false, null);
 
                 NavigationManager.getInstance().showNotification("Wipe Failed",
-                        drive.model() + " sanitization failed.", ToastNotification.ToastType.ERROR);
+                        drive.model() + " sanitization failed.", ToastType.ERROR);
             }
 
             btnAbort.setVisible(false);
@@ -792,7 +795,7 @@ public class BatchWipeView {
                     totalBytes += c.drive.sizeBytes();
                 }
                 String volStr = String.format(java.util.Locale.US, "%.1f GB", totalBytes / (1024.0 * 1024.0 * 1024.0));
-                com.sanitizer.alert.AlertDispatcher.notifyBatchWipeCompleted(totalDrives, totalDrives, 0, volStr, 60);
+                AlertDispatcher.notifyBatchWipeCompleted(totalDrives, totalDrives, 0, volStr, 60);
             }
         }
 

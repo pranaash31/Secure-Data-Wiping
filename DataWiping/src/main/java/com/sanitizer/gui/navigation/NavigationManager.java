@@ -4,6 +4,8 @@ import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.components.CommandPaletteDialog;
+import com.sanitizer.gui.components.ToastNotification;
+import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.views.AuditView;
 import com.sanitizer.gui.views.BatchWipeView;
 import com.sanitizer.gui.views.ClientManagerView;
@@ -80,7 +82,7 @@ public class NavigationManager {
             public void onSessionUnlocked() {
                 Platform.runLater(() -> {
                     showNotification("Session Restored", "Welcome back, " + getOfficerName(),
-                            com.sanitizer.gui.components.ToastNotification.ToastType.SUCCESS);
+                            ToastType.SUCCESS);
                 });
             }
         });
@@ -360,7 +362,7 @@ public class NavigationManager {
         ));
         alert.showAndWait();
         showNotification("Access Denied", "Insufficient role clearance for " + resourceName,
-                com.sanitizer.gui.components.ToastNotification.ToastType.WARNING);
+                ToastType.WARNING);
     }
 
     public void logout() {
@@ -379,9 +381,9 @@ public class NavigationManager {
     }
 
     // ── Toast Notifications ──────────────────────────────────────────────────
-    public void showNotification(String title, String message, com.sanitizer.gui.components.ToastNotification.ToastType type) {
+    public void showNotification(String title, String message, ToastType type) {
         if (primaryStage != null) {
-            com.sanitizer.gui.components.ToastNotification.show(primaryStage, title, message, type);
+            ToastNotification.show(primaryStage, title, message, type);
         }
     }
 

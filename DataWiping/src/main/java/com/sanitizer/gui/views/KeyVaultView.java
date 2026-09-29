@@ -2,7 +2,7 @@ package com.sanitizer.gui.views;
 
 import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.crypto.CryptoSigner;
-import com.sanitizer.gui.components.ToastNotification;
+import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.session.UserRole;
 import javafx.geometry.Insets;
@@ -206,7 +206,7 @@ public class KeyVaultView {
         btnSaveCert.setOnAction(e -> {
             updatePreviewCard();
             NavigationManager.getInstance().showNotification("Config Saved",
-                    "Certificate template configuration saved.", ToastNotification.ToastType.SUCCESS);
+                    "Certificate template configuration saved.", ToastType.SUCCESS);
         });
 
         Button btnPreview = new Button("Preview Certificate");
@@ -285,7 +285,7 @@ public class KeyVaultView {
             SecurityAuditLogger.logKeyAction(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "ROTATED_KEYPAIR", newKeyId);
 
             NavigationManager.getInstance().showNotification("Keypair Rotated",
-                    "Generated new RSA-2048 signing keypair successfully.", ToastNotification.ToastType.SUCCESS);
+                    "Generated new RSA-2048 signing keypair successfully.", ToastType.SUCCESS);
         }
     }
 
@@ -311,10 +311,10 @@ public class KeyVaultView {
                 SecurityAuditLogger.logKeyAction(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "EXPORTED_" + keyType.toUpperCase(), file.getAbsolutePath());
 
                 NavigationManager.getInstance().showNotification("Key Exported",
-                        "Saved " + keyType + " to " + file.getName(), ToastNotification.ToastType.SUCCESS);
+                        "Saved " + keyType + " to " + file.getName(), ToastType.SUCCESS);
             } catch (IOException ex) {
                 NavigationManager.getInstance().showNotification("Export Error",
-                        "Failed to export key file: " + ex.getMessage(), ToastNotification.ToastType.ERROR);
+                        "Failed to export key file: " + ex.getMessage(), ToastType.ERROR);
             }
         }
     }

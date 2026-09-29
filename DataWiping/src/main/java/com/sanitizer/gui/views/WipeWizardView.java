@@ -5,7 +5,7 @@ import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.SmartDiagnostics;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
-import com.sanitizer.gui.components.ToastNotification;
+import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.policy.WipePolicy;
@@ -633,7 +633,7 @@ public class WipeWizardView {
                 try {
                     java.awt.Desktop.getDesktop().open(new File(pdfPath));
                 } catch (Exception ex) {
-                    NavigationManager.getInstance().showNotification("Certificate Saved", "Saved to " + pdfPath, ToastNotification.ToastType.SUCCESS);
+                    NavigationManager.getInstance().showNotification("Certificate Saved", "Saved to " + pdfPath, ToastType.SUCCESS);
                 }
             }
         });
@@ -712,7 +712,7 @@ public class WipeWizardView {
 
                 completionSuccessBox.setVisible(true);
                 completionSuccessBox.setManaged(true);
-                NavigationManager.getInstance().showNotification("Sanitization Complete", "Certificate successfully issued for " + selectedDrive.model(), ToastNotification.ToastType.SUCCESS);
+                NavigationManager.getInstance().showNotification("Sanitization Complete", "Certificate successfully issued for " + selectedDrive.model(), ToastType.SUCCESS);
             }
         });
 

@@ -6,7 +6,7 @@ import com.sanitizer.detector.ThermalPolicy;
 import com.sanitizer.detector.ThermalPolicyManager;
 import com.sanitizer.gui.components.IoOscilloscopeComponent;
 import com.sanitizer.gui.components.ThermalGraphComponent;
-import com.sanitizer.gui.components.ToastNotification;
+import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -583,7 +583,7 @@ public class DiskDiagnosticView {
         NavigationManager.getInstance().showNotification(
                 "S.M.A.R.T. Self-Test Initiated",
                 "Querying low-level controller registers and sector health for " + drive.model(),
-                ToastNotification.ToastType.INFO
+                ToastType.INFO
         );
 
         loadSelectedDriveDiagnostics();

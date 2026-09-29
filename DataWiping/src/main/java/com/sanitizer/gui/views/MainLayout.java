@@ -4,9 +4,11 @@ import com.sanitizer.a11y.AccessibilityManager;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.components.ToastNotification;
+import com.sanitizer.gui.components.UpdateDialog;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
 import com.sanitizer.session.UserRole;
+import com.sanitizer.update.UpdateManager;
 import javafx.geometry.Pos;
 import javafx.scene.AccessibleRole;
 import javafx.scene.Node;
@@ -194,12 +196,12 @@ public class MainLayout {
         btnUpdate.setTooltip(new Tooltip("Check for latest updates and security patches"));
         btnUpdate.setOnAction(e -> {
             btnUpdate.setText("Checking...");
-            com.sanitizer.update.UpdateManager.getInstance().checkForUpdatesAsync().whenComplete((info, err) -> {
+            UpdateManager.getInstance().checkForUpdatesAsync().whenComplete((info, err) -> {
                 javafx.application.Platform.runLater(() -> {
-                    if (info != null && info.isNewerThan(com.sanitizer.update.UpdateManager.CURRENT_VERSION)) {
+                    if (info != null && info.isNewerThan(UpdateManager.CURRENT_VERSION)) {
                         btnUpdate.setText("🚀 Update v" + info.getVersion());
                         btnUpdate.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: #0284c7; -fx-text-fill: #ffffff;");
-                        com.sanitizer.gui.components.UpdateDialog.show((Stage) rootPane.getScene().getWindow(), info);
+                        UpdateDialog.show((Stage) rootPane.getScene().getWindow(), info);
                     } else {
                         btnUpdate.setText("✓ Up to Date");
                         btnUpdate.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #10b981;");
@@ -210,8 +212,8 @@ public class MainLayout {
         AccessibilityManager.setupAccessible(btnUpdate, "Software Updates", "Check for software updates and patches", AccessibleRole.BUTTON);
 
         // Register UpdateManager listener for automatic background notification
-        com.sanitizer.update.UpdateManager.getInstance().addUpdateListener(info -> {
-            if (info != null && info.isNewerThan(com.sanitizer.update.UpdateManager.CURRENT_VERSION)) {
+        UpdateManager.getInstance().addUpdateListener(info -> {
+            if (info != null && info.isNewerThan(UpdateManager.CURRENT_VERSION)) {
                 javafx.application.Platform.runLater(() -> {
                     btnUpdate.setText("🚀 Update v" + info.getVersion());
                     btnUpdate.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: #0284c7; -fx-text-fill: #ffffff;");
