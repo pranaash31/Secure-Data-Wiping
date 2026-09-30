@@ -6,7 +6,6 @@ import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
 import com.sanitizer.session.UserRole;
 import javafx.animation.FadeTransition;
-import javafx.animation.TranslateTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.AccessibleRole;
@@ -19,32 +18,24 @@ import javafx.util.StringConverter;
 import java.util.Locale;
 
 /**
- * Enterprise-grade, clean and professional LoginView for SecureErase Pro.
- * Features:
- * - Responsive split-screen cybersecurity layout
- * - Real-time system and cryptographic status indicator
- * - Clear multi-tier RBAC authorization breakdown
- * - Password visibility toggle (Show / Hide PIN)
- * - Dynamic Language (i18n) & Visual Theme switcher
- * - 1-Click Quick Demonstration Profiles for Instant Testing
- * - Inline validation feedback with smooth animations
- * - Full Section 508 / WCAG 2.1 AA Accessibility support
+ * Formal, institutional Government Authentication Portal for SecureErase Pro.
+ * Adheres to USDS / DoD / NIST system access interface standards:
+ * - Official Classification Banner & System Identification
+ * - Mandatory Legal Warning & Consent Notice
+ * - Role-Based Clearance Selector
+ * - Clean, standard credential inputs with no extraneous elements
+ * - Formal, accessible typography and high-contrast color scheme
  */
 public class LoginView {
 
     private final StackPane rootPane = new StackPane();
     private final NavigationManager navManager;
 
-    // Form inputs
     private ComboBox<UserRole> cmbRole;
     private TextField txtAgency;
     private TextField txtUser;
     private PasswordField txtPass;
-    private TextField txtPassVisible;
-    private Button btnTogglePassword;
-    private boolean isPasswordVisible = false;
-    private VBox alertBanner;
-    private Label lblAlertText;
+    private Label lblError;
 
     public LoginView(NavigationManager navManager) {
         this.navManager = navManager;
@@ -57,209 +48,86 @@ public class LoginView {
 
     private void buildUi() {
         rootPane.getChildren().clear();
-        rootPane.getStyleClass().add("login-root");
+        rootPane.getStyleClass().add("gov-login-root");
 
-        HBox splitLayout = new HBox(0);
-        splitLayout.setFillHeight(true);
+        VBox mainContainer = new VBox(0);
+        mainContainer.setAlignment(Pos.TOP_CENTER);
 
-        // ══════════════════════════════════════════════════════════════════════
-        // ── LEFT BRAND & SECURITY CLEARANCE PANEL ─────────────────────────────
-        // ══════════════════════════════════════════════════════════════════════
-        VBox brandPanel = buildLeftBrandPanel();
-        HBox.setHgrow(brandPanel, Priority.ALWAYS);
+        // 1. TOP OFFICIAL SYSTEM CLASSIFICATION BANNER
+        HBox topBanner = buildClassificationBanner();
 
-        // ══════════════════════════════════════════════════════════════════════
-        // ── RIGHT AUTHENTICATION FORM PANEL ───────────────────────────────────
-        // ══════════════════════════════════════════════════════════════════════
-        VBox formPanel = buildRightFormPanel();
-        HBox.setHgrow(formPanel, Priority.ALWAYS);
+        // 2. MAIN PORTAL BODY (Centered Scrollable Container)
+        ScrollPane scrollPane = new ScrollPane();
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        scrollPane.getStyleClass().add("gov-scroll-pane");
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 
-        splitLayout.getChildren().addAll(brandPanel, formPanel);
+        VBox contentWrapper = new VBox(24);
+        contentWrapper.setAlignment(Pos.CENTER);
+        contentWrapper.setPadding(new Insets(32, 24, 40, 24));
 
-        rootPane.getChildren().add(splitLayout);
+        // Official Agency & System Header
+        VBox institutionalHeader = buildInstitutionalHeader();
+
+        // Official Warning Banner (Mandatory Notice)
+        VBox legalNoticeBox = buildLegalNoticeBox();
+
+        // Formal Authentication Card
+        VBox authCard = buildAuthCard();
+
+        // Institutional Footer
+        VBox footerBox = buildInstitutionalFooter();
+
+        contentWrapper.getChildren().addAll(
+                institutionalHeader,
+                legalNoticeBox,
+                authCard,
+                footerBox
+        );
+
+        scrollPane.setContent(contentWrapper);
+        VBox.setVgrow(scrollPane, Priority.ALWAYS);
+
+        mainContainer.getChildren().addAll(topBanner, scrollPane);
+        rootPane.getChildren().add(mainContainer);
 
         // Apply visual theme
         AccessibilityManager.applyThemeAndScale(rootPane);
 
-        // Smooth Entrance Fade
+        // Clean Entrance Fade
         rootPane.setOpacity(0);
-        FadeTransition ft = new FadeTransition(Duration.millis(500), rootPane);
+        FadeTransition ft = new FadeTransition(Duration.millis(350), rootPane);
         ft.setFromValue(0);
         ft.setToValue(1);
         ft.play();
     }
 
-    private VBox buildLeftBrandPanel() {
-        VBox brandPanel = new VBox(22);
-        brandPanel.getStyleClass().add("login-brand-panel");
-        brandPanel.setAlignment(Pos.TOP_LEFT);
-        brandPanel.setMinWidth(460);
-        brandPanel.setMaxWidth(560);
-        brandPanel.setPadding(new Insets(36, 44, 36, 44));
+    private HBox buildClassificationBanner() {
+        HBox banner = new HBox(16);
+        banner.setAlignment(Pos.CENTER_LEFT);
+        banner.getStyleClass().add("gov-classification-banner");
+        banner.setPadding(new Insets(6, 24, 6, 24));
 
-        // 1. Back to Landing Page / Public Portal Ghost Button
-        Button btnBack = new Button("←  " + I18n.get("nav.home", "Public Portal Overview"));
-        btnBack.getStyleClass().add("login-back-btn");
-        btnBack.setOnAction(e -> navManager.showHeroView());
-        AccessibilityManager.setupAccessible(btnBack, "Return to Landing Page", "Go back to public portal overview", AccessibleRole.BUTTON);
-
-        // 2. Brand Logo Header
-        HBox logoRow = new HBox(14);
-        logoRow.setAlignment(Pos.CENTER_LEFT);
-
-        Label shieldIcon = new Label("🛡");
-        shieldIcon.getStyleClass().add("login-brand-icon");
-
-        VBox titleGroup = new VBox(2);
-        Label brandTitle = new Label(I18n.get("app.title", "SecureErase Pro"));
-        brandTitle.getStyleClass().add("login-brand-title");
-
-        HBox badgeRow = new HBox(8);
-        badgeRow.setAlignment(Pos.CENTER_LEFT);
-        Label editionBadge = new Label(I18n.get("app.edition", "ENTERPRISE v2.0"));
-        editionBadge.getStyleClass().add("login-edition-badge");
-
-        Label fipsBadge = new Label("FIPS 140-2 LEVEL 3");
-        fipsBadge.getStyleClass().add("login-fips-badge");
-        badgeRow.getChildren().addAll(editionBadge, fipsBadge);
-
-        titleGroup.getChildren().addAll(brandTitle, badgeRow);
-        logoRow.getChildren().addAll(shieldIcon, titleGroup);
-
-        // 3. Live System Security Status Pill
-        HBox statusPill = new HBox(8);
-        statusPill.setAlignment(Pos.CENTER_LEFT);
-        statusPill.getStyleClass().add("login-status-pill");
-
-        Label pulseDot = new Label("●");
-        pulseDot.setStyle("-fx-text-fill: #10B981; -fx-font-size: 11px;");
-        Label statusText = new Label("ENGINE ONLINE  •  HARDWARE HSM READY  •  AIR-GAP ISOLATED");
-        statusText.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #94A3B8; -fx-letter-spacing: 0.5px;");
-        statusPill.getChildren().addAll(pulseDot, statusText);
-
-        // 4. Headline & Narrative Subtitle
-        Label headline = new Label(I18n.get("login.brand_headline", "Military-Grade Data Sanitization Suite"));
-        headline.getStyleClass().add("login-brand-headline");
-        headline.setWrapText(true);
-
-        Label subline = new Label(I18n.get("login.brand_sub",
-                "Certified NIST SP 800-88 R1, DoD 5220.22-M, and ISO/IEC 27001 compliant wiping engine engineered for defense, government, and high-assurance enterprise storage."));
-        subline.getStyleClass().add("login-brand-subline");
-        subline.setWrapText(true);
-
-        // 5. Multi-Tier RBAC Clearance Hierarchy Showcase
-        VBox rbacContainer = new VBox(10);
-        rbacContainer.getStyleClass().add("login-rbac-container");
-
-        HBox rbacHeader = new HBox(8);
-        rbacHeader.setAlignment(Pos.CENTER_LEFT);
-        Label rbacTitle = new Label("MULTI-TIER CLEARANCE ARCHITECTURE (RBAC)");
-        rbacTitle.getStyleClass().add("login-rbac-title");
-        rbacHeader.getChildren().add(rbacTitle);
-
-        VBox tier1Card = buildRbacTierCard(
-                "TIER 1 — SANITIZATION INSPECTOR",
-                "#0284C7",
-                "Operational sanitization execution, drive diagnostics, sector verification & tamper-evident certificates.",
-                "🛡️"
-        );
-
-        VBox tier2Card = buildRbacTierCard(
-                "TIER 2 — OPERATIONS SUPERVISOR",
-                "#D97706",
-                "Sanitization policy editor, thermal thresholds watchdog, real-time alerts & client management.",
-                "⚙️"
-        );
-
-        VBox tier3Card = buildRbacTierCard(
-                "TIER 3 — CHIEF COMPLIANCE AUDITOR",
-                "#9333EA",
-                "Cryptographic ledger verification, KeyVault HSM governance, security audit logs & ESG reporting.",
-                "🔒"
-        );
-
-        rbacContainer.getChildren().addAll(rbacHeader, tier1Card, tier2Card, tier3Card);
-
-        // 6. Compliance Certification Badges
-        HBox complianceRow = new HBox(6);
-        complianceRow.setAlignment(Pos.CENTER_LEFT);
-        for (String cert : new String[]{"NIST SP 800-88", "DoD 5220.22-M", "FIPS 140-2", "ISO/IEC 27001", "HIPAA/GDPR"}) {
-            Label badge = new Label(cert);
-            badge.getStyleClass().add("login-compliance-badge");
-            complianceRow.getChildren().add(badge);
-        }
-
-        // 7. Bottom Spacer & Cryptographic Signature Note
-        Region spacer = new Region();
-        VBox.setVgrow(spacer, Priority.ALWAYS);
-
-        Label cryptoNotice = new Label("🔒 RSA-4096 & ECDSA P-384 Signatures Active  •  Tamper-Evident Ledger");
-        cryptoNotice.getStyleClass().add("login-crypto-notice");
-
-        brandPanel.getChildren().addAll(
-                btnBack,
-                logoRow,
-                statusPill,
-                headline,
-                subline,
-                rbacContainer,
-                complianceRow,
-                spacer,
-                cryptoNotice
-        );
-
-        return brandPanel;
-    }
-
-    private VBox buildRbacTierCard(String title, String accentHex, String description, String icon) {
-        VBox card = new VBox(3);
-        card.getStyleClass().add("login-tier-card");
-        card.setStyle(card.getStyle() + "-fx-border-color: " + accentHex + "40;");
-
-        HBox top = new HBox(6);
-        top.setAlignment(Pos.CENTER_LEFT);
-
-        Label iconLbl = new Label(icon);
-        iconLbl.setStyle("-fx-font-size: 11px;");
-
-        Label titleLbl = new Label(title);
-        titleLbl.setStyle("-fx-font-size: 10.5px; -fx-font-weight: bold; -fx-text-fill: " + accentHex + ";");
-
-        top.getChildren().addAll(iconLbl, titleLbl);
-
-        Label descLbl = new Label(description);
-        descLbl.getStyleClass().add("login-tier-desc");
-        descLbl.setWrapText(true);
-
-        card.getChildren().addAll(top, descLbl);
-        return card;
-    }
-
-    private VBox buildRightFormPanel() {
-        VBox formPanel = new VBox(16);
-        formPanel.getStyleClass().add("login-form-panel");
-        formPanel.setAlignment(Pos.CENTER);
-        formPanel.setPadding(new Insets(30, 48, 30, 48));
-
-        // ── TOP QUICK CONTROLS BAR (Locale + Theme) ───────────────────────────
-        HBox topControls = new HBox(12);
-        topControls.setAlignment(Pos.CENTER_RIGHT);
-        topControls.setMaxWidth(460);
+        Label classLabel = new Label("OFFICIAL USE ONLY  //  RESTRICTED INFORMATION SYSTEM");
+        classLabel.getStyleClass().add("gov-classification-text");
+        HBox.setHgrow(classLabel, Priority.ALWAYS);
 
         // Language Selector
         ComboBox<Locale> cmbLocale = new ComboBox<>();
         cmbLocale.getItems().addAll(I18n.getSupportedLocales());
         cmbLocale.setValue(I18n.getLocale());
-        cmbLocale.getStyleClass().add("login-util-combo");
+        cmbLocale.getStyleClass().add("gov-lang-select");
         cmbLocale.setConverter(new StringConverter<>() {
             @Override
             public String toString(Locale l) {
                 if (l == null) return "";
-                if (l.getLanguage().equals("fr")) return "🇫🇷 Français";
-                if (l.getLanguage().equals("es")) return "🇪🇸 Español";
-                if (l.getLanguage().equals("de")) return "🇩🇪 Deutsch";
-                if (l.getLanguage().equals("hi")) return "🇮🇳 हिन्दी";
-                return "🇺🇸 English";
+                if (l.getLanguage().equals("fr")) return "Français (FR)";
+                if (l.getLanguage().equals("es")) return "Español (ES)";
+                if (l.getLanguage().equals("de")) return "Deutsch (DE)";
+                if (l.getLanguage().equals("hi")) return "हिन्दी (HI)";
+                return "English (US)";
             }
             @Override
             public Locale fromString(String s) { return null; }
@@ -272,279 +140,236 @@ public class LoginView {
             }
         });
 
-        // Theme Toggle Button
-        Button btnTheme = new Button(AccessibilityManager.getTheme() == Theme.DARK ? "☀️ Light" : "🌙 Dark");
-        btnTheme.getStyleClass().add("login-util-btn");
+        // Theme Switcher Button
+        Button btnTheme = new Button(AccessibilityManager.getTheme() == Theme.DARK ? "Theme: Light" : "Theme: Dark");
+        btnTheme.getStyleClass().add("gov-theme-btn");
         btnTheme.setOnAction(e -> {
             AccessibilityManager.toggleDarkLight();
             AccessibilityManager.applyThemeAndScale(rootPane);
-            btnTheme.setText(AccessibilityManager.getTheme() == Theme.DARK ? "☀️ Light" : "🌙 Dark");
+            btnTheme.setText(AccessibilityManager.getTheme() == Theme.DARK ? "Theme: Light" : "Theme: Dark");
         });
 
-        topControls.getChildren().addAll(cmbLocale, btnTheme);
+        banner.getChildren().addAll(classLabel, cmbLocale, btnTheme);
+        return banner;
+    }
 
-        // ── CENTER AUTHENTICATION CARD ────────────────────────────────────────
-        VBox loginCard = new VBox(16);
-        loginCard.getStyleClass().add("login-card");
-        loginCard.setMaxWidth(460);
-        loginCard.setPadding(new Insets(32, 34, 32, 34));
+    private VBox buildInstitutionalHeader() {
+        VBox header = new VBox(6);
+        header.setAlignment(Pos.CENTER);
+        header.setMaxWidth(620);
 
-        // Card Header
-        VBox headerBox = new VBox(4);
-        headerBox.setAlignment(Pos.CENTER_LEFT);
+        Label sealLabel = new Label("NATIONAL DATA SANITIZATION & ASSURANCE SUITE");
+        sealLabel.getStyleClass().add("gov-agency-subtitle");
 
-        Label badgeLabel = new Label(I18n.get("login.portal_badge", "SECURE ACCESS GATEWAY"));
-        badgeLabel.getStyleClass().add("login-portal-pill");
+        Label mainTitle = new Label("SecureErase Pro Enterprise");
+        mainTitle.getStyleClass().add("gov-main-title");
 
-        Label loginTitle = new Label(I18n.get("login.title", "Officer Authentication"));
-        loginTitle.getStyleClass().add("login-title");
+        Label standardNotice = new Label("NIST SP 800-88 Rev. 1  •  DoD 5220.22-M  •  FIPS 140-2 Validated Cryptographic Core");
+        standardNotice.getStyleClass().add("gov-standards-label");
 
-        Label loginSub = new Label(I18n.get("login.subtitle", "Select assigned clearance role and input verification credentials."));
-        loginSub.getStyleClass().add("login-subtitle");
-        loginSub.setWrapText(true);
+        header.getChildren().addAll(sealLabel, mainTitle, standardNotice);
+        return header;
+    }
 
-        headerBox.getChildren().addAll(badgeLabel, loginTitle, loginSub);
+    private VBox buildLegalNoticeBox() {
+        VBox notice = new VBox(6);
+        notice.getStyleClass().add("gov-notice-box");
+        notice.setMaxWidth(620);
+        notice.setPadding(new Insets(12, 16, 12, 16));
 
-        // Dynamic Inline Alert / Feedback Banner (Hidden by default)
-        alertBanner = new VBox(6);
-        alertBanner.getStyleClass().add("login-alert-banner");
-        alertBanner.setVisible(false);
-        alertBanner.setManaged(false);
+        Label noticeHeader = new Label("MANDATORY SYSTEM USE NOTIFICATION");
+        noticeHeader.getStyleClass().add("gov-notice-header");
 
-        HBox alertRow = new HBox(8);
-        alertRow.setAlignment(Pos.CENTER_LEFT);
-        Label alertIcon = new Label("⚠️");
-        lblAlertText = new Label();
-        lblAlertText.getStyleClass().add("login-alert-text");
-        lblAlertText.setWrapText(true);
-        alertRow.getChildren().addAll(alertIcon, lblAlertText);
-        alertBanner.getChildren().add(alertRow);
+        Label noticeBody = new Label(
+                "You are accessing a secured Government Information System (IS) provided for authorized use only. " +
+                "By using this system, you acknowledge and consent to administrative monitoring, cryptographic logging, " +
+                "and auditing of all data sanitization operations. Unauthorized access or misuse is subject to legal prosecution under applicable federal statutes."
+        );
+        noticeBody.getStyleClass().add("gov-notice-body");
+        noticeBody.setWrapText(true);
 
-        // ── FORM FIELDS ───────────────────────────────────────────────────────
-        VBox formFields = new VBox(12);
+        notice.getChildren().addAll(noticeHeader, noticeBody);
+        return notice;
+    }
 
-        // 1. Role Clearance Selector
-        VBox roleBox = new VBox(4);
-        Label lblRole = new Label("Assigned Role Clearance (RBAC):");
-        lblRole.getStyleClass().add("form-label");
+    private VBox buildAuthCard() {
+        VBox card = new VBox(18);
+        card.getStyleClass().add("gov-auth-card");
+        card.setMaxWidth(620);
+        card.setPadding(new Insets(28, 32, 28, 32));
+
+        Label cardTitle = new Label("Officer Authentication & Clearance Verification");
+        cardTitle.getStyleClass().add("gov-card-title");
+
+        Separator sep1 = new Separator();
+
+        // Inline Error Message
+        lblError = new Label();
+        lblError.getStyleClass().add("gov-error-label");
+        lblError.setVisible(false);
+        lblError.setManaged(false);
+
+        // Form Fields
+        VBox fieldsContainer = new VBox(14);
+
+        // 1. Assigned Role Clearance (RBAC)
+        VBox roleField = new VBox(4);
+        Label lblRoleTitle = new Label("Security Clearance Role (RBAC):");
+        lblRoleTitle.getStyleClass().add("gov-field-label");
 
         cmbRole = new ComboBox<>();
         cmbRole.getItems().addAll(UserRole.values());
         cmbRole.setValue(UserRole.INSPECTOR);
         cmbRole.setMaxWidth(Double.MAX_VALUE);
-        cmbRole.getStyleClass().add("login-input-combo");
+        cmbRole.getStyleClass().add("gov-input-control");
         cmbRole.setConverter(new StringConverter<>() {
             @Override
             public String toString(UserRole r) {
                 if (r == null) return "";
-                return r.getTitle() + " (" + r.getTierLabel() + ")";
+                return r.getTitle() + " — " + r.getTierLabel();
             }
             @Override
             public UserRole fromString(String s) { return null; }
         });
-        cmbRole.setCellFactory(lv -> new ListCell<>() {
-            @Override
-            protected void updateItem(UserRole r, boolean empty) {
-                super.updateItem(r, empty);
-                if (empty || r == null) {
-                    setText(null);
-                    setGraphic(null);
-                } else {
-                    HBox cell = new HBox(8);
-                    cell.setAlignment(Pos.CENTER_LEFT);
-                    Label dot = new Label("●");
-                    dot.setStyle("-fx-text-fill: " + r.getAccentColor() + "; -fx-font-size: 13px;");
-                    Label label = new Label(r.getTitle() + " — " + r.getTierLabel());
-                    label.setStyle("-fx-font-size: 12px; -fx-font-weight: 500;");
-                    cell.getChildren().addAll(dot, label);
-                    setGraphic(cell);
-                    setText(null);
-                }
-            }
-        });
-        AccessibilityManager.setupAccessible(cmbRole, "User Role", "Select assigned clearance level", AccessibleRole.COMBO_BOX);
-        roleBox.getChildren().addAll(lblRole, cmbRole);
+        AccessibilityManager.setupAccessible(cmbRole, "Security Clearance Role", "Select assigned clearance role", AccessibleRole.COMBO_BOX);
+        roleField.getChildren().addAll(lblRoleTitle, cmbRole);
 
-        // 2. Clearance / Agency ID
-        VBox agencyBox = new VBox(4);
-        Label lblAgency = new Label(I18n.get("login.agency_id", "Agency Identifier / Clearance ID:"));
-        lblAgency.getStyleClass().add("form-label");
+        // 2. Agency Identifier
+        VBox agencyField = new VBox(4);
+        Label lblAgencyTitle = new Label("Clearance Identifier / Agency Code:");
+        lblAgencyTitle.getStyleClass().add("gov-field-label");
+
         txtAgency = new TextField("GOV-DEF-8942");
-        txtAgency.setPromptText(I18n.get("login.agency_placeholder", "e.g. GOV-DEF-8942"));
+        txtAgency.setPromptText("e.g. GOV-DEF-8942");
         txtAgency.setMaxWidth(Double.MAX_VALUE);
-        txtAgency.getStyleClass().add("login-text-field");
-        AccessibilityManager.setupAccessible(txtAgency, "Agency Identifier", "Input clearance identifier", AccessibleRole.TEXT_FIELD);
-        agencyBox.getChildren().addAll(lblAgency, txtAgency);
+        txtAgency.getStyleClass().add("gov-input-control");
+        AccessibilityManager.setupAccessible(txtAgency, "Agency Code", "Enter clearance identifier", AccessibleRole.TEXT_FIELD);
+        agencyField.getChildren().addAll(lblAgencyTitle, txtAgency);
 
         // 3. Officer Username
-        VBox userBox = new VBox(4);
-        Label lblUser = new Label(I18n.get("login.officer_name", "Officer Username:"));
-        lblUser.getStyleClass().add("form-label");
+        VBox userField = new VBox(4);
+        Label lblUserTitle = new Label("Authorized Officer Username:");
+        lblUserTitle.getStyleClass().add("gov-field-label");
+
         txtUser = new TextField("Officer Pranaash");
-        txtUser.setPromptText(I18n.get("login.officer_placeholder", "Enter officer name"));
+        txtUser.setPromptText("Enter assigned username");
         txtUser.setMaxWidth(Double.MAX_VALUE);
-        txtUser.getStyleClass().add("login-text-field");
-        AccessibilityManager.setupAccessible(txtUser, "Officer Username", "Input officer username", AccessibleRole.TEXT_FIELD);
-        userBox.getChildren().addAll(lblUser, txtUser);
+        txtUser.getStyleClass().add("gov-input-control");
+        AccessibilityManager.setupAccessible(txtUser, "Officer Username", "Enter officer username", AccessibleRole.TEXT_FIELD);
+        userField.getChildren().addAll(lblUserTitle, txtUser);
 
-        // 4. Security PIN / Password with Show/Hide Toggle
-        VBox passBox = new VBox(4);
-        Label lblPass = new Label(I18n.get("login.pin", "Security PIN / Access Key:"));
-        lblPass.getStyleClass().add("form-label");
+        // 4. Security PIN / Passcode
+        VBox passField = new VBox(4);
+        Label lblPassTitle = new Label("Security Access PIN / Passcode:");
+        lblPassTitle.getStyleClass().add("gov-field-label");
 
-        StackPane passStack = new StackPane();
         txtPass = new PasswordField();
         txtPass.setText("••••••••");
-        txtPass.setPromptText(I18n.get("login.pin_placeholder", "Enter security access code"));
+        txtPass.setPromptText("Enter secure PIN");
         txtPass.setMaxWidth(Double.MAX_VALUE);
-        txtPass.getStyleClass().add("login-text-field");
+        txtPass.getStyleClass().add("gov-input-control");
+        AccessibilityManager.setupAccessible(txtPass, "Security PIN", "Enter security PIN", AccessibleRole.PASSWORD_FIELD);
+        passField.getChildren().addAll(lblPassTitle, txtPass);
 
-        txtPassVisible = new TextField();
-        txtPassVisible.setText("••••••••");
-        txtPassVisible.setPromptText(I18n.get("login.pin_placeholder", "Enter security access code"));
-        txtPassVisible.setMaxWidth(Double.MAX_VALUE);
-        txtPassVisible.getStyleClass().add("login-text-field");
-        txtPassVisible.setVisible(false);
-        txtPassVisible.setManaged(false);
+        // Handle Enter key on inputs
+        txtAgency.setOnAction(e -> handleLogin());
+        txtUser.setOnAction(e -> handleLogin());
+        txtPass.setOnAction(e -> handleLogin());
 
-        // Sync text between masked and unmasked fields
-        txtPass.textProperty().bindBidirectional(txtPassVisible.textProperty());
+        fieldsContainer.getChildren().addAll(roleField, agencyField, userField, passField);
 
-        btnTogglePassword = new Button("👁");
-        btnTogglePassword.getStyleClass().add("login-pass-toggle-btn");
-        StackPane.setAlignment(btnTogglePassword, Pos.CENTER_RIGHT);
-        StackPane.setMargin(btnTogglePassword, new Insets(0, 8, 0, 0));
-        btnTogglePassword.setOnAction(e -> togglePasswordVisibility());
-        AccessibilityManager.setupAccessible(btnTogglePassword, "Toggle PIN Visibility", "Show or hide security PIN", AccessibleRole.BUTTON);
+        // Authenticate Button
+        Button btnSubmit = new Button("AUTHENTICATE & ENTER SYSTEM");
+        btnSubmit.getStyleClass().add("gov-btn-primary");
+        btnSubmit.setDefaultButton(true);
+        btnSubmit.setMaxWidth(Double.MAX_VALUE);
+        btnSubmit.setOnAction(e -> handleLogin());
+        AccessibilityManager.setupAccessible(btnSubmit, "Authenticate", "Submit credentials for verification", AccessibleRole.BUTTON);
 
-        passStack.getChildren().addAll(txtPass, txtPassVisible, btnTogglePassword);
-        AccessibilityManager.setupAccessible(txtPass, "Security PIN", "Input security PIN or access code", AccessibleRole.PASSWORD_FIELD);
-        passBox.getChildren().addAll(lblPass, passStack);
+        // Quick Demonstration Profiles
+        VBox demoSection = new VBox(6);
+        demoSection.getStyleClass().add("gov-demo-section");
 
-        // Enter key listeners
-        txtAgency.setOnAction(e -> handleAuthentication());
-        txtUser.setOnAction(e -> handleAuthentication());
-        txtPass.setOnAction(e -> handleAuthentication());
-        txtPassVisible.setOnAction(e -> handleAuthentication());
+        Label demoLabel = new Label("Quick Authorization Profiles (Internal Evaluation):");
+        demoLabel.getStyleClass().add("gov-demo-label");
 
-        formFields.getChildren().addAll(roleBox, agencyBox, userBox, passBox);
+        HBox demoButtons = new HBox(8);
+        demoButtons.setAlignment(Pos.CENTER);
 
-        // ── PRIMARY AUTHENTICATE BUTTON ───────────────────────────────────────
-        Button btnLogin = new Button("AUTHENTICATE & ENTER PORTAL  ➔");
-        btnLogin.getStyleClass().add("login-btn-primary");
-        btnLogin.setDefaultButton(true);
-        btnLogin.setMaxWidth(Double.MAX_VALUE);
-        btnLogin.setOnAction(e -> handleAuthentication());
-        AccessibilityManager.setupAccessible(btnLogin, "Authenticate", "Submit credentials and login to suite", AccessibleRole.BUTTON);
-
-        // ── 1-CLICK QUICK PROFILE DEMO BUTTONS ────────────────────────────────
-        VBox demoContainer = new VBox(8);
-        demoContainer.getStyleClass().add("login-demo-container");
-
-        Label lblDemoTitle = new Label("QUICK 1-CLICK ROLE ACCESS (DEMO PROFILES)");
-        lblDemoTitle.getStyleClass().add("login-demo-title");
-
-        HBox demoGrid = new HBox(8);
-        demoGrid.setAlignment(Pos.CENTER);
-
-        Button btnInspector = buildDemoRoleButton("🛡️ Inspector", "Tier 1", "#0284C7", () -> {
-            txtUser.setText("Inspector Pranaash");
-            txtAgency.setText("GOV-DEF-8942");
-            cmbRole.setValue(UserRole.INSPECTOR);
-            navManager.loginSuccess("Inspector Pranaash", "GOV-DEF-8942", UserRole.INSPECTOR);
-        });
-
-        Button btnSupervisor = buildDemoRoleButton("⚙️ Supervisor", "Tier 2", "#D97706", () -> {
-            txtUser.setText("Supervisor Vance");
-            txtAgency.setText("GOV-DEF-8942");
-            cmbRole.setValue(UserRole.SUPERVISOR);
-            navManager.loginSuccess("Supervisor Vance", "GOV-DEF-8942", UserRole.SUPERVISOR);
-        });
-
-        Button btnAuditor = buildDemoRoleButton("🔒 Chief Auditor", "Tier 3", "#9333EA", () -> {
-            txtUser.setText("Chief Auditor Davis");
-            txtAgency.setText("GOV-DEF-8942");
-            cmbRole.setValue(UserRole.CHIEF_AUDITOR);
-            navManager.loginSuccess("Chief Auditor Davis", "GOV-DEF-8942", UserRole.CHIEF_AUDITOR);
-        });
+        Button btnInspector = buildDemoBtn("Inspector (Tier 1)", "Inspector Pranaash", UserRole.INSPECTOR);
+        Button btnSupervisor = buildDemoBtn("Supervisor (Tier 2)", "Supervisor Vance", UserRole.SUPERVISOR);
+        Button btnAuditor = buildDemoBtn("Chief Auditor (Tier 3)", "Chief Auditor Davis", UserRole.CHIEF_AUDITOR);
 
         HBox.setHgrow(btnInspector, Priority.ALWAYS);
         HBox.setHgrow(btnSupervisor, Priority.ALWAYS);
         HBox.setHgrow(btnAuditor, Priority.ALWAYS);
 
-        demoGrid.getChildren().addAll(btnInspector, btnSupervisor, btnAuditor);
-        demoContainer.getChildren().addAll(lblDemoTitle, demoGrid);
+        demoButtons.getChildren().addAll(btnInspector, btnSupervisor, btnAuditor);
+        demoSection.getChildren().addAll(demoLabel, demoButtons);
 
-        // ── FOOTER LEGAL & COMPLIANCE DISCLAIMER ──────────────────────────────
-        Label disclaimer = new Label(I18n.get("login.disclaimer",
-                "Authorized Government & Defense Personnel Only. All session activities and cryptographic signatures are immutably logged."));
-        disclaimer.getStyleClass().add("login-disclaimer");
-        disclaimer.setWrapText(true);
-        disclaimer.setAlignment(Pos.CENTER);
-
-        loginCard.getChildren().addAll(
-                headerBox,
-                alertBanner,
-                formFields,
-                btnLogin,
-                demoContainer,
+        card.getChildren().addAll(
+                cardTitle,
+                sep1,
+                lblError,
+                fieldsContainer,
+                btnSubmit,
                 new Separator(),
-                disclaimer
+                demoSection
         );
 
-        formPanel.getChildren().addAll(topControls, loginCard);
-        return formPanel;
+        return card;
     }
 
-    private Button buildDemoRoleButton(String name, String tier, String accentColor, Runnable onSelect) {
-        Button btn = new Button(name + "\n" + tier);
-        btn.getStyleClass().add("login-demo-btn");
-        btn.setStyle(btn.getStyle() + "-fx-border-color: " + accentColor + "55;");
+    private Button buildDemoBtn(String label, String username, UserRole role) {
+        Button btn = new Button(label);
+        btn.getStyleClass().add("gov-demo-btn");
         btn.setMaxWidth(Double.MAX_VALUE);
-        btn.setOnAction(e -> onSelect.run());
-
-        btn.setOnMouseEntered(e -> btn.setStyle(btn.getStyle() + "-fx-border-color: " + accentColor + "; -fx-text-fill: " + accentColor + ";"));
-        btn.setOnMouseExited(e -> btn.setStyle(btn.getStyle() + "-fx-border-color: " + accentColor + "55; -fx-text-fill: -fx-text-base-color;"));
-
+        btn.setOnAction(e -> {
+            txtUser.setText(username);
+            txtAgency.setText("GOV-DEF-8942");
+            cmbRole.setValue(role);
+            navManager.loginSuccess(username, "GOV-DEF-8942", role);
+        });
         return btn;
     }
 
-    private void togglePasswordVisibility() {
-        isPasswordVisible = !isPasswordVisible;
-        if (isPasswordVisible) {
-            txtPassVisible.setText(txtPass.getText());
-            txtPass.setVisible(false);
-            txtPass.setManaged(false);
-            txtPassVisible.setVisible(true);
-            txtPassVisible.setManaged(true);
-            txtPassVisible.requestFocus();
-            txtPassVisible.positionCaret(txtPassVisible.getText().length());
-            btnTogglePassword.setText("👁‍🗨");
-        } else {
-            txtPass.setText(txtPassVisible.getText());
-            txtPassVisible.setVisible(false);
-            txtPassVisible.setManaged(false);
-            txtPass.setVisible(true);
-            txtPass.setManaged(true);
-            txtPass.requestFocus();
-            txtPass.positionCaret(txtPass.getText().length());
-            btnTogglePassword.setText("👁");
-        }
+    private VBox buildInstitutionalFooter() {
+        VBox footer = new VBox(8);
+        footer.setAlignment(Pos.CENTER);
+        footer.setMaxWidth(620);
+
+        HBox linksRow = new HBox(16);
+        linksRow.setAlignment(Pos.CENTER);
+
+        Hyperlink linkHome = new Hyperlink("← Return to Public System Overview");
+        linkHome.getStyleClass().add("gov-footer-link");
+        linkHome.setOnAction(e -> navManager.showHeroView());
+
+        linksRow.getChildren().add(linkHome);
+
+        Label certLine = new Label("FIPS 140-2 Validated Cryptographic Core  •  NIST SP 800-88 R1  •  Common Criteria EAL4+");
+        certLine.getStyleClass().add("gov-footer-meta");
+
+        Label sysId = new Label("System Identifier: SE-GOV-2026-X86 | Session Attestation: ECDSA P-384 Signed");
+        sysId.getStyleClass().add("gov-footer-sysid");
+
+        footer.getChildren().addAll(linksRow, certLine, sysId);
+        return footer;
     }
 
-    private void handleAuthentication() {
+    private void handleLogin() {
         String username = txtUser.getText() != null ? txtUser.getText().trim() : "";
         String agency = txtAgency.getText() != null ? txtAgency.getText().trim() : "";
         UserRole role = cmbRole.getValue() != null ? cmbRole.getValue() : UserRole.INSPECTOR;
 
         if (username.isEmpty()) {
-            showError("Officer Username is required for cryptographic authentication.");
+            showError("Authentication Failed: Officer Username must be provided.");
             txtUser.requestFocus();
             return;
         }
 
         if (agency.isEmpty()) {
-            showError("Clearance Identifier / Agency ID cannot be empty.");
+            showError("Authentication Failed: Clearance Identifier / Agency Code is required.");
             txtAgency.requestFocus();
             return;
         }
@@ -553,21 +378,14 @@ public class LoginView {
         navManager.loginSuccess(username, agency, role);
     }
 
-    private void showError(String message) {
-        lblAlertText.setText(message);
-        alertBanner.setVisible(true);
-        alertBanner.setManaged(true);
-
-        TranslateTransition tt = new TranslateTransition(Duration.millis(80), alertBanner);
-        tt.setFromX(-6);
-        tt.setToX(6);
-        tt.setCycleCount(4);
-        tt.setAutoReverse(true);
-        tt.play();
+    private void showError(String msg) {
+        lblError.setText(msg);
+        lblError.setVisible(true);
+        lblError.setManaged(true);
     }
 
     private void hideError() {
-        alertBanner.setVisible(false);
-        alertBanner.setManaged(false);
+        lblError.setVisible(false);
+        lblError.setManaged(false);
     }
 }

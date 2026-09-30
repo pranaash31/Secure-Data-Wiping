@@ -516,265 +516,189 @@
     -fx-padding: 14;
 }
 
-/* ─── LOGIN PANEL STYLES ────────────────────────────────────────────────── */
-.login-root {
-    -fx-background-color: #F8FAFC;
+/* ─── GOVERNMENT AUTHENTICATION PORTAL STYLES ─────────────────────────── */
+.gov-login-root {
+    -fx-background-color: #F1F5F9;
 }
-.login-brand-panel {
-    -fx-background-color: #090D16;
-    -fx-border-color: transparent rgba(30, 41, 59, 0.6) transparent transparent;
-    -fx-border-width: 0 1px 0 0;
-}
-.login-back-btn {
+.gov-scroll-pane {
     -fx-background-color: transparent;
-    -fx-text-fill: #94A3B8;
-    -fx-font-size: 11px;
-    -fx-font-weight: bold;
-    -fx-cursor: hand;
-    -fx-padding: 4 8;
+    -fx-background: transparent;
     -fx-border-color: transparent;
 }
-.login-back-btn:hover {
-    -fx-text-fill: #60A5FA;
-    -fx-background-color: rgba(59, 130, 246, 0.08);
-    -fx-background-radius: 6px;
+.gov-scroll-pane > .viewport {
+    -fx-background-color: transparent;
 }
-.login-brand-icon {
-    -fx-font-size: 26px;
-    -fx-text-fill: #3B82F6;
-    -fx-background-color: rgba(59, 130, 246, 0.12);
-    -fx-background-radius: 12px;
-    -fx-padding: 8 12;
-    -fx-border-color: rgba(59, 130, 246, 0.3);
-    -fx-border-radius: 12px;
+.gov-classification-banner {
+    -fx-background-color: #0F172A;
+    -fx-border-color: #1E293B;
+    -fx-border-width: 0 0 1 0;
 }
-.login-brand-title {
-    -fx-font-size: 22px;
+.gov-classification-text {
+    -fx-text-fill: #CBD5E1;
+    -fx-font-size: 11px;
     -fx-font-weight: bold;
-    -fx-text-fill: #FFFFFF;
-}
-.login-edition-badge {
-    -fx-font-size: 9.5px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #38BDF8;
-    -fx-background-color: rgba(56, 189, 248, 0.12);
-    -fx-background-radius: 4px;
-    -fx-padding: 2 6;
-}
-.login-fips-badge {
-    -fx-font-size: 9.5px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #10B981;
-    -fx-background-color: rgba(16, 185, 129, 0.12);
-    -fx-background-radius: 4px;
-    -fx-padding: 2 6;
-}
-.login-status-pill {
-    -fx-background-color: rgba(15, 23, 42, 0.85);
-    -fx-border-color: rgba(51, 65, 85, 0.8);
-    -fx-border-radius: 20px;
-    -fx-background-radius: 20px;
-    -fx-padding: 6 12;
-}
-.login-brand-headline {
-    -fx-font-size: 23px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #F8FAFC;
-    -fx-line-spacing: 2px;
-}
-.login-brand-subline {
-    -fx-font-size: 12.5px;
-    -fx-text-fill: #94A3B8;
-    -fx-line-spacing: 4px;
-}
-.login-rbac-container {
-    -fx-background-color: rgba(15, 23, 42, 0.7);
-    -fx-border-color: rgba(51, 65, 85, 0.6);
-    -fx-border-radius: 12px;
-    -fx-background-radius: 12px;
-    -fx-padding: 14;
-}
-.login-rbac-title {
-    -fx-font-size: 10px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #64748B;
     -fx-letter-spacing: 0.8px;
 }
-.login-tier-card {
-    -fx-background-color: rgba(2, 6, 23, 0.6);
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
-    -fx-border-width: 1px;
-    -fx-padding: 8 10;
+.gov-lang-select {
+    -fx-background-color: #1E293B;
+    -fx-border-color: #334155;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-text-fill: #E2E8F0;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
 }
-.login-tier-desc {
-    -fx-font-size: 10px;
-    -fx-text-fill: #94A3B8;
-    -fx-line-spacing: 1.5px;
-}
-.login-compliance-badge {
-    -fx-font-size: 9.5px;
+.gov-theme-btn {
+    -fx-background-color: #1E293B;
+    -fx-border-color: #334155;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-text-fill: #E2E8F0;
+    -fx-font-size: 11px;
     -fx-font-weight: bold;
-    -fx-text-fill: #60A5FA;
-    -fx-background-color: rgba(59, 130, 246, 0.1);
-    -fx-border-color: rgba(59, 130, 246, 0.25);
+    -fx-padding: 4 10;
+    -fx-cursor: hand;
+}
+.gov-theme-btn:hover {
+    -fx-background-color: #334155;
+}
+.gov-agency-subtitle {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E3A8A;
+    -fx-letter-spacing: 1px;
+}
+.gov-main-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+    -fx-letter-spacing: -0.3px;
+}
+.gov-standards-label {
+    -fx-font-size: 11.5px;
+    -fx-text-fill: #475569;
+    -fx-font-weight: 500;
+}
+.gov-notice-box {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #93C5FD;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+}
+.gov-notice-header {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E40AF;
+    -fx-letter-spacing: 0.5px;
+}
+.gov-notice-body {
+    -fx-font-size: 11px;
+    -fx-text-fill: #1E3A8A;
+    -fx-line-spacing: 2px;
+}
+.gov-auth-card {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #CBD5E1;
+    -fx-border-width: 1px;
     -fx-border-radius: 6px;
     -fx-background-radius: 6px;
-    -fx-padding: 3 7;
+    -fx-effect: dropshadow(three-pass-box, rgba(15, 23, 42, 0.05), 10, 0, 0, 2);
 }
-.login-crypto-notice {
+.gov-card-title {
+    -fx-font-size: 14.5px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+.gov-field-label {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #334155;
+    -fx-letter-spacing: 0.2px;
+}
+.gov-input-control {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #94A3B8;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8 10;
+    -fx-font-size: 12.5px;
+    -fx-text-fill: #0F172A;
+}
+.gov-input-control:focused {
+    -fx-border-color: #1E3A8A;
+    -fx-border-width: 1.5px;
+}
+.gov-btn-primary {
+    -fx-background-color: #1E3A8A;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-padding: 10 16;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-cursor: hand;
+}
+.gov-btn-primary:hover {
+    -fx-background-color: #172554;
+}
+.gov-btn-primary:pressed {
+    -fx-background-color: #0F172A;
+}
+.gov-demo-section {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8 10;
+}
+.gov-demo-label {
     -fx-font-size: 10.5px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #64748B;
+}
+.gov-demo-btn {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E3A8A;
+    -fx-padding: 6 8;
+    -fx-cursor: hand;
+}
+.gov-demo-btn:hover {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #93C5FD;
+}
+.gov-error-label {
+    -fx-background-color: #FEF2F2;
+    -fx-border-color: #EF4444;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 6 10;
+    -fx-text-fill: #B91C1C;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+.gov-footer-link {
+    -fx-text-fill: #1E40AF;
+    -fx-font-size: 11.5px;
+    -fx-font-weight: bold;
+    -fx-underline: true;
+    -fx-cursor: hand;
+}
+.gov-footer-meta {
+    -fx-font-size: 11px;
     -fx-text-fill: #64748B;
     -fx-font-weight: 500;
 }
-.login-form-panel {
-    -fx-background-color: #F8FAFC;
-}
-.login-util-combo {
-    -fx-background-color: #FFFFFF;
-    -fx-border-color: #CBD5E1;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-font-size: 11px;
-    -fx-font-weight: 600;
-    -fx-text-fill: #334155;
-    -fx-cursor: hand;
-}
-.login-util-btn {
-    -fx-background-color: #FFFFFF;
-    -fx-border-color: #CBD5E1;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-font-size: 11px;
-    -fx-font-weight: 600;
-    -fx-text-fill: #334155;
-    -fx-padding: 5 10;
-    -fx-cursor: hand;
-}
-.login-util-btn:hover {
-    -fx-background-color: #F1F5F9;
-    -fx-border-color: #94A3B8;
-}
-.login-card {
-    -fx-background-color: #FFFFFF;
-    -fx-border-color: #E2E8F0;
-    -fx-border-radius: 18px;
-    -fx-background-radius: 18px;
-    -fx-effect: dropshadow(three-pass-box, rgba(15, 23, 42, 0.08), 24, 0, 0, 8);
-}
-.login-portal-pill {
-    -fx-font-size: 9.5px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #2563EB;
-    -fx-background-color: #EFF6FF;
-    -fx-background-radius: 6px;
-    -fx-padding: 3 8;
-    -fx-letter-spacing: 0.5px;
-}
-.login-title {
-    -fx-font-size: 22px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #0F172A;
-}
-.login-subtitle {
-    -fx-font-size: 12px;
-    -fx-text-fill: #64748B;
-}
-.login-alert-banner {
-    -fx-background-color: #FEF2F2;
-    -fx-border-color: #FCA5A5;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-padding: 8 12;
-}
-.login-alert-text {
-    -fx-font-size: 11px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #DC2626;
-}
-.login-input-combo {
-    -fx-background-color: #FFFFFF;
-    -fx-border-color: #CBD5E1;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-padding: 2 6;
-    -fx-font-size: 12px;
-}
-.login-text-field {
-    -fx-background-color: #FFFFFF;
-    -fx-border-color: #CBD5E1;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-padding: 9 12;
-    -fx-font-size: 12.5px;
-    -fx-text-fill: #0F172A;
-}
-.login-text-field:focused, .login-input-combo:focused {
-    -fx-border-color: #3B82F6;
-    -fx-effect: dropshadow(three-pass-box, rgba(59, 130, 246, 0.25), 6, 0, 0, 0);
-}
-.login-pass-toggle-btn {
-    -fx-background-color: transparent;
-    -fx-text-fill: #64748B;
-    -fx-font-size: 13px;
-    -fx-cursor: hand;
-    -fx-padding: 4 6;
-}
-.login-pass-toggle-btn:hover {
-    -fx-text-fill: #2563EB;
-}
-.login-btn-primary {
-    -fx-background-color: linear-gradient(to right, #2563EB, #1D4ED8);
-    -fx-text-fill: #FFFFFF;
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-    -fx-padding: 12 18;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.35), 8, 0, 0, 3);
-}
-.login-btn-primary:hover {
-    -fx-background-color: linear-gradient(to right, #1D4ED8, #1E40AF);
-    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.5), 12, 0, 0, 4);
-}
-.login-btn-primary:pressed {
-    -fx-background-color: #1E40AF;
-    -fx-scale-x: 0.99;
-    -fx-scale-y: 0.99;
-}
-.login-demo-container {
-    -fx-background-color: #F8FAFC;
-    -fx-border-color: #E2E8F0;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
-    -fx-padding: 10 12;
-}
-.login-demo-title {
-    -fx-font-size: 9.5px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #64748B;
-    -fx-letter-spacing: 0.5px;
-}
-.login-demo-btn {
-    -fx-background-color: #FFFFFF;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-border-width: 1px;
-    -fx-font-size: 10.5px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #334155;
-    -fx-padding: 7 6;
-    -fx-cursor: hand;
-    -fx-text-alignment: center;
-}
-.login-demo-btn:hover {
-    -fx-background-color: #F1F5F9;
-}
-.login-disclaimer {
-    -fx-font-size: 9.5px;
-    -fx-text-fill: #64748B;
-    -fx-line-spacing: 2px;
+.gov-footer-sysid {
+    -fx-font-size: 10px;
+    -fx-text-fill: #94A3B8;
+    -fx-font-family: Consolas, "Courier New", monospace;
 }
 .form-label {
     -fx-font-size: 11px;
@@ -1236,56 +1160,89 @@
     -fx-text-fill: #FFFFFF;
 }
 
-/* ─── LOGIN VIEW ────────────────────────────────────────────────────────── */
-.dark-theme .login-root       { -fx-background-color: #060A14; }
-.dark-theme .login-form-panel { -fx-background-color: #060A14; }
-.dark-theme .login-brand-panel { -fx-background-color: #0B1120; -fx-border-color: transparent #1E293B transparent transparent; }
-.dark-theme .login-card {
+/* ─── GOVERNMENT LOGIN VIEW (DARK THEME) ────────────────────────────────── */
+.dark-theme .gov-login-root {
+    -fx-background-color: #090D16;
+}
+.dark-theme .gov-classification-banner {
+    -fx-background-color: #060A14;
+    -fx-border-color: #1E293B;
+}
+.dark-theme .gov-classification-text {
+    -fx-text-fill: #94A3B8;
+}
+.dark-theme .gov-agency-subtitle {
+    -fx-text-fill: #60A5FA;
+}
+.dark-theme .gov-main-title {
+    -fx-text-fill: #F8FAFC;
+}
+.dark-theme .gov-standards-label {
+    -fx-text-fill: #94A3B8;
+}
+.dark-theme .gov-notice-box {
+    -fx-background-color: rgba(30, 58, 138, 0.2);
+    -fx-border-color: #1E3A8A;
+}
+.dark-theme .gov-notice-header {
+    -fx-text-fill: #93C5FD;
+}
+.dark-theme .gov-notice-body {
+    -fx-text-fill: #BFDBFE;
+}
+.dark-theme .gov-auth-card {
     -fx-background-color: #0F172A;
-    -fx-border-color: #1E2D44;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.6), 24, 0, 0, 8);
+    -fx-border-color: #1E293B;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.5), 10, 0, 0, 2);
 }
-.dark-theme .login-title      { -fx-text-fill: #E8EEFA; }
-.dark-theme .login-subtitle   { -fx-text-fill: #94A3B8; }
-.dark-theme .login-util-combo,
-.dark-theme .login-util-btn   {
-    -fx-background-color: #1E293B;
-    -fx-border-color: #334155;
-    -fx-text-fill: #E2E8F0;
+.dark-theme .gov-card-title {
+    -fx-text-fill: #F8FAFC;
 }
-.dark-theme .login-util-btn:hover {
-    -fx-background-color: #334155;
+.dark-theme .gov-field-label {
+    -fx-text-fill: #CBD5E1;
 }
-.dark-theme .login-input-combo,
-.dark-theme .login-text-field {
-    -fx-background-color: #0B1120;
+.dark-theme .gov-input-control {
+    -fx-background-color: #060A14;
     -fx-border-color: #334155;
     -fx-text-fill: #F8FAFC;
 }
-.dark-theme .login-text-field:focused,
-.dark-theme .login-input-combo:focused {
-    -fx-border-color: #3B82F6;
-    -fx-effect: dropshadow(three-pass-box, rgba(59, 130, 246, 0.4), 8, 0, 0, 0);
+.dark-theme .gov-input-control:focused {
+    -fx-border-color: #60A5FA;
 }
-.dark-theme .login-demo-container {
-    -fx-background-color: #0B1120;
+.dark-theme .gov-btn-primary {
+    -fx-background-color: #2563EB;
+    -fx-text-fill: #FFFFFF;
+}
+.dark-theme .gov-btn-primary:hover {
+    -fx-background-color: #1D4ED8;
+}
+.dark-theme .gov-demo-section {
+    -fx-background-color: #060A14;
     -fx-border-color: #1E293B;
 }
-.dark-theme .login-demo-btn {
-    -fx-background-color: #1E293B;
-    -fx-text-fill: #E2E8F0;
+.dark-theme .gov-demo-label {
+    -fx-text-fill: #94A3B8;
 }
-.dark-theme .login-demo-btn:hover {
+.dark-theme .gov-demo-btn {
+    -fx-background-color: #1E293B;
+    -fx-border-color: #334155;
+    -fx-text-fill: #93C5FD;
+}
+.dark-theme .gov-demo-btn:hover {
     -fx-background-color: #334155;
 }
-.dark-theme .login-alert-banner {
-    -fx-background-color: rgba(220, 38, 38, 0.15);
-    -fx-border-color: rgba(220, 38, 38, 0.4);
+.dark-theme .gov-error-label {
+    -fx-background-color: rgba(220, 38, 38, 0.2);
+    -fx-border-color: #EF4444;
+    -fx-text-fill: #FCA5A5;
 }
-.dark-theme .login-alert-text {
-    -fx-text-fill: #F87171;
+.dark-theme .gov-footer-link {
+    -fx-text-fill: #60A5FA;
 }
-.dark-theme .login-disclaimer {
+.dark-theme .gov-footer-meta {
+    -fx-text-fill: #94A3B8;
+}
+.dark-theme .gov-footer-sysid {
     -fx-text-fill: #64748B;
 }
 
