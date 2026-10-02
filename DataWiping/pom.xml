@@ -19,7 +19,7 @@
             <groupId>com.github.oshi</groupId>
             <artifactId>oshi-core</artifactId>
             <version>6.4.10</version>
-        </dependency>
+        
 
         <!-- 2. SQLite: Stores audit history locally -->
         <dependency>
