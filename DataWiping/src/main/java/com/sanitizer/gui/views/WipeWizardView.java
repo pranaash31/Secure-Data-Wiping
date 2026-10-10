@@ -1,6 +1,5 @@
 package com.sanitizer.gui.views;
 
-import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.SmartDiagnostics;
 import com.sanitizer.detector.UsbDetector;
@@ -10,6 +9,10 @@ import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
+import com.sanitizer.service.SanitizationWorkflowService;
+import com.sanitizer.service.WorkflowCallbacks;
+import com.sanitizer.service.WorkflowRequest;
+import com.sanitizer.service.WorkflowResult;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
@@ -660,17 +663,17 @@ public class WipeWizardView {
     private void startWizardSanitization() {
         if (selectedDrive == null || selectedPolicy == null) return;
 
-        Task<Boolean> task = new Task<>() {
+        Task<WorkflowResult> task = new Task<>() {
             @Override
-            protected Boolean call() {
-                long totalBytes = selectedDrive.sizeBytes();
-                String path = selectedDrive.systemPath();
-
-                return WipeEngine.executeWipeWithPolicy(
-                        path,
-                        totalBytes,
+            protected WorkflowResult call() {
+                WorkflowRequest request = WorkflowRequest.of(
+                        selectedDrive,
                         selectedPolicy,
                         isTestMode,
+                        NavigationManager.getInstance().getSessionContext()
+                );
+
+                WorkflowCallbacks callbacks = WorkflowCallbacks.of(
                         metrics -> Platform.runLater(() -> {
                             double p = metrics.overallPercent() / 100.0;
                             pbExecution.setProgress(p);
@@ -679,40 +682,38 @@ public class WipeWizardView {
                             lblExecEta.setText("⏳ ~" + metrics.formattedEta());
                             lblExecPass.setText(metrics.formattedPassSummary());
                         }),
-                        line -> Platform.runLater(() -> txtExecLogs.appendText(line + "\n"))
+                        line -> Platform.runLater(() -> txtExecLogs.appendText(line + "\n")),
+                        badSector -> {}
                 );
+
+                return SanitizationWorkflowService.getInstance().executeWorkflow(request, callbacks);
             }
         };
 
         task.setOnSucceeded(e -> {
-            boolean success = task.getValue();
-            if (success) {
+            WorkflowResult result = task.getValue();
+            if (result != null && result.success()) {
                 lblExecStatus.setText("Status: COMPLETED (PASS)");
                 btnAbortExecution.setVisible(false);
                 btnAbortExecution.setManaged(false);
 
-                // Sign & Save Audit Record
-                String signature = CryptoSigner.signData(selectedDrive.model() + selectedDrive.serial() + selectedPolicy.getName());
-                AuditDb.saveRecord(
-                        selectedDrive.model(),
-                        selectedDrive.serial(),
-                        selectedDrive.formattedSize(),
-                        selectedPolicy.getName(),
-                        "SUCCESS",
-                        signature,
-                        100, 100, 0, 0,
-                        "NIST SP 800-88 Zero Entropy Verification Attested"
-                );
-
-                List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
-                if (!records.isEmpty()) {
-                    completedAuditRecord = records.get(0);
-                    CertificateGenerator.generateCertificate(completedAuditRecord);
-                }
-
+                completedAuditRecord = result.auditRecord();
                 completionSuccessBox.setVisible(true);
                 completionSuccessBox.setManaged(true);
-                NavigationManager.getInstance().showNotification("Sanitization Complete", "Certificate successfully issued for " + selectedDrive.model(), ToastType.SUCCESS);
+                NavigationManager.getInstance().showNotification(
+                        "Sanitization Complete",
+                        "Certificate successfully issued for " + selectedDrive.model(),
+                        ToastType.SUCCESS
+                );
+            } else {
+                lblExecStatus.setText("Status: FAILED / QUARANTINED");
+                btnAbortExecution.setVisible(false);
+                btnAbortExecution.setManaged(false);
+                NavigationManager.getInstance().showNotification(
+                        "Sanitization Failed",
+                        "Drive failed sanitization or was quarantined.",
+                        ToastType.ERROR
+                );
             }
         });
 

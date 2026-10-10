@@ -1,9 +1,5 @@
 package com.sanitizer.gui.views;
 
-import com.sanitizer.alert.AlertDispatcher;
-import com.sanitizer.audit.SecurityAuditLogger;
-import com.sanitizer.crypto.CryptoSigner;
-import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.SmartDiagnostics;
 import com.sanitizer.detector.SmartDiagnostics.HealthScoreResult;
 import com.sanitizer.detector.SmartDiagnostics.InterfaceAnomalyResult;
@@ -14,7 +10,12 @@ import com.sanitizer.detector.ThermalPolicy;
 import com.sanitizer.detector.ThermalPolicyManager;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
+import com.sanitizer.engine.WipeMetrics;
 import com.sanitizer.engine.WipeVerifier;
+import com.sanitizer.service.SanitizationWorkflowService;
+import com.sanitizer.service.WorkflowCallbacks;
+import com.sanitizer.service.WorkflowRequest;
+import com.sanitizer.service.WorkflowResult;
 import com.sanitizer.gui.components.IoOscilloscopeComponent;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ThermalGraphComponent;
@@ -473,332 +474,113 @@ public class WipingView {
         appendLog("[SYSTEM] Launching low-level block sanitization background task...");
         SoundManager.playStartTone();
 
-        final SmartSnapshot preWipeSnapshot =
-                SmartDiagnostics.captureSnapshot(target);
-
-        final boolean[] wasThermalPaused = {false};
-        final boolean[] wasThrottled = {false};
-        final List<LbaFailureRecord> detectedBadSectors =
-                java.util.Collections.synchronizedList(new java.util.ArrayList<>());
-
         final WipeVerifier.VerificationMode verifyMode = cmbVerifyMode.getValue() != null
                 ? cmbVerifyMode.getValue() : WipeVerifier.VerificationMode.FAST_SAMPLE_5_PERCENT;
 
-        record TaskOutcome(boolean wipeSuccess, WipeVerifier.VerificationResult verifyResult) {}
-
-        Task<TaskOutcome> task = new Task<>() {
+        Task<WorkflowResult> task = new Task<>() {
             @Override
-            protected TaskOutcome call() {
-                boolean wipeSuccess = WipeEngine.executeWipeWithPolicy(
-                        target.systemPath(),
-                        target.sizeBytes(),
+            protected WorkflowResult call() {
+                int peakTemp = (thermalGraph != null) ? thermalGraph.getPeakTemp() : 0;
+                int pauseCount = (thermalGraph != null) ? thermalGraph.getPauseCount() : 0;
+
+                WorkflowRequest request = WorkflowRequest.of(
+                        target,
                         selectedPolicy,
-                        isTestMode,
-                        metrics -> Platform.runLater(() -> {
-                            double p = metrics.overallPercent() / 100.0;
-                            progressBar.setProgress(p);
-                            lblProgressPercent.setText(metrics.formattedProgress());
-                            lblLiveSpeed.setText("⚡ " + metrics.formattedSpeed());
-                            lblLiveEta.setText("⏳ ~" + metrics.formattedEta() + " remaining");
-                            lblCurrentPass.setText(metrics.formattedPassSummary());
-                            lblCurrentPass.getStyleClass().setAll("telemetry-chip", "telemetry-chip-green");
-
-                            if (metrics.overallPercent() >= 100.0) {
-                                triggerCompletionGlow();
-                            }
-
-                            if (metrics.isThermalPaused()) {
-                                lblStatusMessage.setText("⏸ THERMAL PAUSE: Cooling down drive (" + metrics.tempCelsius() + "°C)...");
-                                lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #EF4444;");
-
-                                if (!wasThermalPaused[0]) {
-                                    wasThermalPaused[0] = true;
-                                    if (thermalGraph != null) {
-                                        thermalGraph.recordEvent(metrics.tempCelsius(), "AUTO_PAUSE", "Auto-Pause Safeguard");
-                                    }
-                                } else if (thermalGraph != null) {
-                                    thermalGraph.addSample(metrics.tempCelsius(), metrics.throttlePercent(), metrics.throttleState());
-                                }
-                            } else if (metrics.isThrottled()) {
-                                lblStatusMessage.setText(String.format("⚡ THERMAL THROTTLING (%d%%): %s | %s | %s | %d°C",
-                                        metrics.throttlePercent(), metrics.formattedPassSummary(), metrics.formattedSpeed(), metrics.formattedEta(), metrics.tempCelsius()));
-                                lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #D97706;");
-
-                                if (!wasThrottled[0]) {
-                                    wasThrottled[0] = true;
-                                    if (thermalGraph != null) {
-                                        thermalGraph.recordEvent(metrics.tempCelsius(), "THROTTLE", "⚡ Throttle Engaged (" + metrics.throttlePercent() + "%)");
-                                    }
-                                } else if (thermalGraph != null) {
-                                    thermalGraph.addSample(metrics.tempCelsius(), metrics.throttlePercent(), metrics.throttleState());
-                                }
-                            } else {
-                                lblStatusMessage.setText(String.format("Wiping: %s | %s | %s | %d°C",
-                                        metrics.formattedPassSummary(), metrics.formattedSpeed(), metrics.formattedEta(), metrics.tempCelsius()));
-                                lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #1E293B;");
-
-                                if (wasThermalPaused[0]) {
-                                    wasThermalPaused[0] = false;
-                                    if (thermalGraph != null) {
-                                        thermalGraph.recordEvent(metrics.tempCelsius(), "RESUME", "Resumed Sanitization");
-                                    }
-                                } else if (wasThrottled[0]) {
-                                    wasThrottled[0] = false;
-                                    if (thermalGraph != null) {
-                                        thermalGraph.recordEvent(metrics.tempCelsius(), "RAMP_UP", "🚀 Auto-Recovery 100% Speed");
-                                    }
-                                } else if (thermalGraph != null) {
-                                    thermalGraph.addSample(metrics.tempCelsius(), metrics.throttlePercent(), metrics.throttleState());
-                                }
-                            }
-
-                            if (lblLiveTempBadge != null) {
-                                String throttleSuffix = metrics.isThrottled() ? " [⚡ Throttled " + metrics.throttlePercent() + "%]" : "";
-                                lblLiveTempBadge.setText(String.format("Temp: %d °C (%s)%s", metrics.tempCelsius(), metrics.thermalStatus().name(), throttleSuffix));
-                                lblLiveTempBadge.setStyle(String.format(
-                                        "-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 4 10; -fx-background-radius: 4px;",
-                                        metrics.thermalStatus().getBgColor(), metrics.thermalStatus().getTextColor()
-                                ));
-                            }
-                            if (ioOscilloscope != null) {
-                                ioOscilloscope.addSample(metrics);
-                            }
-                            sectorMatrix.updateProgress(metrics);
-                        }),
-                        line -> Platform.runLater(() -> appendLog(line)),
-                        badSector -> {
-                            detectedBadSectors.add(badSector);
-                            Platform.runLater(() -> sectorMatrix.markBadSector(badSector.startByteOffset(), badSector.errorType()));
-                        }
-                );
-
-                if (!wipeSuccess) {
-                    return new TaskOutcome(false, null);
-                }
-
-                Platform.runLater(() -> {
-                    lblStatusMessage.setText("🔍 Performing Post-Wipe Sampling & Zero-Residual Entropy Verification...");
-                    lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #2563EB;");
-                });
-
-                WipeVerifier.VerificationResult verifyResult = WipeVerifier.verifyDrive(
-                        target.systemPath(),
-                        target.sizeBytes(),
                         verifyMode,
                         isTestMode,
+                        NavigationManager.getInstance().getSessionContext()
+                ).withThermalTelemetry(peakTemp, pauseCount);
+
+                WorkflowCallbacks callbacks = WorkflowCallbacks.of(
+                        metrics -> Platform.runLater(() -> handleLiveMetrics(metrics)),
+                        line -> Platform.runLater(() -> appendLog(line)),
+                        badSector -> Platform.runLater(() -> sectorMatrix.markBadSector(badSector.startByteOffset(), badSector.errorType())),
                         p -> Platform.runLater(() -> {
                             progressBar.setProgress(p);
                             lblProgressPercent.setText(String.format(java.util.Locale.US, "%.1f%% (Verifying)", p * 100.0));
-                        }),
-                        msg -> Platform.runLater(() -> appendLog(msg))
+                        })
                 );
 
-                return new TaskOutcome(true, verifyResult);
+                return SanitizationWorkflowService.getInstance().executeWorkflow(request, callbacks);
             }
         };
 
         task.setOnSucceeded(e -> {
-            TaskOutcome outcome = task.getValue();
-            if (outcome != null && outcome.wipeSuccess()) {
+            WorkflowResult result = task.getValue();
+            if (result != null && result.success()) {
                 triggerCompletionGlow();
                 lblLiveSpeed.setText("⚡ 0.0 MB/s (Complete)");
                 lblLiveEta.setText("⏳ 00:00 (Complete)");
                 lblCurrentPass.setText("✓ " + selectedPolicy.getName() + " Finished");
                 lblCurrentPass.getStyleClass().setAll("telemetry-chip", "telemetry-chip-green");
 
-                WipeVerifier.VerificationResult vResult = outcome.verifyResult();
-                double resEntropy = (vResult != null) ? vResult.entropyScore() : 0.0;
+                double resEntropy = (result.verificationResult() != null) ? result.verificationResult().entropyScore() : 0.0;
                 SoundManager.playSanitizationComplete(target.systemPath(), selectedPolicy.getName(), resEntropy);
                 lblStatusMessage.setText("Sanitization completed! Issuing digital seal...");
                 appendLog("\n[SUCCESS] Sanitization operation & verification completed successfully.");
                 sectorMatrix.setCompleted();
 
-                // Capture Post-Wipe S.M.A.R.T. Snapshot & Compute Delta
-                SmartSnapshot postWipeSnapshot =
-                        SmartDiagnostics.captureSnapshot(target);
-                SmartDelta smartDelta =
-                        SmartDiagnostics.compareSnapshots(preWipeSnapshot, postWipeSnapshot);
+                String deltaSummary = result.smartDelta() != null ? result.smartDelta().formattedSummary() : "Integrity Verified: 0 Defects";
+                long vSectors = (result.verificationResult() != null) ? result.verificationResult().totalSectorsVerified() : 20480;
+                String pdfPath = result.certificatePdfPath();
+                String sig = (result.auditRecord() != null && result.auditRecord().digitalSignature() != null)
+                        ? result.auditRecord().digitalSignature() : "N/A";
 
-                if (smartDelta != null) {
-                    appendLog("[S.M.A.R.T. INTEGRITY] " + smartDelta.integrityVerdict());
-                    appendLog("[S.M.A.R.T. DELTA] " + smartDelta.formattedSummary());
+                if (pdfPath != null) {
+                    appendLog("[PDF] Exported PDF Certificate: " + pdfPath);
                 }
 
-                String stdString = selectedPolicy.getName();
-                String auditPayload = target.model() + "|" + target.serial() + "|" + target.formattedSize() + "|" + stdString + "|SUCCESS";
-                String signature = CryptoSigner.signData(auditPayload);
-
-                int preScore = (smartDelta != null && smartDelta.preWipe() != null) ? smartDelta.preWipe().healthScore() : 100;
-                int postScore = (smartDelta != null && smartDelta.postWipe() != null) ? smartDelta.postWipe().healthScore() : 100;
-                int badDelta = smartDelta != null ? smartDelta.badBlocksDelta() : 0;
-                int wearDelta = smartDelta != null ? smartDelta.wearDeltaPercent() : 0;
-                String deltaSummary = smartDelta != null ? smartDelta.formattedSummary() : "Integrity Verified: 0 Defects";
-
-                // Capture Thermal & Interface Telemetry for Certificate
-                int peakTemp = (thermalGraph != null) ? thermalGraph.getPeakTemp() : 0;
-                int pauseCount = (thermalGraph != null) ? thermalGraph.getPauseCount() : 0;
-                int certCrcErrors = (preWipeSnapshot != null) ? preWipeSnapshot.crcErrors() : 0;
-                String ifaceSummary = "OPTIMAL";
-                if (report != null && report.interfaceAnomaly() != null) {
-                    InterfaceAnomalyResult ia = report.interfaceAnomaly();
-                    ifaceSummary = ia.severity().getLabel() + ": " + ia.rootCauseDiagnosis();
-                }
-
-                String vStatus = vResult != null ? vResult.statusSummary() : "PASS — Zero Residual Data Confirmed (0.000% Entropy)";
-                long vSectors = vResult != null ? vResult.totalSectorsVerified() : 20480;
-                double vEntropy = vResult != null ? vResult.entropyScore() : 0.0000;
-                String vHash = vResult != null ? vResult.sha256Proof() : "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-
-                boolean dbSaved = AuditDb.saveRecord(
-                        target.model(),
-                        target.serial(),
-                        target.formattedSize(),
-                        stdString,
-                        "SUCCESS",
-                        signature,
-                        preScore,
-                        postScore,
-                        badDelta,
-                        wearDelta,
-                        deltaSummary,
-                        peakTemp,
-                        pauseCount,
-                        certCrcErrors,
-                        ifaceSummary,
-                        vStatus,
-                        vSectors,
-                        vEntropy,
-                        vHash
-                );
-
-                if (dbSaved) {
-                    appendLog("[DB] Saved audit record with S.M.A.R.T. Delta & Zero-Residual Entropy proof into SQLite database.");
-                    var nav = NavigationManager.getInstance();
-                    SecurityAuditLogger.logWipeAction(SecurityAuditLogger.EVENT_WIPE_COMPLETED,
-                            nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
-                            target.systemPath() + " (" + target.model() + ")", stdString, "SUCCESS");
-
-                    List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
-                    if (!records.isEmpty()) {
-                        AuditDb.AuditRecord latest = records.get(0);
-                        String pdfPath = CertificateGenerator.generateCertificate(latest);
-                        AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), stdString, true, pdfPath);
-                        if (pdfPath != null) {
-                            appendLog("[PDF] Exported PDF Certificate: " + pdfPath);
-                            showAlert(Alert.AlertType.INFORMATION, "Sanitization Complete",
-                                     "Data Wiping Finished Successfully!\n\n" +
-                                     "Sanitization Standard: " + stdString + "\n" +
-                                     "Zero-Residual Shannon Entropy: " + String.format(java.util.Locale.US, "%.4f bits/byte (0.000%%)", vEntropy) + "\n" +
-                                     "Verified Sectors Sampled: " + String.format(java.util.Locale.US, "%,d LBAs", vSectors) + "\n\n" +
-                                     "S.M.A.R.T. Wear & Integrity Delta: " + deltaSummary + "\n\n" +
-                                     "PDF Certificate Exported:\n" + pdfPath +
-                                     "\n\nRSA Signature: " + signature.substring(0, 30) + "...");
-                        }
-                    } else {
-                        AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), stdString, true, null);
-                    }
-                }
+                showAlert(Alert.AlertType.INFORMATION, "Sanitization Complete",
+                        "Data Wiping Finished Successfully!\n\n" +
+                        "Sanitization Standard: " + selectedPolicy.getName() + "\n" +
+                        "Zero-Residual Shannon Entropy: " + String.format(java.util.Locale.US, "%.4f bits/byte (0.000%%)", resEntropy) + "\n" +
+                        "Verified Sectors Sampled: " + String.format(java.util.Locale.US, "%,d LBAs", vSectors) + "\n\n" +
+                        "S.M.A.R.T. Wear & Integrity Delta: " + deltaSummary + "\n\n" +
+                        "PDF Certificate Exported:\n" + (pdfPath != null ? pdfPath : "Generated in application folder") +
+                        "\n\nRSA Signature: " + sig.substring(0, Math.min(30, sig.length())) + "...");
             } else {
-                // --- HARDWARE FAILURE & QUARANTINE ASSESSMENT BRANCH ---
                 SoundManager.playVerificationFailure(target.systemPath(), "Hardware defect or verification failure encountered.");
-                var nav = NavigationManager.getInstance();
-                SecurityAuditLogger.logWipeAction(SecurityAuditLogger.EVENT_WIPE_FAILED,
-                        nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
-                        target.systemPath() + " (" + target.model() + ")", selectedPolicy.getName(), "FAILED");
                 lblStatusMessage.setText("⚠️ SANITIZATION FAILED: HARDWARE DEFECT / BAD SECTORS ENCOUNTERED");
                 lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #EF4444;");
                 appendLog("\n⚠️ [CRITICAL DEFECT] Sector wiping encountered unrecoverable hardware I/O fault.");
 
-                SmartSnapshot postFailSnapshot =
-                        SmartDiagnostics.captureSnapshot(target);
-                SmartDelta failDelta =
-                        SmartDiagnostics.compareSnapshots(preWipeSnapshot, postFailSnapshot);
+                if (result != null && result.isQuarantined()) {
+                    QuarantineRecord qRecord = result.quarantineRecord();
+                    String quarantinePdfPath = result.quarantinePdfPath();
+                    String alertMsg = String.format(
+                            java.util.Locale.US,
+                            """
+                            ⚠️ HARDWARE DEFECT DETECTED — ASSET QUARANTINED!
+                            
+                            The target drive encountered unrecoverable hardware I/O errors and cannot be safely sanitized via software overwrite.
+                            
+                            • Quarantine Tracking ID: %s
+                            • Device Model:           %s
+                            • Serial Number:          %s
+                            • Failing Sectors Logged: %,d bad block LBA(s)
+                            
+                            ──────────────────────────────────────────────────────
+                            🔥 MANDATORY PHYSICAL DISPOSITION DIRECTIVE:
+                            %s
+                            Standard: %s
+                            %s
+                            ──────────────────────────────────────────────────────
+                            
+                            Official Defective Hardware Quarantine Order Exported:
+                            %s
+                            """,
+                            qRecord.quarantineId(),
+                            qRecord.driveModel(),
+                            qRecord.serialNumber(),
+                            qRecord.totalBadSectorsDetected(),
+                            qRecord.destructionRecommendation().getTitle().toUpperCase(),
+                            qRecord.destructionRecommendation().getStandardReference(),
+                            qRecord.destructionRecommendation().getTechnicalDescription(),
+                            quarantinePdfPath != null ? quarantinePdfPath : "Generated in application folder"
+                    );
 
-                int preScore = (failDelta != null && failDelta.preWipe() != null) ? failDelta.preWipe().healthScore() : 90;
-                int postScore = (failDelta != null && failDelta.postWipe() != null) ? failDelta.postWipe().healthScore() : 40;
-                String deltaSummary = failDelta != null ? failDelta.formattedSummary() : "Critical I/O Defect: Bad Sectors Encountered";
-
-                QuarantineRecord qRecord = QuarantineEngine.assessHardwareFailure(
-                        target.model(),
-                        target.serial(),
-                        target.formattedSize(),
-                        target.systemPath(),
-                        selectedPolicy.getName(),
-                        "Unrecoverable Hardware I/O Fault / Defective Blocks",
-                        detectedBadSectors,
-                        preScore,
-                        postScore,
-                        deltaSummary
-                );
-
-                AlertDispatcher.notifyQuarantineDefect(
-                        target.model(), target.serial(), qRecord.quarantineId(),
-                        "Unrecoverable Hardware I/O Fault (" + detectedBadSectors.size() + " bad LBAs)",
-                        qRecord.destructionRecommendation().getTitle()
-                );
-                AlertDispatcher.notifySingleWipeCompleted(target.model(), target.serial(), selectedPolicy.getName(), false, null);
-
-                // Save Quarantined Record to SQLite
-                AuditDb.saveRecord(
-                        target.model(),
-                        target.serial(),
-                        target.formattedSize(),
-                        selectedPolicy.getName(),
-                        "QUARANTINED_DEFECTIVE",
-                        qRecord.digitalAttestationSignature(),
-                        preScore,
-                        postScore,
-                        detectedBadSectors.size(),
-                        100,
-                        "QUARANTINED: " + qRecord.destructionRecommendation().getTitle(),
-                        (thermalGraph != null) ? thermalGraph.getPeakTemp() : 0,
-                        0,
-                        detectedBadSectors.size(),
-                        "HARDWARE_DEFECT_EIO",
-                        "FAIL — Defective LBAs Prevented Overwrite",
-                        0,
-                        8.0000,
-                        "SHA256:HARDWARE_QUARANTINE_NON_COMPLIANT"
-                );
-
-                String quarantinePdfPath = QuarantineReportGenerator.generatePdfReport(qRecord);
-                if (quarantinePdfPath != null) {
-                    appendLog("[QUARANTINE REPORT] Generated Physical Destruction Order: " + quarantinePdfPath);
+                    showAlert(Alert.AlertType.ERROR, "⚠️ Hardware Quarantine Directive", alertMsg);
                 }
-
-                String alertMsg = String.format(
-                        java.util.Locale.US,
-                        """
-                        ⚠️ HARDWARE DEFECT DETECTED — ASSET QUARANTINED!
-                        
-                        The target drive encountered unrecoverable hardware I/O errors and cannot be safely sanitized via software overwrite.
-                        
-                        • Quarantine Tracking ID: %s
-                        • Device Model:           %s
-                        • Serial Number:          %s
-                        • Failing Sectors Logged: %,d bad block LBA(s)
-                        
-                        ──────────────────────────────────────────────────────
-                        🔥 MANDATORY PHYSICAL DISPOSITION DIRECTIVE:
-                        %s
-                        Standard: %s
-                        %s
-                        ──────────────────────────────────────────────────────
-                        
-                        Official Defective Hardware Quarantine Order Exported:
-                        %s
-                        """,
-                        qRecord.quarantineId(),
-                        qRecord.driveModel(),
-                        qRecord.serialNumber(),
-                        qRecord.totalBadSectorsDetected(),
-                        qRecord.destructionRecommendation().getTitle().toUpperCase(),
-                        qRecord.destructionRecommendation().getStandardReference(),
-                        qRecord.destructionRecommendation().getTechnicalDescription(),
-                        quarantinePdfPath != null ? quarantinePdfPath : "Generated in application folder"
-                );
-
-                showAlert(Alert.AlertType.ERROR, "⚠️ Hardware Quarantine Directive", alertMsg);
             }
             setUiControlsDisabled(false);
         });
@@ -818,6 +600,57 @@ public class WipingView {
         });
 
         new Thread(task).start();
+    }
+
+    private void handleLiveMetrics(WipeMetrics metrics) {
+        double p = metrics.overallPercent() / 100.0;
+        progressBar.setProgress(p);
+        lblProgressPercent.setText(metrics.formattedProgress());
+        lblLiveSpeed.setText("⚡ " + metrics.formattedSpeed());
+        lblLiveEta.setText("⏳ ~" + metrics.formattedEta() + " remaining");
+        lblCurrentPass.setText(metrics.formattedPassSummary());
+        lblCurrentPass.getStyleClass().setAll("telemetry-chip", "telemetry-chip-green");
+
+        if (metrics.overallPercent() >= 100.0) {
+            triggerCompletionGlow();
+        }
+
+        if (metrics.isThermalPaused()) {
+            lblStatusMessage.setText("⏸ THERMAL PAUSE: Cooling down drive (" + metrics.tempCelsius() + "°C)...");
+            lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #EF4444;");
+            if (thermalGraph != null) {
+                thermalGraph.recordEvent(metrics.tempCelsius(), "AUTO_PAUSE", "Auto-Pause Safeguard");
+                thermalGraph.addSample(metrics.tempCelsius(), metrics.throttlePercent(), metrics.throttleState());
+            }
+        } else if (metrics.isThrottled()) {
+            lblStatusMessage.setText(String.format("⚡ THERMAL THROTTLING (%d%%): %s | %s | %s | %d°C",
+                    metrics.throttlePercent(), metrics.formattedPassSummary(), metrics.formattedSpeed(), metrics.formattedEta(), metrics.tempCelsius()));
+            lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #D97706;");
+            if (thermalGraph != null) {
+                thermalGraph.recordEvent(metrics.tempCelsius(), "THROTTLE", "⚡ Throttle Engaged (" + metrics.throttlePercent() + "%)");
+                thermalGraph.addSample(metrics.tempCelsius(), metrics.throttlePercent(), metrics.throttleState());
+            }
+        } else {
+            lblStatusMessage.setText(String.format("Wiping: %s | %s | %s | %d°C",
+                    metrics.formattedPassSummary(), metrics.formattedSpeed(), metrics.formattedEta(), metrics.tempCelsius()));
+            lblStatusMessage.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #1E293B;");
+            if (thermalGraph != null) {
+                thermalGraph.addSample(metrics.tempCelsius(), metrics.throttlePercent(), metrics.throttleState());
+            }
+        }
+
+        if (lblLiveTempBadge != null) {
+            String throttleSuffix = metrics.isThrottled() ? " [⚡ Throttled " + metrics.throttlePercent() + "%]" : "";
+            lblLiveTempBadge.setText(String.format("Temp: %d °C (%s)%s", metrics.tempCelsius(), metrics.thermalStatus().name(), throttleSuffix));
+            lblLiveTempBadge.setStyle(String.format(
+                    "-fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color: %s; -fx-text-fill: %s; -fx-padding: 4 10; -fx-background-radius: 4px;",
+                    metrics.thermalStatus().getBgColor(), metrics.thermalStatus().getTextColor()
+            ));
+        }
+        if (ioOscilloscope != null) {
+            ioOscilloscope.addSample(metrics);
+        }
+        sectorMatrix.updateProgress(metrics);
     }
 
     private void triggerCompletionGlow() {

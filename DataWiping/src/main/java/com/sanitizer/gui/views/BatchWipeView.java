@@ -1,19 +1,22 @@
 package com.sanitizer.gui.views;
 
 import com.sanitizer.alert.AlertDispatcher;
-import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.SmartDiagnostics;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
 import com.sanitizer.engine.WipeMetrics;
+import com.sanitizer.engine.WipeVerifier;
 import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
-import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
+import com.sanitizer.service.SanitizationWorkflowService;
+import com.sanitizer.service.WorkflowCallbacks;
+import com.sanitizer.service.WorkflowRequest;
+import com.sanitizer.service.WorkflowResult;
 import com.sanitizer.shield.WorkerPoolGovernor;
 import com.sanitizer.util.SoundManager;
 import javafx.application.Platform;
@@ -701,7 +704,33 @@ public class BatchWipeView {
             activeTasks.remove(drive.systemPath());
             liveMetricsMap.remove(drive.systemPath());
 
-            if (success) {
+            int peakTemp = (lastMetrics != null) ? lastMetrics.tempCelsius() : 0;
+            WorkflowRequest request = new WorkflowRequest(
+                    drive.systemPath(),
+                    drive.model(),
+                    drive.serial(),
+                    drive.sizeBytes(),
+                    drive.formattedSize(),
+                    policy != null ? policy : WipePolicyManager.getInstance().getDefaultPolicy(),
+                    WipeVerifier.VerificationMode.FAST_SAMPLE_5_PERCENT,
+                    true,
+                    NavigationManager.getInstance().getSessionContext(),
+                    peakTemp,
+                    0,
+                    preWipeCrcErrors,
+                    preWipeIfaceSummary
+            );
+
+            WorkflowResult result = SanitizationWorkflowService.getInstance().finalizeWipe(
+                    request,
+                    success,
+                    Collections.emptyList(),
+                    peakTemp,
+                    0,
+                    WorkflowCallbacks.none()
+            );
+
+            if (result.success()) {
                 SoundManager.playSanitizationComplete(drive.systemPath(), policy != null ? policy.getName() : "NIST SP 800-88", 0.0);
                 progressBar.setProgress(1.0);
                 pctLabel.setText("100.0% — Pass Verified");
@@ -714,51 +743,7 @@ public class BatchWipeView {
                 statusBadge.getStyleClass().setAll("badge-success");
                 heatmap.setCompleted();
 
-                // Compute S.M.A.R.T. Wear & Integrity Delta
-                SmartDiagnostics.SmartSnapshot postWipeSnapshot =
-                        SmartDiagnostics.captureSnapshot(drive);
-                SmartDiagnostics.SmartDelta smartDelta =
-                        SmartDiagnostics.compareSnapshots(preWipeSnapshot, postWipeSnapshot);
-
-                int preScore = (smartDelta != null && smartDelta.preWipe() != null) ? smartDelta.preWipe().healthScore() : 100;
-                int postScore = (smartDelta != null && smartDelta.postWipe() != null) ? smartDelta.postWipe().healthScore() : 100;
-                int badDelta = smartDelta != null ? smartDelta.badBlocksDelta() : 0;
-                int wearDelta = smartDelta != null ? smartDelta.wearDeltaPercent() : 0;
-                String deltaSummary = smartDelta != null ? smartDelta.formattedSummary() : "Integrity Verified: 0 Defects";
-
-                String payload = drive.model() + "|" + drive.serial() + "|" + drive.formattedSize() + "|" + policy.getName() + "|SUCCESS";
-                String sig = CryptoSigner.signData(payload);
-
-                // Capture peak thermal data from last wipe metrics
-                int peakTemp = (lastMetrics != null) ? lastMetrics.tempCelsius() : 0;
-
-                AuditDb.saveRecord(
-                        drive.model(),
-                        drive.serial(),
-                        drive.formattedSize(),
-                        policy.getName(),
-                        "SUCCESS",
-                        sig,
-                        preScore,
-                        postScore,
-                        badDelta,
-                        wearDelta,
-                        deltaSummary,
-                        peakTemp,
-                        0, // Batch mode: no per-drive pause count tracked separately
-                        preWipeCrcErrors,
-                        preWipeIfaceSummary
-                );
-
-                String pdfPath = null;
-                List<AuditDb.AuditRecord> recs = AuditDb.getAllRecords();
-                if (!recs.isEmpty()) {
-                    pdfPath = CertificateGenerator.generateCertificate(recs.get(0));
-                }
-
-                AlertDispatcher.notifySingleWipeCompleted(
-                        drive.model(), drive.serial(), policy.getName(), true, pdfPath);
-
+                String deltaSummary = result.smartDelta() != null ? result.smartDelta().formattedSummary() : "Integrity Verified: 0 Defects";
                 NavigationManager.getInstance().showNotification("Drive Sanitized",
                         drive.model() + " sanitized & certified. S.M.A.R.T. Delta: " + deltaSummary, ToastType.SUCCESS);
             } else {
@@ -768,9 +753,6 @@ public class BatchWipeView {
                 passBadge.setText("Wipe Failed");
                 passBadge.setStyle("-fx-font-size: 11px; -fx-background-color: #FEE2E2; -fx-text-fill: #991B1B; -fx-padding: 4 10; -fx-background-radius: 6px; -fx-font-weight: bold;");
                 heatmap.setAborted();
-
-                AlertDispatcher.notifySingleWipeCompleted(
-                        drive.model(), drive.serial(), policy.getName(), false, null);
 
                 NavigationManager.getInstance().showNotification("Wipe Failed",
                         drive.model() + " sanitization failed.", ToastType.ERROR);
