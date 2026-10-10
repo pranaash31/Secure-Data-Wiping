@@ -2,22 +2,18 @@ package com.sanitizer.gui.views;
 
 import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.audit.SecurityAuditRecord;
-import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
-import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
-import com.sanitizer.pdf.CertificateGenerator;
-import com.sanitizer.quarantine.QuarantineEngine;
-import com.sanitizer.quarantine.QuarantineRecord;
-import com.sanitizer.quarantine.QuarantineReportGenerator;
-import com.sanitizer.report.AuditExporter;
+import com.sanitizer.service.AuditExportService;
+import com.sanitizer.service.AuditService;
+import com.sanitizer.service.ExportFormat;
+import javafx.application.Platform;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
-import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
@@ -33,6 +29,7 @@ import java.util.List;
 public class AuditView {
 
     private final VBox rootContainer = new VBox(16);
+    private final AuditService auditService;
 
     // Tab 1: Sanitization History
     private TableView<AuditDb.AuditRecord> tblAuditHistory;
@@ -46,6 +43,11 @@ public class AuditView {
     private FilteredList<SecurityAuditRecord> filteredSecurityData;
 
     public AuditView() {
+        this(AuditExportService.getInstance());
+    }
+
+    public AuditView(AuditService auditService) {
+        this.auditService = (auditService != null) ? auditService : AuditExportService.getInstance();
         buildUi();
         loadAuditHistory();
         loadSecurityHistory();
@@ -348,16 +350,7 @@ public class AuditView {
     private void loadAuditHistory() {
         List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
         auditData.setAll(records);
-
-        EsgCalculator.EsgMetrics esg = EsgCalculator.calculateAggregate(records);
-        lblEsgBannerText.setText(String.format(
-                java.util.Locale.US,
-                "🌱 Corporate ESG Impact: %.1f kg E-Waste Diverted | %.1f kg CO₂ Mitigated (~%.2f Tree Seedlings Equiv.) across %d sanitized devices",
-                esg.eWasteDivertedKg(),
-                esg.co2EmissionsSavedKg(),
-                esg.treesEquivalent(),
-                records.size()
-        ));
+        lblEsgBannerText.setText(auditService.formatEsgBannerText(records));
     }
 
     private void loadSecurityHistory() {
@@ -400,7 +393,7 @@ public class AuditView {
     }
 
     private void handleVerifySecurityEventChain() {
-        var res = SecurityAuditLogger.verifySecurityLedgerIntegrity();
+        var res = auditService.verifySecurityLedger();
         showSecurityLedgerVerificationDialog(res);
     }
 
@@ -473,39 +466,8 @@ public class AuditView {
 
     private void handleExportEsgReport() {
         List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
-        EsgCalculator.EsgMetrics esg = EsgCalculator.calculateAggregate(records);
-
-        String report = String.format(
-                java.util.Locale.US,
-                """
-                =======================================================
-                🌱 ENTERPRISE ESG SUSTAINABILITY & CIRCULAR ECONOMY AUDIT
-                Standard: ISO 14064-1 / GHG Protocol Scope 3 Compliant
-                =======================================================
-                Total Sanitized Assets for Circular Reuse: %d devices
-                Total Storage Capacity Sanitized: %s
-                -------------------------------------------------------
-                E-Waste Diverted from Landfills: %.1f kg
-                Scope 3 CO₂ Emissions Mitigated: %.1f kg CO₂e
-                10-Year Tree Seedlings Equivalent: %.2f trees
-                Manufacturing Power Conserved: %.1f kWh
-                Circular Economy Disposal Index: 100%% Zero-Landfill
-                -------------------------------------------------------
-                Executive Compliance Proof:
-                %s
-                =======================================================
-                """,
-                records.size(),
-                EsgCalculator.formatGb(esg.capacityGb()),
-                esg.eWasteDivertedKg(),
-                esg.co2EmissionsSavedKg(),
-                esg.treesEquivalent(),
-                esg.energySavedKwh(),
-                esg.impactStatement()
-        );
-
-        var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
-        SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "ESG Corporate Sustainability Report", "In-App Dialog");
+        var nav = NavigationManager.getInstance();
+        String report = auditService.generateEsgReport(records, nav.getSessionContext());
         loadSecurityHistory();
         showAlert(Alert.AlertType.INFORMATION, "🌱 ESG Corporate Sustainability Audit Report", report);
     }
@@ -515,51 +477,11 @@ public class AuditView {
         if (records.isEmpty()) {
             records = AuditDb.getAllRecords();
         }
-
-        AuditExporter.ComplianceSummary s = AuditExporter.generateComplianceSummary(records);
-
-        String summaryText = String.format(
-                java.util.Locale.US,
-                """
-                ══════════════════════════════════════════════════════════════
-                📊 CONSOLIDATED ENTERPRISE SANITIZATION COMPLIANCE KPIS
-                Standard: NIST SP 800-88 R1 / ISO 27040 / EU GDPR Art. 17
-                ══════════════════════════════════════════════════════════════
-                • Total Storage Assets Processed: %d devices
-                • Successful Sanitizations:       %d devices (%.2f%%)
-                • Failed Sanitization Attempts:   %d devices
-                • Total Data Volume Sanitized:    %s (%d bytes)
-                • Average Residual Shannon Score: %.4f bits/byte (Target: 0.000)
-                • Earliest Logged Audit Entry:    %s
-                • Latest Logged Audit Entry:      %s
-                ──────────────────────────────────────────────────────────────
-                🌱 Corporate ESG & Scope 3 Sustainability Impact:
-                • E-Waste Diverted from Landfills: %.1f kg
-                • Scope 3 CO₂ Emissions Mitigated: %.1f kg CO₂e
-                • 10-Year Tree Seedlings Saved:    %.2f trees
-                • Manufacturing Power Conserved:   %.1f kWh
-                • Circular Disposition Index:      100%% Zero-Landfill E-Waste
-                ══════════════════════════════════════════════════════════════
-                """,
-                s.totalDrivesProcessed(),
-                s.successCount(),
-                s.passRatePercent(),
-                s.failureCount(),
-                s.formattedTotalCapacity(),
-                s.totalCapacityBytes(),
-                s.averageResidualEntropy(),
-                s.earliestRecordTimestamp(),
-                s.latestRecordTimestamp(),
-                s.esgImpact().eWasteDivertedKg(),
-                s.esgImpact().co2EmissionsSavedKg(),
-                s.esgImpact().treesEquivalent(),
-                s.esgImpact().energySavedKwh()
-        );
-
+        String summaryText = auditService.generateComplianceSummaryText(records);
         showAlert(Alert.AlertType.INFORMATION, "📊 Executive Compliance & Sanitization KPIs", summaryText);
     }
 
-    private void handleBatchExport(String format) {
+    private void handleBatchExport(String formatStr) {
         List<AuditDb.AuditRecord> records = new ArrayList<>(filteredData);
         if (records.isEmpty()) {
             records = AuditDb.getAllRecords();
@@ -570,62 +492,36 @@ public class AuditView {
             return;
         }
 
+        ExportFormat format = ExportFormat.fromString(formatStr);
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Save Sanitization Audit Report (" + format + ")");
+        fileChooser.setTitle("Save Sanitization Audit Report (" + format.getLabel() + ")");
         String timestamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
                 .withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.now());
 
-        switch (format.toUpperCase()) {
-            case "CSV" -> {
-                fileChooser.setInitialFileName("Sanitization_Audit_Report_" + timestamp + ".csv");
-                fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Comma Delimited (*.csv)", "*.csv"));
-            }
-            case "JSON" -> {
-                fileChooser.setInitialFileName("Sanitization_Audit_Report_" + timestamp + ".json");
-                fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Data (*.json)", "*.json"));
-            }
-            case "EXCEL" -> {
-                fileChooser.setInitialFileName("Sanitization_Audit_Report_" + timestamp + ".xml");
-                fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Excel Spreadsheet XML (*.xml, *.xls)", "*.xml", "*.xls"));
-            }
-        }
+        fileChooser.setInitialFileName("Sanitization_Audit_Report_" + timestamp + format.getExtension());
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(format.getDescription(), "*" + format.getExtension()));
 
         File targetFile = fileChooser.showSaveDialog(rootContainer.getScene() != null ? rootContainer.getScene().getWindow() : null);
         if (targetFile == null) return;
 
-        final List<AuditDb.AuditRecord> exportList = records;
-        Task<Void> exportTask = new Task<>() {
-            @Override
-            protected Void call() throws Exception {
-                switch (format.toUpperCase()) {
-                    case "CSV" -> AuditExporter.exportToCsv(exportList, targetFile);
-                    case "JSON" -> AuditExporter.exportToJson(exportList, targetFile);
-                    case "EXCEL" -> AuditExporter.exportToExcelXml(exportList, targetFile);
-                }
-                return null;
-            }
-        };
-
-        exportTask.setOnSucceeded(ev -> {
-            var nav = NavigationManager.getInstance();
-            SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), format + " Batch Export", targetFile.getAbsolutePath());
-            loadSecurityHistory();
-            nav.showNotification(
-                    format + " Export Successful",
-                    "Exported " + exportList.size() + " records to: " + targetFile.getName(),
-                    ToastType.SUCCESS
-            );
-        });
-
-        exportTask.setOnFailed(ev -> {
-            Throwable ex = exportTask.getException();
-            NavigationManager.getInstance().showNotification(
-                    "Export Failed", ex != null ? ex.getMessage() : "Unknown export error",
-                    ToastType.ERROR
-            );
-        });
-
-        new Thread(exportTask, "audit-export-thread").start();
+        var nav = NavigationManager.getInstance();
+        auditService.exportBatchAsync(records, targetFile, format, nav.getSessionContext())
+                .thenAcceptAsync(result -> {
+                    if (result.success()) {
+                        loadSecurityHistory();
+                        nav.showNotification(
+                                format.getLabel() + " Export Successful",
+                                result.message(),
+                                ToastType.SUCCESS
+                        );
+                    } else {
+                        nav.showNotification(
+                                "Export Failed",
+                                result.message(),
+                                ToastType.ERROR
+                        );
+                    }
+                }, Platform::runLater);
     }
 
     private void handleExportFullPackage() {
@@ -644,44 +540,24 @@ public class AuditView {
         File targetDir = dirChooser.showDialog(rootContainer.getScene() != null ? rootContainer.getScene().getWindow() : null);
         if (targetDir == null) return;
 
-        final List<AuditDb.AuditRecord> exportList = records;
-        String timestamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
-                .withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.now());
-
-        File csvFile = new File(targetDir, "Sanitization_Audit_" + timestamp + ".csv");
-        File jsonFile = new File(targetDir, "Sanitization_Audit_" + timestamp + ".json");
-        File excelFile = new File(targetDir, "Sanitization_Audit_" + timestamp + ".xml");
-
-        Task<Void> packageTask = new Task<>() {
-            @Override
-            protected Void call() throws Exception {
-                AuditExporter.exportToCsv(exportList, csvFile);
-                AuditExporter.exportToJson(exportList, jsonFile);
-                AuditExporter.exportToExcelXml(exportList, excelFile);
-                return null;
-            }
-        };
-
-        packageTask.setOnSucceeded(ev -> {
-            var nav = NavigationManager.getInstance();
-            SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Full Audit Package", targetDir.getAbsolutePath());
-            loadSecurityHistory();
-            nav.showNotification(
-                    "Audit Package Exported",
-                    "Generated CSV, JSON, and Excel reports in " + targetDir.getName(),
-                    ToastType.SUCCESS
-            );
-        });
-
-        packageTask.setOnFailed(ev -> {
-            Throwable ex = packageTask.getException();
-            NavigationManager.getInstance().showNotification(
-                    "Package Export Failed", ex != null ? ex.getMessage() : "Unknown error",
-                    ToastType.ERROR
-            );
-        });
-
-        new Thread(packageTask, "audit-package-thread").start();
+        var nav = NavigationManager.getInstance();
+        auditService.exportFullPackageAsync(records, targetDir, nav.getSessionContext())
+                .thenAcceptAsync(result -> {
+                    if (result.success()) {
+                        loadSecurityHistory();
+                        nav.showNotification(
+                                "Audit Package Exported",
+                                result.message(),
+                                ToastType.SUCCESS
+                        );
+                    } else {
+                        nav.showNotification(
+                                "Package Export Failed",
+                                result.message(),
+                                ToastType.ERROR
+                        );
+                    }
+                }, Platform::runLater);
     }
 
     private void handleExportPdf() {
@@ -692,29 +568,16 @@ public class AuditView {
             return;
         }
 
-        Task<String> pdfTask = new Task<>() {
-            @Override
-            protected String call() {
-                return CertificateGenerator.generateCertificate(selected);
-            }
-        };
-        pdfTask.setOnSucceeded(ev -> {
-            String pdfPath = pdfTask.getValue();
-            if (pdfPath != null) {
-                var nav = NavigationManager.getInstance();
-                SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "PDF Sanitization Certificate", pdfPath);
-                loadSecurityHistory();
-                nav.showNotification("PDF Exported",
-                        "Certificate generated at: " + pdfPath, ToastType.SUCCESS);
-            } else {
-                NavigationManager.getInstance().showNotification("Export Error",
-                        "Failed to generate PDF Certificate.", ToastType.ERROR);
-            }
-        });
-        pdfTask.setOnFailed(ev ->
-            NavigationManager.getInstance().showNotification("Export Error",
-                    pdfTask.getException().getMessage(), ToastType.ERROR));
-        new Thread(pdfTask, "audit-pdf-export-thread").start();
+        var nav = NavigationManager.getInstance();
+        auditService.exportCertificatePdfAsync(selected, nav.getSessionContext())
+                .thenAcceptAsync(result -> {
+                    if (result.success()) {
+                        loadSecurityHistory();
+                        nav.showNotification("PDF Exported", result.message(), ToastType.SUCCESS);
+                    } else {
+                        nav.showNotification("Export Error", result.message(), ToastType.ERROR);
+                    }
+                }, Platform::runLater);
     }
 
     private void handleExportQuarantineReport() {
@@ -725,40 +588,16 @@ public class AuditView {
             return;
         }
 
-        Task<String> qTask = new Task<>() {
-            @Override
-            protected String call() {
-                QuarantineRecord qRecord = QuarantineEngine.assessHardwareFailure(
-                        selected.driveModel(),
-                        selected.serialNumber(),
-                        selected.capacity(),
-                        null,
-                        selected.wipeStandard(),
-                        "Defective Blocks / Non-Compliant Sanitization Attempt",
-                        List.of(),
-                        selected.preHealthScore(),
-                        selected.postHealthScore(),
-                        selected.smartDeltaSummary()
-                );
-                return QuarantineReportGenerator.generatePdfReport(qRecord);
-            }
-        };
-
-        qTask.setOnSucceeded(ev -> {
-            String qPath = qTask.getValue();
-            if (qPath != null) {
-                var nav = NavigationManager.getInstance();
-                SecurityAuditLogger.logExport(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "Quarantine Destruction Order", qPath);
-                loadSecurityHistory();
-                nav.showNotification("Quarantine Report Exported",
-                        "Order generated at: " + qPath, ToastType.SUCCESS);
-            }
-        });
-
-        qTask.setOnFailed(ev ->
-            NavigationManager.getInstance().showNotification("Report Error",
-                    qTask.getException().getMessage(), ToastType.ERROR));
-        new Thread(qTask, "quarantine-pdf-thread").start();
+        var nav = NavigationManager.getInstance();
+        auditService.exportQuarantineReportPdfAsync(selected, nav.getSessionContext())
+                .thenAcceptAsync(result -> {
+                    if (result.success()) {
+                        loadSecurityHistory();
+                        nav.showNotification("Quarantine Report Exported", result.message(), ToastType.SUCCESS);
+                    } else {
+                        nav.showNotification("Report Error", result.message(), ToastType.ERROR);
+                    }
+                }, Platform::runLater);
     }
 
     private void handleVerifySignature() {
@@ -769,9 +608,7 @@ public class AuditView {
             return;
         }
 
-        String payload = selected.driveModel() + "|" + selected.serialNumber() + "|" + selected.capacity() + "|" + selected.wipeStandard() + "|" + selected.status();
-        boolean valid = CryptoSigner.verifySignature(payload, selected.digitalSignature());
-
+        boolean valid = auditService.verifyRecordSignature(selected);
         if (valid) {
             NavigationManager.getInstance().showNotification("Signature Authenticated",
                     "SHA256withRSA signature matches payload!", ToastType.SUCCESS);
@@ -786,11 +623,8 @@ public class AuditView {
     }
 
     private void handleVerifyLedgerIntegrity() {
-        var result = AuditDb.verifyDatabaseIntegrity();
-        var nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
-        SecurityAuditLogger.logEvent(SecurityAuditLogger.EVENT_LEDGER_VERIFIED, nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
-                "Sanitization DB Ledger Verification: " + (result.isFullyValid() ? "PASSED (100% Tamper Proof)" : "FAILED"), "sanitizer_history.db",
-                result.isFullyValid() ? "SUCCESS" : "FAILED");
+        var nav = NavigationManager.getInstance();
+        var result = auditService.verifyDatabaseLedger(nav.getSessionContext());
         loadSecurityHistory();
         showLedgerVerificationDialog(result);
     }

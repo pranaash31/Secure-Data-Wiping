@@ -23,7 +23,7 @@
 ```mermaid
 flowchart TD
     UI[JavaFX UI Layer\nNavigationManager / Views / Components] --> SESS[Session & RBAC Guard\nUserRole: Tier 1/2/3 & AutoLock]
-    UI --> SRVC[Application Service Layer\nSanitizationWorkflowService]
+    UI --> SRVC[Application Service Layer\nSanitizationWorkflowService & AuditExportService]
     SRVC --> DET[Hardware Detection & Health\nUsbDetector / SmartDiagnostics]
     SRVC --> SHIELD[Safety Interceptor Shield\nSystemDiskShield & DiskLockShield]
     SHIELD --> GOV[Concurrency Governor\nWorkerPoolGovernor: CPU & Memory Guard]
@@ -270,8 +270,17 @@ DWproject/
     8. Exports official PDF compliance certificates via `CertificateGenerator`.
     9. Dispatches notifications to webhooks and email via `AlertDispatcher`.
     10. In case of hardware write faults, triggers `QuarantineEngine` and generates DIN 66399 physical destruction orders.
-* **`WorkflowRequest.java`**, **`WorkflowResult.java`**, **`WorkflowCallbacks.java`**:
-  * **Role**: Strongly-typed, immutable value objects decoupling GUI controllers (e.g. `WipingView`, `WipeWizardView`, `BatchWipeView`) and headless CLI runners from low-level subsystem internals.
+* **`AuditService.java` & `AuditExportService.java`**:
+  * **Role**: Headless enterprise reporting and compliance service decoupling `AuditView` from raw file formats, background threads, and SIEM event logging.
+  * **Capabilities**:
+    1. **Asynchronous Batch Export (`exportBatchAsync`)**: Generates CSV, JSON, and Excel SpreadsheetML files via daemon worker threads without blocking JavaFX.
+    2. **Full Corporate Audit Bundle (`exportFullPackageAsync`)**: Simultaneously generates timestamped CSV, JSON, and XML reports into a target directory.
+    3. **Official PDF Certificate Issuance (`exportCertificatePdfAsync`)**: Generates tamper-proof Apache PDFBox certificates.
+    4. **Quarantine Work Orders (`exportQuarantineReportPdfAsync`)**: Assesses hardware failure parameters and generates DIN 66399 physical destruction orders.
+    5. **Executive Analytics (`generateEsgReport`, `generateComplianceSummaryText`, `formatEsgBannerText`)**: Generates standardized ISO 14064-1 ESG summaries and NIST SP 800-88 / ISO 27040 compliance KPI reports.
+    6. **Cryptographic Validation & SIEM (`verifyDatabaseLedger`, `verifySecurityLedger`, `verifyRecordSignature`)**: Validates SHA-256 blockchain ledger integrity and logs all export operations to `SecurityAuditLogger`.
+* **Value & Data Records (`WorkflowRequest.java`, `WorkflowResult.java`, `WorkflowCallbacks.java`, `ExportResult.java`, `ExportFormat.java`)**:
+  * **Role**: Strongly-typed, immutable value objects decoupling GUI controllers (e.g. `WipingView`, `WipeWizardView`, `BatchWipeView`, `AuditView`) and headless CLI runners from low-level subsystem internals.
 
 ---
 
@@ -280,6 +289,8 @@ DWproject/
 | Module / Package | Class / File | Primary Responsibility |
 | :--- | :--- | :--- |
 | `service` | [SanitizationWorkflowService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/SanitizationWorkflowService.java) | Application service orchestrator coordinating diagnostics, wipe, verification, digital seal, audit, and quarantine |
+| `service` | [AuditExportService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/AuditExportService.java) | Application service orchestrator for asynchronous CSV/JSON/XML/PDF exports, ESG metrics, and SIEM logging |
+| `service` | [AuditService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/AuditService.java) | Service contract interface for audit reporting, compliance summaries, and ledger verification |
 | `engine` | [WipeEngine.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/engine/WipeEngine.java) | Overwrites raw block devices via `dd`, manages worker threads, pauses on thermal events |
 | `engine` | [WipeVerifier.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/engine/WipeVerifier.java) | Calculates Shannon Entropy ($H(X)$), verifies 0x00 pattern, produces SHA-256 proof |
 | `shield` | [SystemDiskShield.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/shield/SystemDiskShield.java) | Evaluates disk paths, protects OS root partitions (`disk0`, `C:`, `/dev/sda`) |
