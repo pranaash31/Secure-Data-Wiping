@@ -247,7 +247,7 @@ DWproject/
   * `KeyVaultView`: RSA-2048 keypair management, CA metadata configuration, and public key export.
   * `AuditView`: Historical wipe log table, certificate regeneration, and Excel/CSV/JSON export.
   * `VerificationPortalView`: Built-in certificate verification tester and server status manager.
-  * `SettingsView`: Platform configuration (thermal thresholds, alert webhooks, language, auto-lock timeouts).
+  * `SettingsView`: Modular configuration container assembling domain-isolated card components (`com.sanitizer.gui.views.settings`): `AccessibilitySettingsCard`, `AutoLockSecurityCard`, `CustomPolicyCard`, `ThermalPolicyCard`, `AlertDispatcherCard`, `AudioAlarmsCard`, `DatabaseMaintenanceCard`, `CryptoParametersCard`, `HardwareSafetyCard`, and `SystemInfoCard`.
   * `LockScreenOverlay`: Security lock screen overlay requesting PIN re-entry.
 * **Interactive Components**:
   * `SectorHeatmapComponent`: Colorblind-friendly block matrix visualizer (Dirty, Active Head, Pattern, Zeroed, Bad Sector) supporting Protanopia, Deuteranopia, Tritanopia, and Monochrome modes.
@@ -279,8 +279,16 @@ DWproject/
     4. **Quarantine Work Orders (`exportQuarantineReportPdfAsync`)**: Assesses hardware failure parameters and generates DIN 66399 physical destruction orders.
     5. **Executive Analytics (`generateEsgReport`, `generateComplianceSummaryText`, `formatEsgBannerText`)**: Generates standardized ISO 14064-1 ESG summaries and NIST SP 800-88 / ISO 27040 compliance KPI reports.
     6. **Cryptographic Validation & SIEM (`verifyDatabaseLedger`, `verifySecurityLedger`, `verifyRecordSignature`)**: Validates SHA-256 blockchain ledger integrity and logs all export operations to `SecurityAuditLogger`.
+* **`ConfigurationService.java` & `SystemConfigurationService.java`**:
+  * **Role**: Decoupled application configuration and maintenance service isolating hardware safety policies, operator chimes, external alerting, and database maintenance from GUI controllers.
+  * **Capabilities**:
+    1. **Database Maintenance (`exportDatabaseBackupAsync`, `clearAuditHistory`)**: Performs asynchronous streaming file backups of SQLite history and supervisor-authenticated audit log purges with SIEM tracking.
+    2. **Alert Orchestration (`saveAlertConfig`, `sendTestAlertAsync`)**: Validates and persists webhook/SMTP alert rules and executes asynchronous live test dispatches.
+    3. **Thermal Throttling Policies (`saveThermalPolicy`, `resetThermalPoliciesToDefaults`)**: Governs device-specific auto-pause/resume thermal safety rules with audit logging.
+    4. **Operator Bench Alarms (`saveAudioAlarmConfig`, `testAudioAlarm`)**: Manages synthesized voice speech templates, harmonic chimes, and visual laboratory flash alerts.
+    5. **Custom Sanitization Standards (`savePolicy`, `deletePolicy`, `exportPolicyToFile`, `importPolicyFromFile`)**: Manages custom multi-pass bit patterns and NIST/DoD sanitization policy JSON profile import/export.
 * **Value & Data Records (`WorkflowRequest.java`, `WorkflowResult.java`, `WorkflowCallbacks.java`, `ExportResult.java`, `ExportFormat.java`)**:
-  * **Role**: Strongly-typed, immutable value objects decoupling GUI controllers (e.g. `WipingView`, `WipeWizardView`, `BatchWipeView`, `AuditView`) and headless CLI runners from low-level subsystem internals.
+  * **Role**: Strongly-typed, immutable value objects decoupling GUI controllers (e.g. `WipingView`, `WipeWizardView`, `BatchWipeView`, `AuditView`, `SettingsView`) and headless CLI runners from low-level subsystem internals.
 
 ---
 
@@ -291,6 +299,8 @@ DWproject/
 | `service` | [SanitizationWorkflowService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/SanitizationWorkflowService.java) | Application service orchestrator coordinating diagnostics, wipe, verification, digital seal, audit, and quarantine |
 | `service` | [AuditExportService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/AuditExportService.java) | Application service orchestrator for asynchronous CSV/JSON/XML/PDF exports, ESG metrics, and SIEM logging |
 | `service` | [AuditService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/AuditService.java) | Service contract interface for audit reporting, compliance summaries, and ledger verification |
+| `service` | [ConfigurationService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/ConfigurationService.java) | Service contract interface for system backup, alert dispatching, thermal policies, audio alarms, and wipe standards |
+| `service` | [SystemConfigurationService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/SystemConfigurationService.java) | Application service orchestrator for asynchronous database backups, alerts, thermal safety, chimes, and JSON policies |
 | `engine` | [WipeEngine.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/engine/WipeEngine.java) | Overwrites raw block devices via `dd`, manages worker threads, pauses on thermal events |
 | `engine` | [WipeVerifier.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/engine/WipeVerifier.java) | Calculates Shannon Entropy ($H(X)$), verifies 0x00 pattern, produces SHA-256 proof |
 | `shield` | [SystemDiskShield.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/shield/SystemDiskShield.java) | Evaluates disk paths, protects OS root partitions (`disk0`, `C:`, `/dev/sda`) |
@@ -313,6 +323,8 @@ DWproject/
 | `esg` | [EsgCalculator.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/esg/EsgCalculator.java) | Computes avoided e-waste (kg), CO2e emissions saved, and tree seedling equivalencies |
 | `report` | [AuditExporter.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/report/AuditExporter.java) | Exports audit records to CSV, structured JSON, and Excel SpreadsheetML (XML) |
 | `gui` | [NavigationManager.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/gui/navigation/NavigationManager.java) | App router, view cache, RBAC enforcer, shortcut dispatcher, and scene manager |
+| `gui` | [SettingsView.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/gui/views/SettingsView.java) | Modular settings dashboard container assembling domain cards (A11y, Alerts, Thermal, Alarms, DB, Policies) |
+| `gui` | [`settings/*`](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/gui/views/settings) | Decomposed card components for WCAG/I18n, auto-lock, custom policies, thermal limits, alerts, audio, and database maintenance |
 
 ---
 
