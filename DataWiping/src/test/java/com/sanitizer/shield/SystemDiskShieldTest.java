@@ -54,5 +54,9 @@ class SystemDiskShieldTest {
 
         SystemDiskShield.SafetyVerdict winVerdict = SystemDiskShield.evaluate("\\\\.\\PhysicalDrive2");
         assertThat(winVerdict.isSafe()).isTrue();
+
+        SystemDiskShield.SafetyVerdict windowsTempFileVerdict =
+                SystemDiskShield.evaluate("C:\\Users\\runneradmin\\AppData\\Local\\Temp\\test_mock_drive.img");
+        assertThat(windowsTempFileVerdict.isSafe()).isTrue();
     }
 }

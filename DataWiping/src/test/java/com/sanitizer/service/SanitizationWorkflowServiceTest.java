@@ -73,7 +73,14 @@ class SanitizationWorkflowServiceTest {
                 badSector -> {}
         );
 
-        WorkflowResult result = SanitizationWorkflowService.getInstance().executeWorkflow(request, callbacks);
+        WorkflowResult result = SanitizationWorkflowService.getInstance().finalizeWipe(
+                request,
+                true,
+                List.of(),
+                45,
+                0,
+                callbacks
+        );
 
         assertThat(result).isNotNull();
         assertThat(result.success()).isTrue();

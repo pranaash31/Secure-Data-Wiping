@@ -9,7 +9,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,7 +70,7 @@ class UsbDetectorTest {
     @Test
     @DisplayName("Mock Hardware Harness simulates USB hot-plug event and notifies listeners")
     void testMockHardwareHotPlugNotification() {
-        List<List<UsbDetector.UsbDriveInfo>> listenerEvents = new ArrayList<>();
+        List<List<UsbDetector.UsbDriveInfo>> listenerEvents = Collections.synchronizedList(new ArrayList<>());
         AtomicInteger notificationCount = new AtomicInteger(0);
 
         UsbDetector.registerListener(drives -> {
@@ -80,8 +82,8 @@ class UsbDetectorTest {
         UsbDetector.UsbDriveInfo sanDisk = MockHardwareHarness.createSanDisk32GB();
         harness.connectDrive(sanDisk);
 
-        assertThat(notificationCount.get()).isGreaterThanOrEqualTo(1);
-        List<UsbDetector.UsbDriveInfo> lastEventDrives = listenerEvents.get(listenerEvents.size() - 1);
+        awaitEvents(listenerEvents, notificationCount, 1);
+        List<UsbDetector.UsbDriveInfo> lastEventDrives = getLastEvent(listenerEvents);
         assertThat(lastEventDrives).hasSize(1);
         assertThat(lastEventDrives.get(0).model()).contains("SanDisk");
         assertThat(lastEventDrives.get(0).systemPath()).isEqualTo("/dev/rdisk4");
@@ -90,7 +92,8 @@ class UsbDetectorTest {
         UsbDetector.UsbDriveInfo kingston = MockHardwareHarness.createKingston64GB();
         harness.connectDrive(kingston);
 
-        lastEventDrives = listenerEvents.get(listenerEvents.size() - 1);
+        awaitEvents(listenerEvents, notificationCount, 2);
+        lastEventDrives = getLastEvent(listenerEvents);
         assertThat(lastEventDrives).hasSize(2);
         assertThat(lastEventDrives).extracting(UsbDetector.UsbDriveInfo::serial)
                 .containsExactlyInAnyOrder("SD-FLAIR-99421", "KG-DT100-3882");
@@ -98,8 +101,41 @@ class UsbDetectorTest {
         // 3. Hot-unplug SanDisk drive
         harness.disconnectDriveBySerial("SD-FLAIR-99421");
 
-        lastEventDrives = listenerEvents.get(listenerEvents.size() - 1);
+        awaitEvents(listenerEvents, notificationCount, 3);
+        lastEventDrives = getLastEvent(listenerEvents);
         assertThat(lastEventDrives).hasSize(1);
         assertThat(lastEventDrives.get(0).serial()).isEqualTo("KG-DT100-3882");
+    }
+
+    private void awaitEvents(List<List<UsbDetector.UsbDriveInfo>> listenerEvents,
+                             AtomicInteger notificationCount,
+                             int expectedMinimum) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (System.nanoTime() < deadline) {
+            if (notificationCount.get() >= expectedMinimum) {
+                synchronized (listenerEvents) {
+                    if (listenerEvents.size() >= expectedMinimum) {
+                        return;
+                    }
+                }
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
+        assertThat(notificationCount.get()).isGreaterThanOrEqualTo(expectedMinimum);
+        synchronized (listenerEvents) {
+            assertThat(listenerEvents.size()).isGreaterThanOrEqualTo(expectedMinimum);
+        }
+    }
+
+    private List<UsbDetector.UsbDriveInfo> getLastEvent(List<List<UsbDetector.UsbDriveInfo>> listenerEvents) {
+        synchronized (listenerEvents) {
+            return listenerEvents.get(listenerEvents.size() - 1);
+        }
     }
 }

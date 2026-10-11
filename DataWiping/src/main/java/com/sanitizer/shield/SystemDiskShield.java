@@ -67,7 +67,11 @@ public class SystemDiskShield {
                     String.format("CRITICAL SAFETY SHIELD: Primary system drive (%s) blocked from wiping!", systemPath));
         }
 
-        if (norm.contains("physicaldrive0") || norm.startsWith("c:") || norm.contains("\\\\.\\c:") || norm.equals("c")) {
+        if (norm.contains("physicaldrive0")
+                || norm.equals("c:")
+                || norm.equals("c:/")
+                || norm.equals("//./c:")
+                || norm.startsWith("c:/windows")) {
             return SafetyVerdict.blocked(systemPath,
                     String.format("CRITICAL SAFETY SHIELD: Primary Windows boot volume (%s) protected!", systemPath));
         }
