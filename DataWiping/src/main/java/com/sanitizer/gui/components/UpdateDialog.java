@@ -28,7 +28,9 @@ public class UpdateDialog {
         if (updateInfo == null) return;
 
         Stage dialog = new Stage();
-        dialog.initOwner(owner);
+        if (owner != null) {
+            dialog.initOwner(owner);
+        }
         dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.initStyle(StageStyle.UNDECORATED);
         dialog.setTitle("USB Sanitizer Update Available");

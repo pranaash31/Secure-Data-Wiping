@@ -46,6 +46,7 @@ public class BatchWipeView {
     private Button btnRunAll;
     private Button btnStopAll;
     private Button btnAudioToggle;
+    private CheckBox chkFastTestMode;
 
     // Ambient Live Telemetry Dashboard Labels
     private Label lblTotalSpeed;
@@ -142,10 +143,15 @@ public class BatchWipeView {
         queueStatusLabel = new Label("Queue Status: Scanning hardware...");
         queueStatusLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748B; -fx-font-weight: bold;");
 
+        chkFastTestMode = new CheckBox("🧪 1GB Fast Cap");
+        chkFastTestMode.setSelected(true);
+        chkFastTestMode.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #475569;");
+        chkFastTestMode.setTooltip(new Tooltip("Limit batch wiping to 1GB sample per target for rapid bench testing"));
+
         Region ctrlSpacer = new Region();
         HBox.setHgrow(ctrlSpacer, Priority.ALWAYS);
 
-        controlBar.getChildren().addAll(btnRefresh, lblStandard, cmbGlobalStandard, btnRunAll, btnStopAll, btnAudioToggle, ctrlSpacer, queueStatusLabel);
+        controlBar.getChildren().addAll(btnRefresh, lblStandard, cmbGlobalStandard, chkFastTestMode, btnRunAll, btnStopAll, btnAudioToggle, ctrlSpacer, queueStatusLabel);
 
         // ── Ambient Live Telemetry Dashboard (4 Metric Cards) ─────────────────
         HBox telemetryDashboard = createAmbientTelemetryDashboard();
@@ -615,11 +621,12 @@ public class BatchWipeView {
             WipePolicy selectedPolicy = cmbStandard.getValue() != null
                     ? cmbStandard.getValue() : WipePolicyManager.getInstance().getDefaultPolicy();
 
+            boolean fastMode = (chkFastTestMode != null) && chkFastTestMode.isSelected();
             Future<Boolean> future = WipeEngine.submitBatchWipeTaskWithPolicy(
                     drive.systemPath(),
                     drive.sizeBytes(),
                     selectedPolicy,
-                    true, // Fast mode enabled for safe queue testing demo
+                    fastMode,
                     metrics -> Platform.runLater(() -> updateMetricsUi(metrics)),
                     null,
                     success -> Platform.runLater(() -> handleCompletion(success, selectedPolicy))
@@ -705,6 +712,7 @@ public class BatchWipeView {
             liveMetricsMap.remove(drive.systemPath());
 
             int peakTemp = (lastMetrics != null) ? lastMetrics.tempCelsius() : 0;
+            boolean fastMode = (chkFastTestMode != null) && chkFastTestMode.isSelected();
             WorkflowRequest request = new WorkflowRequest(
                     drive.systemPath(),
                     drive.model(),
@@ -713,7 +721,7 @@ public class BatchWipeView {
                     drive.formattedSize(),
                     policy != null ? policy : WipePolicyManager.getInstance().getDefaultPolicy(),
                     WipeVerifier.VerificationMode.FAST_SAMPLE_5_PERCENT,
-                    true,
+                    fastMode,
                     NavigationManager.getInstance().getSessionContext(),
                     peakTemp,
                     0,

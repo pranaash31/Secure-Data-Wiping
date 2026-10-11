@@ -74,4 +74,40 @@ class CryptoSignerTest {
         assertThat(CryptoSigner.verifySignature("Data", blankInput)).isFalse();
         assertThat(CryptoSigner.verifySignature(blankInput, "ValidBase64==")).isFalse();
     }
+
+    @Test
+    @DisplayName("Rotate key pair generates new valid key pair")
+    void testRotateKeyPair() {
+        var newKeyPair = CryptoSigner.rotateKeyPair();
+        assertThat(newKeyPair).isNotNull();
+        assertThat(CryptoSigner.getPublicKey()).isNotNull();
+        assertThat(CryptoSigner.getPrivateKey()).isNotNull();
+
+        String payload = "TEST_PAYLOAD_POST_ROTATION";
+        String sig = CryptoSigner.signData(payload);
+        assertThat(sig).isNotNull().isNotBlank();
+        assertThat(CryptoSigner.verifySignature(payload, sig)).isTrue();
+    }
+
+    @Test
+    @DisplayName("PEM export provides valid BEGIN/END headers and MIME base64 blocks")
+    void testPemExport() {
+        String pubPem = CryptoSigner.getPublicKeyPem();
+        assertThat(pubPem).startsWith("-----BEGIN PUBLIC KEY-----")
+                .contains("-----END PUBLIC KEY-----");
+
+        String privPem = CryptoSigner.getPrivateKeyPem();
+        assertThat(privPem).startsWith("-----BEGIN PRIVATE KEY-----")
+                .contains("-----END PRIVATE KEY-----");
+    }
+
+    @Test
+    @DisplayName("Public key fingerprint provides valid colon-delimited hex string")
+    void testFingerprintFormat() {
+        String fingerprint = CryptoSigner.getPublicKeyFingerprint();
+        assertThat(fingerprint).isNotNull().isNotBlank();
+        assertThat(fingerprint).contains(":");
+        String[] parts = fingerprint.split(":");
+        assertThat(parts.length).isEqualTo(32); // SHA-256 is 32 bytes
+    }
 }

@@ -24,6 +24,13 @@ public final class AppLogger {
 
     // ── Public API ───────────────────────────────────────────────────────────
 
+    /** Log a debug message. */
+    public static void debug(String module, String message) {
+        if (Boolean.getBoolean("sanitizer.debug")) {
+            System.out.printf("%s [%-16s] DEBUG  %s%n", now(), module, message);
+        }
+    }
+
     /** Log an informational message. */
     public static void info(String module, String message) {
         System.out.printf("%s [%-16s] INFO   %s%n", now(), module, message);

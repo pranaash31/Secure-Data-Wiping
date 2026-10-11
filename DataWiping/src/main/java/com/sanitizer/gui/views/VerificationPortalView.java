@@ -218,7 +218,7 @@ public class VerificationPortalView {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Select Sanitization Certificate PDF");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Documents (*.pdf)", "*.pdf"));
-        File file = chooser.showOpenDialog(rootContainer.getScene().getWindow());
+        File file = chooser.showOpenDialog(rootContainer.getScene() != null ? rootContainer.getScene().getWindow() : null);
         if (file != null) {
             verifyPdfFile(file);
         }

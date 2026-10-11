@@ -89,4 +89,13 @@ public class SessionAutoLockTest {
 
         manager.setTimeoutSeconds(300);
     }
+
+    @Test
+    @DisplayName("Verify attachToScene with null and monitor lifecycle handles safely without exception")
+    public void testAttachToSceneNullSafety() {
+        SessionAutoLockManager manager = SessionAutoLockManager.getInstance();
+        assertDoesNotThrow(() -> manager.attachToScene(null));
+        assertDoesNotThrow(manager::startInactivityMonitor);
+        assertDoesNotThrow(manager::stopInactivityMonitor);
+    }
 }

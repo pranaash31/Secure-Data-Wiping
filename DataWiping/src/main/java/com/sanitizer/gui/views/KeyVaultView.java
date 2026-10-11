@@ -94,7 +94,7 @@ public class KeyVaultView {
         lblCreatedValue = new Label("2025-01-01 09:00:00 UTC");
         lblCreatedValue.getStyleClass().add("settings-value-label");
 
-        lblFingerprintValue = new Label("AB:CD:EF:12:34:56:78:9A:BC:DE:F0:12:34:56:78:9A:34:56:78");
+        lblFingerprintValue = new Label(CryptoSigner.getPublicKeyFingerprint());
         lblFingerprintValue.getStyleClass().add("settings-value-label");
 
         Object[][] keyData = {
@@ -230,8 +230,10 @@ public class KeyVaultView {
 
         Label certHeader = new Label("SANITIZATION CERTIFICATE");
         certHeader.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #60A5FA; -fx-letter-spacing: 1px;");
-        Label certBorder = new Label("━━━━━━━━━━━━━━━━━━━━");
-        certBorder.setStyle("-fx-text-fill: #334155; -fx-font-size: 11px;");
+        Label certBorderTop = new Label("━━━━━━━━━━━━━━━━━━━━");
+        certBorderTop.setStyle("-fx-text-fill: #334155; -fx-font-size: 11px;");
+        Label certBorderBottom = new Label("━━━━━━━━━━━━━━━━━━━━");
+        certBorderBottom.setStyle("-fx-text-fill: #334155; -fx-font-size: 11px;");
 
         certOrgPreview = new Label(txtOrg.getText());
         certOrgPreview.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #FFFFFF;");
@@ -248,7 +250,7 @@ public class KeyVaultView {
         Label certSig = new Label("Signed: RSA-2048/SHA-256");
         certSig.setStyle("-fx-font-size: 10px; -fx-text-fill: #34D399;");
 
-        certPreview.getChildren().addAll(certHeader, certBorder, certOrgPreview, certAgencyPreview, certOfficerPreview, certStandard, certBorder, certSig);
+        certPreview.getChildren().addAll(certHeader, certBorderTop, certOrgPreview, certAgencyPreview, certOfficerPreview, certStandard, certBorderBottom, certSig);
         certPreviewCard.getChildren().addAll(previewTitle, certPreview);
 
         certRow.getChildren().addAll(certConfigCard, certPreviewCard);
@@ -275,12 +277,11 @@ public class KeyVaultView {
         confirm.setContentText("Generating a new keypair will sign future certificates with the new private key. Proceed?");
 
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
-            String testSig = CryptoSigner.signData("KEY_ROTATE_TEST_PAYLOAD");
-            String newHash = Math.abs(testSig.hashCode()) + "";
-            String newKeyId = "SE-KEY-" + System.currentTimeMillis() / 1000;
+            CryptoSigner.rotateKeyPair();
+            String newKeyId = "SE-KEY-" + (System.currentTimeMillis() / 1000);
             lblKeyIdValue.setText(newKeyId);
             lblCreatedValue.setText("NOW (Active)");
-            lblFingerprintValue.setText("FE:89:12:45:" + newHash.substring(0, 4) + ":78:9A:BC:DE:F0:12:34:56:78:9A");
+            lblFingerprintValue.setText(CryptoSigner.getPublicKeyFingerprint());
 
             SecurityAuditLogger.logKeyAction(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "ROTATED_KEYPAIR", newKeyId);
 
@@ -300,13 +301,21 @@ public class KeyVaultView {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Export Cryptographic " + keyType);
         chooser.setInitialFileName(defaultName);
-        File file = chooser.showSaveDialog(null);
+        File file = chooser.showSaveDialog(rootContainer.getScene() != null ? rootContainer.getScene().getWindow() : null);
 
         if (file != null) {
             try (FileWriter writer = new FileWriter(file)) {
-                writer.write("-----BEGIN " + keyType + "-----\n");
-                writer.write(CryptoSigner.signData("KEY_EXPORT_" + defaultName) + "\n");
-                writer.write("-----END " + keyType + "-----\n");
+                String pemContent;
+                if ("PUBLIC KEY".equalsIgnoreCase(keyType)) {
+                    pemContent = CryptoSigner.getPublicKeyPem();
+                } else if ("PRIVATE KEY".equalsIgnoreCase(keyType)) {
+                    pemContent = CryptoSigner.getPrivateKeyPem();
+                } else {
+                    pemContent = "-----BEGIN " + keyType + "-----\n" +
+                            CryptoSigner.signData("KEY_EXPORT_" + defaultName) + "\n" +
+                            "-----END " + keyType + "-----\n";
+                }
+                writer.write(pemContent);
 
                 SecurityAuditLogger.logKeyAction(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "EXPORTED_" + keyType.toUpperCase(), file.getAbsolutePath());
 

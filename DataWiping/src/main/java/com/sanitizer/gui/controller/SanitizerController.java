@@ -4,7 +4,16 @@ import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.engine.WipeEngine;
+import com.sanitizer.engine.WipeVerifier;
 import com.sanitizer.pdf.CertificateGenerator;
+import com.sanitizer.policy.WipePolicy;
+import com.sanitizer.policy.WipePolicyManager;
+import com.sanitizer.service.SanitizationWorkflowService;
+import com.sanitizer.service.WorkflowCallbacks;
+import com.sanitizer.service.WorkflowRequest;
+import com.sanitizer.service.WorkflowResult;
+import com.sanitizer.session.SessionContext;
+import com.sanitizer.session.UserRole;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -385,38 +394,47 @@ public class SanitizerController {
         wipeTask.setOnSucceeded(e -> {
             boolean success = wipeTask.getValue();
             if (success) {
-                lblStatusMessage.setText("Wipe completed successfully! Generating digital signature...");
-                appendLog("\n[SUCCESS] Wipe Completed Successfully!");
+                lblStatusMessage.setText("Wipe completed successfully! Executing verification & audit workflow...");
+                appendLog("\n[SUCCESS] Low-level wipe overwrite passed. Finalizing compliance workflow...");
 
-                // Generate signature & save audit log
-                String stdString = standard == WipeEngine.WipeStandard.DOD_5220_22_M ? "DoD 5220.22-M" : "NIST SP 800-88";
-                String auditPayload = target.model() + "|" + target.serial() + "|" + target.formattedSize() + "|" + stdString + "|SUCCESS";
-                String signature = CryptoSigner.signData(auditPayload);
+                WipePolicy policy = (standard == WipeEngine.WipeStandard.DOD_5220_22_M)
+                        ? WipePolicyManager.getInstance().getPolicyById("dod-5220-22-m")
+                        : WipePolicyManager.getInstance().getDefaultPolicy();
 
-                boolean dbSaved = AuditDb.saveRecord(
-                        target.model(),
-                        target.serial(),
-                        target.formattedSize(),
-                        stdString,
-                        "SUCCESS",
-                        signature
+                WorkflowRequest request = WorkflowRequest.of(
+                        target,
+                        policy,
+                        WipeVerifier.VerificationMode.FAST_SAMPLE_5_PERCENT,
+                        isTestMode,
+                        new SessionContext("Operator", "SYS-CONSOLE", UserRole.INSPECTOR)
                 );
 
-                if (dbSaved) {
-                    appendLog("[DB] Saved audit record to SQLite database.");
-                    loadAuditHistory();
+                WorkflowResult workflowResult = SanitizationWorkflowService.getInstance().finalizeWipe(
+                        request,
+                        true,
+                        java.util.Collections.emptyList(),
+                        0,
+                        0,
+                        new WorkflowCallbacks(
+                                null,
+                                line -> Platform.runLater(() -> appendLog(line)),
+                                null,
+                                null
+                        )
+                );
 
-                    List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
-                    if (!records.isEmpty()) {
-                        AuditDb.AuditRecord latest = records.get(0);
-                        String pdfPath = CertificateGenerator.generateCertificate(latest);
-                        if (pdfPath != null) {
-                            appendLog("[PDF] PDF Sanitization Certificate created: " + pdfPath);
-                            showAlert(Alert.AlertType.INFORMATION, "Sanitization Complete",
-                                    "Data wiping finished successfully!\n\nPDF Certificate Generated:\n" + pdfPath +
-                                            "\n\nRSA Signature: " + signature.substring(0, 30) + "...");
-                        }
-                    }
+                if (workflowResult.success()) {
+                    loadAuditHistory();
+                    lblStatusMessage.setText("Sanitization Certified & Digitally Signed");
+                    String sig = workflowResult.auditRecord() != null ? workflowResult.auditRecord().digitalSignature() : "";
+                    String displaySig = (sig != null && sig.length() > 30) ? sig.substring(0, 30) + "..." : sig;
+                    showAlert(Alert.AlertType.INFORMATION, "Sanitization Complete",
+                            "Data wiping finished successfully!\n\nPDF Certificate Generated:\n" + workflowResult.certificatePdfPath() +
+                                    "\n\nRSA Signature: " + displaySig);
+                } else {
+                    lblStatusMessage.setText("Sanitization Verification Failed!");
+                    appendLog("\n[ERROR] Post-wipe verification failed: non-zero residual data detected.");
+                    showAlert(Alert.AlertType.ERROR, "Verification Failed", "Zero-residual data verification failed.");
                 }
             } else {
                 lblStatusMessage.setText("Wipe execution failed!");

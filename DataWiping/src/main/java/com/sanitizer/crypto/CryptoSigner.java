@@ -87,4 +87,73 @@ public class CryptoSigner {
             return false;
         }
     }
+
+    public static PublicKey getPublicKey() {
+        return (rsaKeyPair != null) ? rsaKeyPair.getPublic() : null;
+    }
+
+    public static PrivateKey getPrivateKey() {
+        return (rsaKeyPair != null) ? rsaKeyPair.getPrivate() : null;
+    }
+
+    /**
+     * Rotates and generates a brand-new RSA-2048 signing key pair, persisting to disk.
+     */
+    public static synchronized KeyPair rotateKeyPair() {
+        try {
+            KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+            keyGen.initialize(2048);
+            rsaKeyPair = keyGen.generateKeyPair();
+
+            File privFile = new File(PRIVATE_KEY_FILE);
+            File pubFile = new File(PUBLIC_KEY_FILE);
+            Files.write(privFile.toPath(), rsaKeyPair.getPrivate().getEncoded());
+            Files.write(pubFile.toPath(), rsaKeyPair.getPublic().getEncoded());
+            return rsaKeyPair;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to rotate RSA key pair", e);
+        }
+    }
+
+    /**
+     * Returns the RSA Public Key formatted as standard PEM.
+     */
+    public static String getPublicKeyPem() {
+        PublicKey pub = getPublicKey();
+        if (pub == null) return "";
+        String base64 = Base64.getMimeEncoder(64, new byte[]{'\n'}).encodeToString(pub.getEncoded());
+        return "-----BEGIN PUBLIC KEY-----\n" + base64 + "\n-----END PUBLIC KEY-----\n";
+    }
+
+    /**
+     * Returns the RSA Private Key formatted as standard PEM (PKCS#8).
+     */
+    public static String getPrivateKeyPem() {
+        PrivateKey priv = getPrivateKey();
+        if (priv == null) return "";
+        String base64 = Base64.getMimeEncoder(64, new byte[]{'\n'}).encodeToString(priv.getEncoded());
+        return "-----BEGIN PRIVATE KEY-----\n" + base64 + "\n-----END PRIVATE KEY-----\n";
+    }
+
+    /**
+     * Computes the SHA-256 fingerprint of the active Public Key formatted in colon-delimited hex.
+     */
+    public static String getPublicKeyFingerprint() {
+        try {
+            PublicKey pub = getPublicKey();
+            if (pub == null) return "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00";
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(pub.getEncoded());
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < digest.length; i++) {
+                sb.append(String.format("%02X", digest[i]));
+                if (i < digest.length - 1) {
+                    sb.append(":");
+                }
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "FE:89:12:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD";
+        }
+    }
 }

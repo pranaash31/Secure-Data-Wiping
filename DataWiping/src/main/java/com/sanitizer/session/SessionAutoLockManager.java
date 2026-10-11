@@ -71,6 +71,9 @@ public class SessionAutoLockManager {
             scene.addEventFilter(MouseEvent.ANY, activityHandler);
             scene.addEventFilter(KeyEvent.ANY, activityHandler);
             recordUserActivity();
+            if (monitorTimeline == null) {
+                startInactivityMonitor();
+            }
         }
     }
 
@@ -141,24 +144,40 @@ public class SessionAutoLockManager {
         return Math.max(0, remainingSec);
     }
 
-    private void startInactivityMonitor() {
-        if (monitorTimeline != null) {
-            monitorTimeline.stop();
-        }
-        monitorTimeline = new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
-            if (timeoutSeconds > 0 && !locked.get()) {
-                long elapsed = System.currentTimeMillis() - lastActivityEpochMs;
-                if (elapsed >= (timeoutSeconds * 1000L)) {
-                    Platform.runLater(() -> {
-                        com.sanitizer.gui.navigation.NavigationManager nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
-                        lockSession("Inactivity Timeout (" + (timeoutSeconds / 60) + "m idle)",
-                                nav.getOfficerName(), nav.getAgencyId(), nav.getRole());
-                    });
-                }
+    public synchronized void startInactivityMonitor() {
+        try {
+            if (monitorTimeline != null) {
+                monitorTimeline.stop();
             }
-        }));
-        monitorTimeline.setCycleCount(Timeline.INDEFINITE);
-        monitorTimeline.play();
+            monitorTimeline = new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
+                if (timeoutSeconds > 0 && !locked.get()) {
+                    long elapsed = System.currentTimeMillis() - lastActivityEpochMs;
+                    if (elapsed >= (timeoutSeconds * 1000L)) {
+                        Platform.runLater(() -> {
+                            com.sanitizer.gui.navigation.NavigationManager nav = com.sanitizer.gui.navigation.NavigationManager.getInstance();
+                            lockSession("Inactivity Timeout (" + (timeoutSeconds / 60) + "m idle)",
+                                    nav.getOfficerName(), nav.getAgencyId(), nav.getRole());
+                        });
+                    }
+                }
+            }));
+            monitorTimeline.setCycleCount(Timeline.INDEFINITE);
+            monitorTimeline.play();
+        } catch (IllegalStateException | NoClassDefFoundError e) {
+            AppLogger.debug(MODULE, "JavaFX toolkit not initialized; inactivity monitor deferred until JavaFX active");
+        } catch (Exception e) {
+            AppLogger.warn(MODULE, "Could not initialize inactivity monitor timeline: " + e.getMessage());
+        }
+    }
+
+    public synchronized void stopInactivityMonitor() {
+        if (monitorTimeline != null) {
+            try {
+                monitorTimeline.stop();
+            } catch (Exception ignored) {
+            }
+            monitorTimeline = null;
+        }
     }
 
     private void notifyLocked() {
