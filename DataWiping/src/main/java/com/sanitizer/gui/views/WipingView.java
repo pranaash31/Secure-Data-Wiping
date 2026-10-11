@@ -3,13 +3,10 @@ package com.sanitizer.gui.views;
 import com.sanitizer.detector.SmartDiagnostics;
 import com.sanitizer.detector.SmartDiagnostics.HealthScoreResult;
 import com.sanitizer.detector.SmartDiagnostics.InterfaceAnomalyResult;
-import com.sanitizer.detector.SmartDiagnostics.SmartDelta;
 import com.sanitizer.detector.SmartDiagnostics.SmartReport;
-import com.sanitizer.detector.SmartDiagnostics.SmartSnapshot;
 import com.sanitizer.detector.ThermalPolicy;
 import com.sanitizer.detector.ThermalPolicyManager;
 import com.sanitizer.detector.UsbDetector;
-import com.sanitizer.engine.WipeEngine;
 import com.sanitizer.engine.WipeMetrics;
 import com.sanitizer.engine.WipeVerifier;
 import com.sanitizer.service.SanitizationWorkflowService;
@@ -20,13 +17,9 @@ import com.sanitizer.gui.components.IoOscilloscopeComponent;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ThermalGraphComponent;
 import com.sanitizer.gui.navigation.NavigationManager;
-import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
-import com.sanitizer.quarantine.LbaFailureRecord;
-import com.sanitizer.quarantine.QuarantineEngine;
 import com.sanitizer.quarantine.QuarantineRecord;
-import com.sanitizer.quarantine.QuarantineReportGenerator;
 import com.sanitizer.util.SoundManager;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -71,6 +64,8 @@ public class WipingView {
     private Label lblLiveEta;
     private Label lblCurrentPass;
     private Timeline completionGlowTimeline;
+    private Label lblPreWipeHealthBadge;
+    private Label lblLiveTempBadge;
 
     private SectorHeatmapComponent sectorMatrix;
     private IoOscilloscopeComponent ioOscilloscope;
@@ -136,7 +131,7 @@ public class WipingView {
         cmbDrives = new ComboBox<>();
         cmbDrives.setMaxWidth(Double.MAX_VALUE);
         cmbDrives.setPromptText("Scanning connected USB drives...");
-        cmbDrives.setCellFactory(param -> new ListCell<UsbDetector.UsbDriveInfo>() {
+        cmbDrives.setCellFactory(param -> new ListCell<>() {
             @Override
             protected void updateItem(UsbDetector.UsbDriveInfo item, boolean empty) {
                 super.updateItem(item, empty);
@@ -301,9 +296,6 @@ public class WipingView {
 
         rootContainer.getChildren().addAll(titleBox, topRow, cardExec);
     }
-
-    private Label lblPreWipeHealthBadge;
-    private Label lblLiveTempBadge;
 
     private void refreshDriveList() {
         updateDriveList(UsbDetector.getConnectedUsbDrives());
@@ -599,7 +591,9 @@ public class WipingView {
             setUiControlsDisabled(false);
         });
 
-        new Thread(task).start();
+        Thread wipeThread = new Thread(task, "sanitization-wipe-worker");
+        wipeThread.setDaemon(true);
+        wipeThread.start();
     }
 
     private void handleLiveMetrics(WipeMetrics metrics) {

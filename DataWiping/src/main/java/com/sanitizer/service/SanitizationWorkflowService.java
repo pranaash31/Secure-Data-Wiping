@@ -8,7 +8,6 @@ import com.sanitizer.detector.SmartDiagnostics;
 import com.sanitizer.detector.SmartDiagnostics.SmartDelta;
 import com.sanitizer.detector.SmartDiagnostics.SmartSnapshot;
 import com.sanitizer.engine.WipeEngine;
-import com.sanitizer.engine.WipeMetrics;
 import com.sanitizer.engine.WipeVerifier;
 import com.sanitizer.pdf.CertificateGenerator;
 import com.sanitizer.quarantine.LbaFailureRecord;
