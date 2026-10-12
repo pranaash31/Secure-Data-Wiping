@@ -1,6 +1,6 @@
 # Secure-Data-Wiping: Enterprise Architecture & Project Study Guide
 
-> **Official Standard Compliance**: NIST SP 800-88 Rev. 1 | DoD 5220.22-M | DoD 5220.22-M ECE | BSI-VS | HMG IS5 | RCMP TSSIT OPS-II | ISO/IEC 27040:2015 | EU GDPR Art. 17 | HIPAA § 164.310 | FISMA / NIST SP 800-53
+> **Official Standard Compliance**: NIST SP 800-88 Rev. 1 | DoD 5220.22-M | DoD 5220.22-M ECE | BSI-VS | HMG IS5 | RCMP TSSIT OPS-II | ISO/IEC 27040:2015 | EU GDPR Art. 17 | HIPAA § 164.310 | FISMA / NIST SP 800-53 | DIN 66399
 
 ---
 
@@ -9,10 +9,10 @@
 **Secure-Data-Wiping (SecureErase Pro Enterprise)** is a production-grade, defense-standard storage media sanitization and hardware lifecycle assurance suite built in **Java 17** and **JavaFX 21**.
 
 ### Primary Mission:
-1. **Permanent Physical Data Destruction**: Eliminates data remanence across flash memory (USB thumb drives, NVMe/SATA SSDs) and magnetic disks (HDDs) by writing cryptographic bit-patterns directly to raw block devices (`/dev/rdisk*` on macOS, `/dev/sd*` on Linux, `\\\\.\\PhysicalDrive*` on Windows).
+1. **Permanent Physical Data Destruction**: Eliminates data remanence across flash memory (USB drives, NVMe/SATA SSDs) and magnetic disks (HDDs) by writing cryptographic bit-patterns directly to raw block devices (`/dev/rdisk*` on macOS, `/dev/sd*` on Linux, `\\\\.\\PhysicalDrive*` on Windows).
 2. **Mathematical Zero-Residual Verification**: Computes real-time **Shannon Entropy** ($H(X)$) across sampled or 100% read-back physical sectors to mathematically attest that zero residual bits survive.
-3. **Cryptographic Ledger & Tamper Proofing**: Stores every wipe event in an internal SQLite database linked with **SHA-256 blockchain-style hash chaining** (`prev_record_hash` -> `record_hash`), generating **2048-bit RSA digitally signed PDF compliance certificates** with embedded verification QR codes.
-4. **Hardware Failure Quarantine**: Automatically detects failing storage blocks (bad sectors, I/O timeouts), aborts unsafe operations, quarantines the drive, and generates a **DIN 66399 physical destruction work order** (degaussing or shredding).
+3. **Cryptographic Ledger & Tamper Proofing**: Stores every wipe event in an internal SQLite database linked with **SHA-256 blockchain-style hash chaining** (`prev_record_hash` $\to$ `record_hash`), generating **2048-bit RSA digitally signed PDF compliance certificates** with embedded verification QR codes.
+4. **Hardware Failure Quarantine**: Automatically detects failing storage blocks (bad sectors, I/O timeouts), aborts unsafe operations, quarantines the drive, and generates a **DIN 66399 physical destruction work order** (degaussing or mechanical shredding).
 5. **Real-Time Safety & Hardware Preservation**: Enforces active host OS protection shields (prevents wiping `disk0`, `C:`, or root `/`), hardware thermal throttling with auto-pause (`kill -STOP`/`kill -CONT`), and host CPU concurrency regulation.
 6. **ESG / ITAD Carbon Mitigation**: Calculates Scope 3 GHG carbon emissions saved, e-waste diverted in kg, and tree seedling equivalents compared against physical drive shredding.
 
@@ -22,290 +22,474 @@
 
 ```mermaid
 flowchart TD
-    UI[JavaFX UI Layer\nNavigationManager / Views / Components] --> SESS[Session & RBAC Guard\nUserRole: Tier 1/2/3 & AutoLock]
-    UI --> SRVC[Application Service Layer\nSanitizationWorkflowService & AuditExportService]
-    SRVC --> DET[Hardware Detection & Health\nUsbDetector / SmartDiagnostics]
-    SRVC --> SHIELD[Safety Interceptor Shield\nSystemDiskShield & DiskLockShield]
-    SHIELD --> GOV[Concurrency Governor\nWorkerPoolGovernor: CPU & Memory Guard]
-    GOV --> ENG[Sanitization Engine\nWipeEngine / dd Process Execution]
-    ENG <--> THERM[Thermal Throttle Controller\nSmartDiagnostics / SIGSTOP Cooldown]
-    ENG --> VERIF[Read-Back Verifier\nWipeVerifier: Shannon Entropy & SHA-256]
+    subgraph UI_LAYER["1. Presentation & Interaction (JavaFX 21)"]
+        UI[NavigationManager Router]
+        VIEWS["Views: Wizard / Batch / Wiping / Diagnostics / Audit / Settings"]
+        COMPS["Visualizers: Sector Heatmap / I/O Oscilloscope / Thermal Graph"]
+        UI --> VIEWS
+        VIEWS --> COMPS
+    end
+
+    subgraph SECURITY_LAYER["2. Access Control & Session Guard"]
+        LOGIN[LoginView & PIN Auth]
+        SESS[SessionContext & RBAC\nTier 1: Inspector | Tier 2: Supervisor | Tier 3: Chief Auditor]
+        AUTOLOCK[SessionAutoLockManager\nInactivity Lock: 5-15 min]
+        LOGIN --> SESS
+        SESS --> AUTOLOCK
+    end
+
+    subgraph SERVICE_LAYER["3. Application Orchestration Layer"]
+        WORKFLOW[SanitizationWorkflowService]
+        EXPORT_SRV[AuditExportService]
+        CONFIG_SRV[SystemConfigurationService]
+    end
+
+    subgraph SAFETY_LAYER["4. Defensive Hardware Shields"]
+        SHIELD[SystemDiskShield\nBlocks disk0, C:, /dev/sda & Live Mounts]
+        LOCK[DiskLockShield\nUnmounts Volumes & Prevents OS Automount]
+        GOV[WorkerPoolGovernor\nCPU <= 88% & RAM >= 512MB Guard]
+    end
+
+    subgraph EXECUTION_LAYER["5. Low-Level Execution & Hardware Diagnostics"]
+        DET[UsbDetector\nOSHI Poller 2s Interval]
+        SMART[SmartDiagnostics\n0-100 Score & Wear Delta]
+        ENGINE[WipeEngine\nDirect dd Block Overwrite bs=2m]
+        THERMAL[ThermalThrottleController\nSIGSTOP Pause / SIGCONT Cooldown]
+        ENGINE <--> THERMAL
+    end
+
+    subgraph VERIFICATION_LAYER["6. Verification & Quarantine"]
+        VERIF[WipeVerifier\nShannon Entropy H(X) & SHA-256 Readback]
+        QRN[QuarantineEngine\nAssesses Unrecoverable Bad LBAs]
+    end
+
+    subgraph COMPLIANCE_LAYER["7. Cryptography & Compliance Output"]
+        CRYPTO[CryptoSigner\nRSA-2048 / SHA256withRSA]
+        LEDGER[(AuditDb SQLite WAL\nSHA-256 Blockchain Hash Chaining)]
+        PDF[CertificateGenerator\nApache PDFBox + ZXing QR]
+        QRN_PDF[QuarantineReportGenerator\nDIN 66399 Destruction Work Order]
+        HTTP[WebVerificationServer\nSun HttpServer :8080 /verify]
+        ALERT[AlertDispatcher\nSlack/Teams Webhooks & TLS SMTP]
+        ESG[EsgCalculator\nScope 3 GHG & Circular Economy]
+    end
+
+    UI_LAYER --> SECURITY_LAYER
+    SECURITY_LAYER --> SERVICE_LAYER
+    SERVICE_LAYER --> SAFETY_LAYER
+    SAFETY_LAYER --> EXECUTION_LAYER
+    EXECUTION_LAYER --> VERIFICATION_LAYER
     
-    VERIF -->|Pass: Zero Residual| SIGN[Crypto Engine\nCryptoSigner: RSA-2048 Digital Sign]
-    VERIF -->|Fail: Bad Sectors / I/O Fault| QRN[Quarantine Engine\nQuarantineRecord: DIN 66399 Destruction Order]
+    VERIF -->|Pass: H(X) == 0.0000| CRYPTO
+    VERIF -->|Fail: Bad Sectors / I/O Fault| QRN
     
-    SIGN --> DB[(Audit Ledger DB\nAuditDb: SHA-256 Block Chained)]
-    SIGN --> PDF[Certificate Generator\nApache PDFBox + ZXing QR]
-    PDF --> SRV[Web Verification Server\nSun HttpServer :8080 /verify]
-    SIGN --> ALERT[Alert Dispatcher\nWebhooks Slack/Teams & SMTP]
-    SIGN --> ESG[ESG ITAD Calculator\nCO2e Saved & E-Waste Diverted]
+    CRYPTO --> LEDGER
+    CRYPTO --> PDF
+    PDF --> HTTP
+    CRYPTO --> ALERT
+    CRYPTO --> ESG
+    QRN --> QRN_PDF
 ```
 
 ---
 
-## 3. Complete Project Directory Structure & Component Map
+## 3. End-to-End Sanitization Lifecycle (Sequence Diagram)
+
+This diagram illustrates the step-by-step lifecycle of a wipe operation from operator initiation to final certificate issuance.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Tech as Technician / Operator
+    participant UI as WipeWizardView / WipingView
+    participant Svc as SanitizationWorkflowService
+    participant Shield as SystemDiskShield & DiskLockShield
+    participant Smart as SmartDiagnostics
+    participant Engine as WipeEngine (dd process)
+    participant Verifier as WipeVerifier
+    participant Crypto as CryptoSigner
+    participant DB as AuditDb (Blockchain Ledger)
+    participant PDF as CertificateGenerator
+    participant Alert as AlertDispatcher
+
+    Tech->>UI: Select Target Drive & Sanitization Policy
+    UI->>Svc: executeWorkflow(request, callbacks)
+    
+    rect rgb(240, 248, 255)
+        Note over Svc,Shield: Phase 1: Pre-Flight Safety & Diagnostics
+        Svc->>Shield: validateTarget(drivePath)
+        alt Protected OS Drive Detected (disk0, C:, /)
+            Shield-->>Svc: THROW SecurityShieldException
+            Svc-->>UI: Abort & Alert Security Violation
+        end
+        Shield->>Shield: Unmount all active partitions (DiskLockShield)
+        Svc->>Smart: capturePreWipeSnapshot(drivePath)
+        Smart-->>Svc: Pre-Wipe Health Score (e.g. 98/100)
+    end
+
+    rect rgb(255, 250, 240)
+        Note over Svc,Engine: Phase 2: Block Overwrite Execution
+        Svc->>Engine: wipeDrive(devicePath, policy, callbacks)
+        loop For each pass (e.g. 0x00 -> 0xFF -> Random)
+            Engine->>Engine: Fork OS `dd` command with `bs=2m`
+            Engine->>UI: Stream live progress, MB/s, ETA, Heatmap updates
+            opt Temperature > Threshold (°C)
+                Engine->>Engine: Send SIGSTOP (Pause write)
+                Engine->>UI: Display "Thermal Cooldown Active"
+                Engine->>Engine: Wait until temp < Resume Threshold
+                Engine->>Engine: Send SIGCONT (Resume write)
+            end
+        end
+        Engine-->>Svc: Wipe execution completed
+    end
+
+    rect rgb(245, 255, 245)
+        Note over Svc,Verifier: Phase 3: Mathematical Verification
+        Svc->>Verifier: verifyDrive(devicePath, mode, callbacks)
+        Verifier->>Verifier: Read physical sectors back
+        Verifier->>Verifier: Calculate Shannon Entropy H(X) & Sample SHA-256
+        alt Entropy == 0.0000 & Zero Residual
+            Verifier-->>Svc: Verification PASS
+        else Non-zero bytes found OR Bad Sector I/O Fault
+            Verifier-->>Svc: Verification FAIL / Hardware Defect
+            Svc->>Svc: Trigger QuarantineEngine (DIN 66399 Destruction Order)
+        end
+    end
+
+    rect rgb(250, 240, 255)
+        Note over Svc,Alert: Phase 4: Attestation, Ledger & Export
+        Svc->>Smart: capturePostWipeSnapshot(drivePath)
+        Smart-->>Svc: Compute SmartDelta (Post-Health, Wear, Bad Blocks)
+        Svc->>Crypto: signPayload(recordData)
+        Crypto-->>Svc: RSA-2048 Digital Signature
+        Svc->>DB: insertRecord(record + prev_record_hash -> record_hash)
+        Svc->>PDF: generateCertificate(record)
+        PDF-->>Svc: Sanitization_Certificate_<id>.pdf
+        Svc->>Alert: dispatchAlert(WipeSuccessEvent)
+        Svc-->>UI: Complete! Display Certificate & QR Code
+    end
+```
+
+---
+
+## 4. Key Subsystem Architectural Diagrams
+
+### 4.1. Defensive System Disk Shield Logic
+
+How the application makes 100% sure the operator cannot wipe the host operating system:
+
+```mermaid
+flowchart TD
+    START([User Selects Drive]) --> S1{Check Hardcoded OS Roots\nmacOS: disk0, rdisk0\nWindows: PhysicalDrive0, C:\nLinux: /dev/sda, /dev/nvme0n1}
+    S1 -- Matches Root --> BLOCK[BLOCKED: Immediate Rejection]
+    S1 -- Clean --> S2{OSHI Live Mount Inspection\nInspect all active mount points:\n/, /boot, /System, /etc, C:\\Windows}
+    S2 -- Matches Mount Point --> BLOCK
+    S2 -- Clean --> S3{Partition Geometry Check\nDoes target share parent physical\ndisk with an OS root partition?}
+    S3 -- Yes --> BLOCK
+    S3 -- No --> S4{Size & Capacity Boundary Check\nIs capacity within allowed target range?}
+    S4 -- Out of Bounds --> BLOCK
+    S4 -- Within Bounds --> PASS[APPROVED: Pass to DiskLockShield for Unmounting]
+    
+    BLOCK --> ALERT[SecurityAuditLogger: Log Shield Violation\nAlertDispatcher: Notify Administrator]
+```
+
+---
+
+### 4.2. Thermal Throttling State Machine
+
+How the system protects storage hardware against heat-induced degradation during intense write passes:
+
+```mermaid
+stateDiagram-v2
+    [*] --> MONITORING: Wipe Started
+
+    state MONITORING {
+        [*] --> CheckTemperature
+        CheckTemperature --> CheckTemperature: Temp in Safe Range
+    }
+
+    MONITORING --> THROTTLED: Temp >= Warning Threshold\n(e.g., HDD >= 46°C / SSD >= 55°C)
+    
+    state THROTTLED {
+        InjectDelay: Inject pacing sleep milliseconds\nPassively dissipate thermal energy
+    }
+
+    THROTTLED --> MONITORING: Temp cools below warning
+    THROTTLED --> PAUSED: Temp >= Auto-Pause Threshold\n(e.g., HDD >= 52°C / SSD >= 65°C)
+
+    state PAUSED {
+        SendSigstop: Send SIGSTOP to dd process\nWrite heads halt instantly
+        AudioAlert: Sound laboratory thermal warning\nLog event to audit database
+        WaitCooldown: Monitor cooling cycle
+    }
+
+    PAUSED --> RESUMING: Temp <= Resume Threshold\n(e.g., HDD <= 42°C / SSD <= 50°C)
+
+    state RESUMING {
+        SendSigcont: Send SIGCONT to dd process\nResume block writing seamlessly
+    }
+
+    RESUMING --> MONITORING: Normal write pace restored
+    MONITORING --> [*]: Wipe Completed
+```
+
+---
+
+### 4.3. Blockchain-Style SHA-256 Ledger Integrity
+
+How `AuditDb` and `LedgerIntegrityEngine` prevent tampering, deletion, or modification of historical wipe logs:
+
+```mermaid
+flowchart LR
+    subgraph GENESIS["Record #0 (Root Anchor)"]
+        G_HASH["Genesis Hash:\n00000000000000000000000000000000..."]
+    end
+
+    subgraph REC1["Audit Record #1"]
+        P1["Payload: Drive A | DoD | PASS | Temp: 38C"]
+        PREV1["prev_hash: 0000...0000"]
+        H1["record_hash:\nSHA256(prev_hash + Payload1)"]
+    end
+
+    subgraph REC2["Audit Record #2"]
+        P2["Payload: Drive B | NIST | PASS | Temp: 41C"]
+        PREV2["prev_hash: H1"]
+        H2["record_hash:\nSHA256(H1 + Payload2)"]
+    end
+
+    subgraph REC3["Audit Record #3"]
+        P3["Payload: Drive C | BSI | PASS | Temp: 36C"]
+        PREV3["prev_hash: H2"]
+        H3["record_hash:\nSHA256(H2 + Payload3)"]
+    end
+
+    GENESIS --> REC1
+    REC1 --> REC2
+    REC2 --> REC3
+
+    style REC1 fill:#e6f3ff,stroke:#2b6cb0
+    style REC2 fill:#e6f3ff,stroke:#2b6cb0
+    style REC3 fill:#e6f3ff,stroke:#2b6cb0
+```
+
+> **If an attacker alters Record #2 (e.g. changes `FAIL` to `PASS`)**:
+> `record_hash` of Record #2 changes $\to$ Record #3's `prev_hash` no longer matches $\to$ The entire ledger validation fails immediately with exact row identification!
+
+---
+
+### 4.4. Shannon Entropy Verification & Zero-Residual Mathematics
+
+How `WipeVerifier` mathematically proves that no data remains:
+
+```mermaid
+flowchart TD
+    READ[Read Raw Physical Block Stream\nbs=2MB from /dev/rdisk*] --> BINS[Compute Byte Frequency Histogram\n256 Bins: Count occurrences of 0x00 to 0xFF]
+    BINS --> PROB[Compute Probabilities:\np(x_i) = count(x_i) / TotalBytes]
+    PROB --> ENTROPY["Compute Shannon Entropy:\nH(X) = - SUM [ p(x_i) * log2(p(x_i)) ]"]
+    
+    ENTROPY --> EVAL{Entropy Score H(X)}
+    
+    EVAL -->|H(X) == 0.0000\n100% bytes are 0x00| VERIF_PASS["VERIFIED CLEAN (PASS)\nZero data remanence mathematically attested"]
+    EVAL -->|H(X) > 0.001\nResidual data or non-zero bytes detected| VERIF_FAIL["CONTAMINATED (FAIL)\nData remanence detected! Abort & Alert"]
+    
+    VERIF_PASS --> SHA[Generate Readback SHA-256 Digest]
+    SHA --> CERT[Embed Proof in RSA Signed Certificate]
+```
+
+---
+
+### 4.5. Defective Hardware Quarantine Decision Tree
+
+When a drive fails with I/O errors or bad sectors, software sanitization cannot guarantee complete erasure. The system automatically prescribes physical destruction conforming to **DIN 66399** and **NIST SP 800-88 Rev. 1 § 4.7**:
+
+```mermaid
+flowchart TD
+    FAIL[Sanitization Failure Detected\nBad LBAs / Read-Write Timeout / S.M.A.R.T. Collapse] --> ASSESS[QuarantineEngine: Assess Hardware Physics]
+    
+    ASSESS --> DETECT_MEDIA{Determine Media Physics}
+    
+    DETECT_MEDIA -->|Magnetic HDD\nRotational platters| DEGAUSS[Prescribe MAGNETIC DEGAUSSING\nStandard: NSA/CSS Manual 9-12 / DIN 66399 H-5\nCoercivity Field: >= 10,000 Oersted\nRenders magnetic domains permanently inert]
+    
+    DETECT_MEDIA -->|Solid State / Flash\nNVMe / SATA SSD / USB Pen Drive| SHRED[Prescribe MECHANICAL SHREDDING\nStandard: DIN 66399 E-4 / NIST SP 800-88\nParticle Size: <= 2mm cross-cut\nPhysically disintegrates NAND flash dies]
+    
+    DEGAUSS --> ORDER[Generate Official PDF Work Order\nDIN 66399 Destruction & Custody Order\nGranular Failing LBA Table + Custody Sign-Off]
+    SHRED --> ORDER
+```
+
+---
+
+### 4.6. Role-Based Access Control (RBAC) Clearance Matrix
+
+```mermaid
+flowchart TD
+    subgraph TIER1["Tier 1: INSPECTOR (Technician)"]
+        T1_A[Execute Guided & Manual Wipes]
+        T1_B[Run S.M.A.R.T. Diagnostics]
+        T1_C[View Telemetry & Heatmap]
+        T1_D[Generate PDF Certificates]
+    end
+
+    subgraph TIER2["Tier 2: SUPERVISOR (Manager)"]
+        T2_A[All Tier 1 Capabilities]
+        T2_B[Create & Edit Custom Multi-Pass Policies]
+        T2_C[Adjust Thermal Policies & Limits]
+        T2_D[Configure Alert Webhooks & SMTP]
+        T2_E[Export Full Audit Batches (CSV/JSON/XML)]
+    end
+
+    subgraph TIER3["Tier 3: CHIEF AUDITOR (Executive)"]
+        T3_A[All Tier 2 Capabilities]
+        T3_B[Cryptographic Key Vault Management]
+        T3_C[Verify Blockchain Ledger Integrity]
+        T3_D[Database Backup & History Purge]
+        T3_E[System-Wide SIEM Security Auditing]
+    end
+
+    TIER1 --> TIER2
+    TIER2 --> TIER3
+```
+
+---
+
+## 5. Master Directory Structure & Component Map
 
 ```
 DWproject/
-├── README.md                          # Repository landing overview
-├── PROJECT_STUDY_GUIDE.md             # This comprehensive study manual
-├── dist/                              # Compiled native installation packages
-│   └── USBSanitizer-1.0.0.dmg         # macOS DMG distribution installer
-├── packaging/                         # Multi-platform installer build toolchain
-│   ├── build-all.sh                   # Master platform detection & packaging router
+├── README.md                          # Repository overview & setup
+├── PROJECT_STUDY_GUIDE.md             # This comprehensive study guide
+├── dist/                              # Native installation packages (DMG)
+├── packaging/                         # Multi-platform installer build scripts
+│   ├── build-all.sh                   # Platform detection & packaging router
 │   ├── package-mac.sh                 # macOS DMG & App bundle packager (jpackage)
 │   ├── package-linux.sh               # Linux RPM / DEB packager
 │   ├── package-appimage.sh            # Linux portable AppImage builder
-│   ├── package-flatpak.sh             # Linux Flatpak packaging script
-│   ├── package-win.bat / .ps1         # Windows MSI / EXE / ZIP packaging scripts
-│   ├── IconGenerator.java / IconToIco # Dynamic platform icon converters
-│   └── mac/entitlements.plist         # macOS hardened runtime security entitlements
-├── .github/workflows/                 # CI/CD automation pipelines
-│   ├── ci.yml                         # Automated Maven build, compile, and JUnit 5 tests
-│   └── release.yml                    # Multi-platform release artifact generation
+│   ├── package-flatpak.sh             # Linux Flatpak builder
+│   └── package-win.bat / .ps1         # Windows MSI / EXE / ZIP builders
+├── .github/workflows/                 # CI/CD pipelines
+│   ├── ci.yml                         # Automated Maven compile & 34 JUnit 5 tests
+│   └── release.yml                    # Multi-platform release artifact packaging
 └── DataWiping/                        # Core Java Application Maven Module
     ├── pom.xml                        # Maven dependencies & build configurations
     └── src/
-        ├── main/resources/            # Application assets, styling, and i18n bundles
-        │   ├── css/style.css          # Executive theme design system (~1,670 lines)
+        ├── main/resources/            # Assets, design system, and i18n
+        │   ├── css/style.css          # Modern corporate dark/light theme (~1,670 lines)
         │   ├── icons/icon.png         # High-resolution application brand icon
-        │   └── i18n/messages_*.props  # Localized strings: EN, DE, FR, ES, HI
-        ├── test/java/com/sanitizer/   # 34 comprehensive JUnit 5 test suites (100% passing)
-        └── main/java/com/sanitizer/   # Core source packages (explained in detail below)
+        │   └── i18n/messages_*.props  # Localization: EN, DE, FR, ES, HI
+        ├── test/java/com/sanitizer/   # 34 JUnit 5 test suites (100% passing)
+        └── main/java/com/sanitizer/   # Core source packages (detailed below)
 ```
 
 ---
 
-## 4. Package-by-Package Deep Dive ("What is What")
+## 6. Package-by-Package Deep Dive ("What is What")
 
-### 4.1. Core Sanitization & Verification Engine (`com.sanitizer.engine`)
+### 6.1. Core Sanitization & Verification Engine (`com.sanitizer.engine`)
 * **`WipeEngine.java`**:
-  * **Role**: Primary execution orchestrator for low-level block overwriting.
-  * **Mechanics**: Manages a fixed thread pool (`Executors.newFixedThreadPool(THREAD_POOL_SIZE)`), forks OS `dd` processes targeting block devices with `bs=2m`, captures standard output progress, computes real-time MB/s, ETA, and 4KB IOPS, and passes telemetry to visualizers.
-  * **Control Flow**: Enforces pre-execution validation through `SystemDiskShield`, unmounts partitions via `DiskLockShield`, and invokes `WorkerPoolGovernor` slot acquisition.
-  * **Thermal Integration**: Continuously evaluates device temperature against device-specific thermal policies. If critical overheating occurs, dispatches `kill -STOP` (pausing writing), waits for cooldown, and resumes with `kill -CONT`.
+  * **Role**: Primary orchestrator for low-level block overwriting.
+  * **Execution**: Manages a fixed thread pool, forks the OS `dd` process targeting block devices with `bs=2m`, captures standard error progress, computes real-time MB/s, ETA, and 4KB IOPS, and streams telemetry to visualizers.
+  * **Safety Checks**: Validates via `SystemDiskShield`, unmounts partitions via `DiskLockShield`, and checks CPU/RAM via `WorkerPoolGovernor`.
+  * **Thermal Throttle**: If critical overheating occurs, executes `kill -STOP` (pause), waits for cooldown, and resumes with `kill -CONT`.
 * **`WipeVerifier.java`**:
   * **Role**: Post-wipe compliance auditor conforming to NIST SP 800-88 Rev. 1 § 4.7 and ISO/IEC 27040.
-  * **Mechanics**: Performs raw block read-back across storage media using three intensity modes: `FAST_SAMPLE_5_PERCENT`, `EXTENSIVE_SAMPLE_10_PERCENT`, or `FULL_100_PERCENT`.
-  * **Mathematics**: Calculates **Shannon Entropy** across 256 byte frequency bins:
-    $$H(X) = -\sum_{i=0}^{255} p(x_i) \log_2 p(x_i)$$
-    A true zero-fill returns an entropy score of $0.0000\text{ bits/byte}$. If any non-zero byte is found ($H(X) > 0.001$), the wipe status fails immediately. Generates a SHA-256 hash digest of the read stream.
+  * **Mechanics**: Reads physical sectors back across three intensity modes: `FAST_SAMPLE_5_PERCENT`, `EXTENSIVE_SAMPLE_10_PERCENT`, or `FULL_100_PERCENT`.
+  * **Mathematics**: Calculates **Shannon Entropy** across 256 byte frequency bins ($H(X) = -\sum p(x_i) \log_2 p(x_i)$). True zero-fill returns $0.0000\text{ bits/byte}$. Any non-zero byte ($H(X) > 0.001$) fails the operation immediately. Also outputs a SHA-256 verification hash.
 * **`WipeMetrics.java`**:
-  * **Role**: Immutable record encapsulating instantaneous telemetry: percent complete, current pass, elapsed speed (MB/s), remaining ETA (seconds), temperature (°C), IOPS, latency (ms), and bus saturation percentage (%).
+  * **Role**: Immutable record carrying telemetry: percent complete, current pass, elapsed speed (MB/s), remaining ETA (seconds), temperature (°C), IOPS, latency (ms), and bus saturation percentage (%).
 * **`MacUtil.java`**:
-  * **Role**: Platform helper for macOS block path normalization (`/dev/diskX` <-> `/dev/rdiskX` raw character device).
+  * **Role**: Platform helper for macOS block path normalization (`/dev/diskX` $\leftrightarrow$ `/dev/rdiskX` raw character device).
 
 ---
 
-### 4.2. Defensive Safety Shields & Concurrency (`com.sanitizer.shield`)
+### 6.2. Defensive Safety Shields & Concurrency (`com.sanitizer.shield`)
 * **`SystemDiskShield.java`**:
   * **Role**: Bulletproof multi-OS root and boot disk protection interceptor.
-  * **Protection Rules**:
+  * **Rules**:
     1. Blocks string signatures: `disk0`, `rdisk0` (macOS), `PhysicalDrive0`, `C:` (Windows), `/dev/sda`, `/dev/nvme0n1` (Linux).
-    2. Deep OSHI mount inspection: Inspects live filesystem mounts (`/`, `/boot`, `/System`, `/etc`, `C:\Windows`) and forbids any target matching or sharing physical geometry with an active OS mount.
-    3. Triggers immediate alert dispatch via `AlertDispatcher.notifyShieldViolation` if a violation is attempted.
+    2. Deep OSHI mount inspection: Inspects live filesystem mounts (`/`, `/boot`, `/System`, `/etc`, `C:\Windows`) and rejects any drive matching an active OS mount.
+    3. Partition geometry checking: Prevents targeting secondary partitions that share a physical drive with an OS partition.
 * **`DiskLockShield.java`**:
   * **Role**: Media unmount and locking coordinator.
-  * **Mechanics**: Invokes `diskutil unmountDisk` (macOS) or `umount -f` (Linux) to dismount filesystem partitions before low-level block writes, preventing automount daemons (`diskarbitrationd`, `udisks2`) from interrupting the write head.
+  * **Mechanics**: Invokes `diskutil unmountDisk` (macOS) or `umount -f` (Linux) to dismount filesystem partitions before raw block writes, preventing automount daemons from corrupting write operations.
 * **`WorkerPoolGovernor.java`**:
   * **Role**: Host resource regulator.
-  * **Mechanics**: Continuously tracks system CPU load ticks and available physical RAM via OSHI. Throttles concurrent disk wipe dispatches if host CPU exceeds $88\%$ load or memory drops below $512\text{ MB}$, preventing system lockups during multi-drive operations.
+  * **Mechanics**: Tracks system CPU load ticks and available physical RAM via OSHI. Throttles concurrent disk wipe dispatches if host CPU exceeds $88\%$ load or memory drops below $512\text{ MB}$.
 
 ---
 
-### 4.3. Hardware Detection & Diagnostic Telemetry (`com.sanitizer.detector`)
+### 6.3. Hardware Detection & Diagnostic Telemetry (`com.sanitizer.detector`)
 * **`UsbDetector.java`**:
   * **Role**: Autonomous storage discovery service.
-  * **Mechanics**: Uses OSHI (`HardwareAbstractionLayer`) to poll storage devices every 2 seconds on a background daemon. Filters out internal SSDs, system drives, and APFS volumes, isolating removable drives within valid size boundaries (1 GB – 128 GB default). Notifies listeners via JavaFX UI thread or direct invocation.
+  * **Mechanics**: Polls storage devices every 2 seconds via OSHI on a background daemon. Filters out internal SSDs, system drives, and APFS volumes, isolating removable drives within valid size boundaries (1 GB – 128 GB default).
 * **`SmartDiagnostics.java`**:
   * **Role**: S.M.A.R.T. health analyzer and predictive failure evaluator.
-  * **Metrics Evaluated**: Reallocated sector count (ID 5), bad blocks, wear leveling percent (ID 173/231), power-on hours (ID 9), temperature (ID 194), UDMA CRC error count (ID 199), and command timeouts (ID 188).
-  * **Health Scoring**: Computes a holistic $0-100$ health score and classifies drives into `HEALTHY`, `WARNING`, or `CRITICAL`.
-  * **Pre/Post Delta**: Computes `SmartDelta` to attest whether sanitization introduced mechanical stress or wear.
+  * **Attributes Evaluated**: Reallocated sector count (ID 5), bad blocks, wear leveling percent (ID 173/231), power-on hours (ID 9), temperature (ID 194), UDMA CRC error count (ID 199), and command timeouts (ID 188).
+  * **Scoring**: Computes a $0-100$ health score and classifies drives into `HEALTHY`, `WARNING`, or `CRITICAL`.
+  * **Pre/Post Delta**: Computes `SmartDelta` to verify if sanitization introduced mechanical stress.
 * **`ThermalPolicy.java` & `ThermalPolicyManager.java`**:
-  * **Role**: Device-aware thermal thresholds.
-  * **Threshold Profiles**:
-    * *Magnetic HDD*: Warning $46^\circ\text{C}$, Auto-Pause $52^\circ\text{C}$, Resume $42^\circ\text{C}$.
-    * *SATA SSD*: Warning $55^\circ\text{C}$, Auto-Pause $65^\circ\text{C}$, Resume $50^\circ\text{C}$.
-    * *NVMe SSD*: Warning $68^\circ\text{C}$, Auto-Pause $78^\circ\text{C}$, Resume $60^\circ\text{C}$.
-    * *USB Flash*: Warning $48^\circ\text{C}$, Auto-Pause $58^\circ\text{C}$, Resume $44^\circ\text{C}$.
-* **`ThermalThrottleController.java`**:
-  * **Role**: Dynamic thermal regulation engine. Evaluates temperature rates and applies pacing delays (sleep milliseconds) to dissipate heat passively before hard pauses are reached.
-* **`DeviceType.java`**:
-  * **Role**: Enum identifying media physics: `USB_FLASH_DRIVE`, `SATA_SSD`, `NVME_SSD`, `MAGNETIC_HDD`.
+  * **Role**: Device-aware thermal thresholds (HDD: 46°/52°C, SATA SSD: 55°/65°C, NVMe: 68°/78°C, USB Flash: 48°/58°C).
+* **`ThermalThrottleController.java`**: Dynamic thermal regulation engine injecting pacing delays.
+* **`DeviceType.java`**: Enum: `USB_FLASH_DRIVE`, `SATA_SSD`, `NVME_SSD`, `MAGNETIC_HDD`.
 
 ---
 
-### 4.4. Sanitization Policy Standards & Profiles (`com.sanitizer.policy`)
-* **`WipePolicyManager.java`**:
-  * **Role**: Registry and lifecycle manager for international wiping standards and custom user profiles. Supports JSON import/export and disk persistence under `~/.sanitizer/policies`.
+### 6.4. Sanitization Policy Standards & Profiles (`com.sanitizer.policy`)
+* **`WipePolicyManager.java`**: Registry and lifecycle manager for international wiping standards and custom JSON profiles stored under `~/.sanitizer/policies`.
 * **Built-in Standards**:
   1. **NIST SP 800-88 Rev. 1 Clear**: 1-pass fixed zero-fill (`0x00`).
-  2. **US DoD 5220.22-M (NISPOM)**: 3-pass sequence (`0x00` Zero -> `0xFF` One -> Cryptographic Pseudo-Random).
-  3. **US DoD 5220.22-M ECE**: 7-pass military wipe (`0x00` -> `0xFF` -> Random -> `0x96` -> `0x00` -> `0xFF` -> Random).
-  4. **British HMG Infosec Standard 5 (Enhanced)**: 3-pass sequence (`0x00` -> `0xFF` -> Random).
-  5. **German BSI-VS / BSI TL-03423**: 7-pass standard (`0x00` -> `0xFF` -> `0x00` -> `0xFF` -> `0xAA` -> `0x55` -> Random).
-  6. **Canadian RCMP TSSIT OPS-II**: 7-pass standard (`0x00` -> `0xFF` -> `0x00` -> `0xFF` -> `0xAA` -> `0x55` -> Random).
-* **`WipePolicy.java`**, **`WipePass.java`**, **`WipePatternType.java`**:
-  * **Role**: Data structures defining multi-pass patterns (`ZERO_FILL`, `ONE_FILL`, `PSEUDO_RANDOM`, `CUSTOM_BYTE`).
+  2. **US DoD 5220.22-M (NISPOM)**: 3-pass sequence (`0x00` Zero $\to$ `0xFF` One $\to$ Pseudo-Random).
+  3. **US DoD 5220.22-M ECE**: 7-pass military wipe (`0x00` $\to$ `0xFF` $\to$ Random $\to$ `0x96` $\to$ `0x00` $\to$ `0xFF` $\to$ Random).
+  4. **British HMG Infosec Standard 5 (Enhanced)**: 3-pass sequence (`0x00` $\to$ `0xFF` $\to$ Random).
+  5. **German BSI-VS / BSI TL-03423**: 7-pass standard (`0x00` $\to$ `0xFF` $\to$ `0x00` $\to$ `0xFF` $\to$ `0xAA` $\to$ `0x55` $\to$ Random).
+  6. **Canadian RCMP TSSIT OPS-II**: 7-pass standard (`0x00` $\to$ `0xFF` $\to$ `0x00` $\to$ `0xFF` $\to$ `0xAA` $\to$ `0x55` $\to$ Random).
 
 ---
 
-### 4.5. Cryptography, Audit Ledger & Attestation (`com.sanitizer.crypto`, `com.sanitizer.db`, `com.sanitizer.audit`)
+### 6.5. Cryptography, Audit Ledger & Attestation (`com.sanitizer.crypto`, `com.sanitizer.db`, `com.sanitizer.audit`)
 * **`CryptoSigner.java`**:
   * **Role**: Hardware-grade public-key cryptography engine.
-  * **Implementation**: Generates or loads an **RSA 2048-bit keypair** (`sanitizer_private.key` and `sanitizer_public.key`). Signs audit record payloads using **SHA256withRSA**, returning Base64 digital signatures, and verifies signature validity.
+  * **Implementation**: Generates/loads an **RSA 2048-bit keypair** (`sanitizer_private.key` and `sanitizer_public.key`). Signs audit records using **SHA256withRSA**, returning Base64 digital signatures.
 * **`AuditDb.java`**:
-  * **Role**: SQLite transactional audit database (`sanitizer_history.db`) operating in high-performance WAL mode (`PRAGMA journal_mode=WAL;`).
-  * **Data Stored**: Record ID, timestamp, drive model, serial, capacity, standard, status, digital signature, pre/post health scores, bad blocks delta, wear delta, peak temperature, thermal pauses, CRC errors, Shannon entropy score, sample SHA-256 proof, `prev_record_hash`, and `record_hash`.
+  * **Role**: SQLite transactional audit database (`sanitizer_history.db`) in WAL mode (`PRAGMA journal_mode=WAL;`).
+  * **Schema**: Record ID, timestamp, drive model, serial, capacity, standard, status, digital signature, pre/post health scores, bad blocks delta, wear delta, peak temperature, thermal pauses, CRC errors, Shannon entropy score, sample SHA-256 proof, `prev_record_hash`, and `record_hash`.
 * **`LedgerIntegrityEngine.java`**:
-  * **Role**: Enterprise cryptographic blockchain-style ledger validator.
-  * **Mechanics**: Every audit record computes a SHA-256 hash chaining back to the previous record:
-    $$\text{Hash}_n = \text{SHA-256}(\text{Hash}_{n-1} \parallel \text{Payload}_n)$$
-    Anchored at the Genesis Root Hash (`0000000000000000000000000000000000000000000000000000000000000000`). Detects row modifications, deleted records, ID sequence gaps, and unsealed entries.
-* **`SecurityAuditLogger.java` & `SecurityAuditRecord.java`**:
-  * **Role**: SIEM-grade operational event logging for FISMA / HIPAA / NIST SP 800-53 compliance. Logs operator logins, PIN authentications, policy edits, key vault actions, and unauthorized privilege attempts with SHA-256 chain links.
+  * **Role**: Blockchain-style ledger validator.
+  * **Equation**: $\text{Hash}_n = \text{SHA-256}(\text{Hash}_{n-1} \parallel \text{Payload}_n)$. Detects row modifications, deleted records, and sequence gaps.
+* **`SecurityAuditLogger.java`**: SIEM-grade operational event logging for FISMA / HIPAA / NIST SP 800-53 compliance.
 
 ---
 
-### 4.6. PDF Certification & QR Verification Portal (`com.sanitizer.pdf`, `com.sanitizer.server`)
-* **`CertificateGenerator.java`**:
-  * **Role**: Generates defense-grade official sanitization certificates in PDF format via **Apache PDFBox**.
-  * **Features**: Embeds drive metadata, pre/post S.M.A.R.T. health deltas, thermal telemetry logs, interface bus CRC audit, drive risk ratings, RSA digital signature string, ESG sustainability metrics, and a dynamic **ZXing QR Code** linking directly to the embedded web verification portal.
-* **`WebVerificationServer.java`**:
-  * **Role**: Embedded, zero-dependency HTTP verification server (`com.sun.net.httpserver.HttpServer`) automatically starting on port 8080 (or 8088/8888/9090 fallback).
-  * **Endpoints**:
-    * `GET /verify?certId=...&model=...&sig=...`: Serves a dark-mode, mobile-friendly verification webpage for phone camera QR scans.
-    * `GET /api/verify`: REST API endpoint returning JSON authentication proofs and ESG metrics for enterprise B2B compliance checks.
+### 6.6. PDF Certification & QR Verification Portal (`com.sanitizer.pdf`, `com.sanitizer.server`)
+* **`CertificateGenerator.java`**: Generates official PDF certificates via **Apache PDFBox** with drive metadata, pre/post S.M.A.R.T. deltas, thermal logs, RSA signatures, ESG metrics, and a dynamic **ZXing QR Code** linking to the verification portal.
+* **`WebVerificationServer.java`**: Embedded zero-dependency HTTP server (`com.sun.net.httpserver.HttpServer`) running on port 8080 (or 8088/8888 fallback). Serves a dark-mode mobile verification page and a REST API endpoint (`/api/verify`).
 
 ---
 
-### 4.7. Defective Media Quarantine Engine (`com.sanitizer.quarantine`)
-* **`QuarantineEngine.java`**:
-  * **Role**: Evaluates unrecoverable hardware I/O write failures and bad blocks per NIST SP 800-88 Rev. 1 § 4.7 and EU GDPR Article 17 (Right to Erasure).
-  * **Logic**: If sectors cannot be physically written, software wipe cannot certify erasure. Prescribes mandatory physical destruction:
-    * *Rotational HDDs*: **Magnetic Degaussing** (≥10,000 Oersted / DIN 66399 H-5).
-    * *SSDs & USB Flash*: **Mechanical Shredding** (≤2mm cross-cut particle size / DIN 66399 E-4).
-* **`QuarantineReportGenerator.java`**:
-  * **Role**: Generates official PDF Quarantine & Physical Destruction Work Orders complete with granular failing LBA tables, chain-of-custody tracking IDs, and officer sign-off lines.
-* **`QuarantineRecord.java` & `LbaFailureRecord.java`**:
-  * **Role**: Immutable records capturing failure diagnostics, failing byte offsets, and sector ranges.
+### 6.7. Defective Media Quarantine Engine (`com.sanitizer.quarantine`)
+* **`QuarantineEngine.java`**: Evaluates unrecoverable hardware I/O write failures and bad blocks per NIST SP 800-88 Rev. 1 § 4.7 and EU GDPR Article 17. Prescribes **Magnetic Degaussing** (HDDs, $\ge 10,000\text{ Oe}$) or **Mechanical Shredding** (SSDs/Flash, $\le 2\text{mm}$).
+* **`QuarantineReportGenerator.java`**: Generates official DIN 66399 destruction work order PDFs with failing LBA fault tables and chain-of-custody sign-offs.
 
 ---
 
-### 4.8. Security, RBAC & Session Management (`com.sanitizer.session`)
-* **`UserRole.java`**:
-  * **Clearance Hierarchy**:
-    1. **INSPECTOR (Tier 1 - Operator)**: Can execute wipes, run diagnostics, and generate certificates.
-    2. **SUPERVISOR (Tier 2 - Manager)**: Grants policy creation, thermal config, alert dispatch settings, and audit viewing.
-    3. **CHIEF_AUDITOR (Tier 3 - Executive)**: Full governance, cryptographic key vault management, and blockchain ledger verification.
-* **`SessionContext.java`**:
-  * **Role**: Immutable identity token representing active operator, government agency ID, assigned role tier, and login timestamp.
-* **`SessionAutoLockManager.java`**:
-  * **Role**: FISMA/HIPAA compliant idle session lock. Auto-locks UI after configured inactivity (default 5 or 15 mins) requiring PIN re-authentication.
+### 6.8. Application Service Layer (`com.sanitizer.service`)
+* **`SanitizationWorkflowService.java`**: Decoupled orchestrator managing pre-flight diagnostics, block overwriting, entropy verification, RSA signing, blockchain ledger insertion, PDF generation, and alert dispatching.
+* **`AuditExportService.java`**: Asynchronous batch exporter generating CSV, JSON, and Excel SpreadsheetML files without blocking JavaFX.
+* **`SystemConfigurationService.java`**: Configuration service isolating database backup/pruning, alert rules, thermal safety policies, and audio alarms from UI views.
 
 ---
 
-### 4.9. Real-Time Alerting & External Integrations (`com.sanitizer.alert`)
-* **`AlertDispatcher.java`**:
-  * **Role**: Central asynchronous notification bus.
-  * **Events**: Batch wipe completion, single wipe finish/fail, thermal auto-pause triggered, and security shield intercept.
-* **`WebhookDispatcher.java`**: Dispatches JSON payloads to custom webhooks (Slack, Discord, Microsoft Teams).
-* **`SmtpEmailDispatcher.java`**: Transmits TLS-encrypted SMTP emails to compliance officer mailing lists.
-* **`AlertConfig.java` & `AlertConfigManager.java`**: Configures URLs, recipient addresses, and trigger toggles.
-
----
-
-### 4.10. Audio & Voice Announcements (`com.sanitizer.audio`, `com.sanitizer.util`)
-* **`TextToSpeechEngine.java`**:
-  * **Role**: Cross-platform native voice synthesizer.
-  * **Platform Implementations**: macOS (`say`), Windows (PowerShell `System.Speech.SpeechSynthesizer`), Linux (`spd-say` / `espeak`). Announces sanitization milestones, warnings, and completions.
-* **`SoundManager.java`**: Synthesizes synthetic tones (alert beeps, success chimes) via Java Audio System.
-
----
-
-### 4.11. Environmental ESG & Compliance Reporting (`com.sanitizer.esg`, `com.sanitizer.report`)
-* **`EsgCalculator.java`**:
-  * **Role**: Models IT Asset Disposition (ITAD) Scope 3 greenhouse gas avoidance and circular economy metrics:
-    * Standard 500GB baseline: Prevents $1.4\text{ kg}$ e-waste, saves $12.6\text{ kg}$ CO₂ emissions, equivalent to $0.21$ tree seedlings grown for 10 years and $18.9\text{ kWh}$ energy conserved.
-* **`AuditExporter.java`**:
-  * **Role**: Multi-format audit exporter generating **RFC 4180 CSV**, structured **JSON**, and native **Excel SpreadsheetML (XML)** with consolidated executive KPI blocks.
-
----
-
-### 4.12. User Interface & Interactive Views (`com.sanitizer.gui.*`)
-* **`NavigationManager.java`**: Central router and view cache controlling transition between views, RBAC access denial checks, global shortcuts, and theme/language changes.
-* **Views**:
-  * `HeroView`: Executive startup landing page displaying platform capabilities and compliance badges.
-  * `LoginView`: Clearance gate with Officer Name, Agency ID, Role selection, and PIN verification.
-  * `DashboardView`: High-level operational overview, quick actions, active drive list, and recent audit logs.
-  * `WipeWizardView`: 5-step guided wizard for technicians (Drive Select -> Diagnostic Verification -> Policy Selection -> Safety Confirmation -> Live Sanitization).
-  * `WipingView`: Manual single-drive wiping console with real-time logs and oscilloscope.
-  * `BatchWipeView`: Concurrent wiping console managing up to 8+ drives simultaneously with independent progress bars.
-  * `DiskDiagnosticView`: S.M.A.R.T. diagnostic console with health scores and interface signal analysis.
-  * `ClientManagerView`: ITAD organization customer management and sector compliance tagging.
-  * `KeyVaultView`: RSA-2048 keypair management, CA metadata configuration, and public key export.
-  * `AuditView`: Historical wipe log table, certificate regeneration, and Excel/CSV/JSON export.
-  * `VerificationPortalView`: Built-in certificate verification tester and server status manager.
-  * `SettingsView`: Modular configuration container assembling domain-isolated card components (`com.sanitizer.gui.views.settings`): `AccessibilitySettingsCard`, `AutoLockSecurityCard`, `CustomPolicyCard`, `ThermalPolicyCard`, `AlertDispatcherCard`, `AudioAlarmsCard`, `DatabaseMaintenanceCard`, `CryptoParametersCard`, `HardwareSafetyCard`, and `SystemInfoCard`.
-  * `LockScreenOverlay`: Security lock screen overlay requesting PIN re-entry.
-* **Interactive Components**:
-  * `SectorHeatmapComponent`: Colorblind-friendly block matrix visualizer (Dirty, Active Head, Pattern, Zeroed, Bad Sector) supporting Protanopia, Deuteranopia, Tritanopia, and Monochrome modes.
-  * `IoOscilloscopeComponent`: Real-time canvas oscilloscope showing write throughput (MB/s), IOPS, latency (ms), and bus saturation (%).
-  * `ThermalGraphComponent`: Rolling real-time temperature graph with warning and auto-pause indicators.
-
----
-
-### 4.13. Application Service Layer (`com.sanitizer.service`)
-* **`SanitizationService.java` & `SanitizationWorkflowService.java`**:
-  * **Role**: Decoupled application orchestrator managing the complete lifecycle of storage media sanitization independently of the presentation layer.
-  * **End-to-End Execution Sequence**:
-    1. Captures pre-wipe S.M.A.R.T. health snapshot and evaluates interface integrity.
-    2. Overwrites physical sectors via `WipeEngine` while forwarding live metrics, telemetry, and LBA defects.
-    3. Executes automated post-wipe read-back verification via `WipeVerifier` (Shannon Entropy & SHA-256 sample proof).
-    4. Computes pre/post `SmartDelta` to attest that media surface integrity was preserved.
-    5. Digitally signs proof payloads via `CryptoSigner` (RSA-2048).
-    6. Persists records to `AuditDb` with SHA-256 block chain linking.
-    7. Logs immutable SIEM audit records via `SecurityAuditLogger`.
-    8. Exports official PDF compliance certificates via `CertificateGenerator`.
-    9. Dispatches notifications to webhooks and email via `AlertDispatcher`.
-    10. In case of hardware write faults, triggers `QuarantineEngine` and generates DIN 66399 physical destruction orders.
-* **`AuditService.java` & `AuditExportService.java`**:
-  * **Role**: Headless enterprise reporting and compliance service decoupling `AuditView` from raw file formats, background threads, and SIEM event logging.
-  * **Capabilities**:
-    1. **Asynchronous Batch Export (`exportBatchAsync`)**: Generates CSV, JSON, and Excel SpreadsheetML files via daemon worker threads without blocking JavaFX.
-    2. **Full Corporate Audit Bundle (`exportFullPackageAsync`)**: Simultaneously generates timestamped CSV, JSON, and XML reports into a target directory.
-    3. **Official PDF Certificate Issuance (`exportCertificatePdfAsync`)**: Generates tamper-proof Apache PDFBox certificates.
-    4. **Quarantine Work Orders (`exportQuarantineReportPdfAsync`)**: Assesses hardware failure parameters and generates DIN 66399 physical destruction orders.
-    5. **Executive Analytics (`generateEsgReport`, `generateComplianceSummaryText`, `formatEsgBannerText`)**: Generates standardized ISO 14064-1 ESG summaries and NIST SP 800-88 / ISO 27040 compliance KPI reports.
-    6. **Cryptographic Validation & SIEM (`verifyDatabaseLedger`, `verifySecurityLedger`, `verifyRecordSignature`)**: Validates SHA-256 blockchain ledger integrity and logs all export operations to `SecurityAuditLogger`.
-* **`ConfigurationService.java` & `SystemConfigurationService.java`**:
-  * **Role**: Decoupled application configuration and maintenance service isolating hardware safety policies, operator chimes, external alerting, and database maintenance from GUI controllers.
-  * **Capabilities**:
-    1. **Database Maintenance (`exportDatabaseBackupAsync`, `clearAuditHistory`)**: Performs asynchronous streaming file backups of SQLite history and supervisor-authenticated audit log purges with SIEM tracking.
-    2. **Alert Orchestration (`saveAlertConfig`, `sendTestAlertAsync`)**: Validates and persists webhook/SMTP alert rules and executes asynchronous live test dispatches.
-    3. **Thermal Throttling Policies (`saveThermalPolicy`, `resetThermalPoliciesToDefaults`)**: Governs device-specific auto-pause/resume thermal safety rules with audit logging.
-    4. **Operator Bench Alarms (`saveAudioAlarmConfig`, `testAudioAlarm`)**: Manages synthesized voice speech templates, harmonic chimes, and visual laboratory flash alerts.
-    5. **Custom Sanitization Standards (`savePolicy`, `deletePolicy`, `exportPolicyToFile`, `importPolicyFromFile`)**: Manages custom multi-pass bit patterns and NIST/DoD sanitization policy JSON profile import/export.
-* **Value & Data Records (`WorkflowRequest.java`, `WorkflowResult.java`, `WorkflowCallbacks.java`, `ExportResult.java`, `ExportFormat.java`)**:
-  * **Role**: Strongly-typed, immutable value objects decoupling GUI controllers (e.g. `WipingView`, `WipeWizardView`, `BatchWipeView`, `AuditView`, `SettingsView`) and headless CLI runners from low-level subsystem internals.
-
----
-
-## 5. Summary Table of Core Source Files
+## 7. Master File Directory Table
 
 | Module / Package | Class / File | Primary Responsibility |
 | :--- | :--- | :--- |
-| `service` | [SanitizationWorkflowService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/SanitizationWorkflowService.java) | Application service orchestrator coordinating diagnostics, wipe, verification, digital seal, audit, and quarantine |
-| `service` | [AuditExportService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/AuditExportService.java) | Application service orchestrator for asynchronous CSV/JSON/XML/PDF exports, ESG metrics, and SIEM logging |
+| `service` | [SanitizationWorkflowService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/SanitizationWorkflowService.java) | Central orchestrator coordinating diagnostics, wipe, verification, digital seal, audit, and quarantine |
+| `service` | [AuditExportService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/AuditExportService.java) | Orchestrator for asynchronous CSV/JSON/XML/PDF exports, ESG metrics, and SIEM logging |
 | `service` | [AuditService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/AuditService.java) | Service contract interface for audit reporting, compliance summaries, and ledger verification |
-| `service` | [ConfigurationService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/ConfigurationService.java) | Service contract interface for system backup, alert dispatching, thermal policies, audio alarms, and wipe standards |
-| `service` | [SystemConfigurationService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/SystemConfigurationService.java) | Application service orchestrator for asynchronous database backups, alerts, thermal safety, chimes, and JSON policies |
+| `service` | [ConfigurationService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/ConfigurationService.java) | Service contract interface for system backup, alert dispatching, thermal policies, and wipe standards |
+| `service` | [SystemConfigurationService.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/service/SystemConfigurationService.java) | Orchestrator for asynchronous database backups, alerts, thermal safety, chimes, and JSON policies |
 | `engine` | [WipeEngine.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/engine/WipeEngine.java) | Overwrites raw block devices via `dd`, manages worker threads, pauses on thermal events |
 | `engine` | [WipeVerifier.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/engine/WipeVerifier.java) | Calculates Shannon Entropy ($H(X)$), verifies 0x00 pattern, produces SHA-256 proof |
 | `shield` | [SystemDiskShield.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/shield/SystemDiskShield.java) | Evaluates disk paths, protects OS root partitions (`disk0`, `C:`, `/dev/sda`) |
 | `shield` | [DiskLockShield.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/shield/DiskLockShield.java) | Unmounts logical partitions and locks devices against OS automount daemons |
-| `shield` | [WorkerPoolGovernor.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/shield/WorkerPoolGovernor.java) | Regulates host CPU load (≤88%) and memory to throttle parallel wipe dispatching |
+| `shield` | [WorkerPoolGovernor.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/shield/WorkerPoolGovernor.java) | Regulates host CPU load ($\le 88\%$) and memory to throttle parallel wipe dispatching |
 | `detector` | [UsbDetector.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/detector/UsbDetector.java) | Background OSHI hardware poller discovering removable pen drives and block devices |
 | `detector` | [SmartDiagnostics.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/detector/SmartDiagnostics.java) | Evaluates S.M.A.R.T. attributes, calculates 0-100 health score, tracks wear delta |
 | `detector` | [ThermalThrottleController.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/detector/ThermalThrottleController.java) | Computes throttle delays and auto-pauses when media exceeds thermal limits |
@@ -323,47 +507,86 @@ DWproject/
 | `esg` | [EsgCalculator.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/esg/EsgCalculator.java) | Computes avoided e-waste (kg), CO2e emissions saved, and tree seedling equivalencies |
 | `report` | [AuditExporter.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/report/AuditExporter.java) | Exports audit records to CSV, structured JSON, and Excel SpreadsheetML (XML) |
 | `gui` | [NavigationManager.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/gui/navigation/NavigationManager.java) | App router, view cache, RBAC enforcer, shortcut dispatcher, and scene manager |
-| `gui` | [SettingsView.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/gui/views/SettingsView.java) | Modular settings dashboard container assembling domain cards (A11y, Alerts, Thermal, Alarms, DB, Policies) |
+| `gui` | [SettingsView.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/gui/views/SettingsView.java) | Modular settings dashboard container assembling domain cards |
 | `gui` | [`settings/*`](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/gui/views/settings) | Decomposed card components for WCAG/I18n, auto-lock, custom policies, thermal limits, alerts, audio, and database maintenance |
 
 ---
 
-## 6. How to Run, Test, and Build the Project
+## 8. High-Yield Viva, Defense & Interview Masterclass (Q&A)
 
-### 6.1. Prerequisites
+Use these authoritative answers during viva examinations, project presentations, and technical interviews.
+
+### Q1: Why does your application write directly to raw character devices (`/dev/rdisk*`) instead of standard file I/O?
+> **Answer**: Standard file I/O operations go through the operating system's Virtual File System (VFS), filesystem cache, and kernel write buffers. The OS may delay writing, cache writes in RAM, or skip blocks via wear-leveling/journaling. By opening raw block devices (e.g. `/dev/rdisk*` on macOS, `/dev/sd*` on Linux, `\\\\.\\PhysicalDrive*` on Windows) with `bs=2m`, we bypass kernel caching layers and write directly to physical sectors on the storage media. This is a mandatory requirement of NIST SP 800-88 Rev. 1 for media sanitization.
+
+### Q2: How does Shannon Entropy mathematically prove that a drive has zero residual data?
+> **Answer**: Shannon Entropy measures the average information density (uncertainty) in bits per byte across a probability distribution of 256 byte values ($0\text{x}00$ through $0\text{xFF}$):
+> $$H(X) = -\sum_{i=0}^{255} p(x_i) \log_2 p(x_i)$$
+> If a drive has been completely sanitized with zero-fill, 100% of the bytes read back are `0x00` ($p(0\text{x}00) = 1.0$, and all other $p(x_i) = 0$). Since $1 \times \log_2(1) = 0$, the entropy score is **exactly $0.0000\text{ bits/byte}$**. If even a single byte or residual file fragment survives, $H(X) > 0.001$, which immediately fails verification and flags the drive as contaminated.
+
+### Q3: How do you prevent accidental destruction of the host operating system drive?
+> **Answer**: We employ a three-tier defense-in-depth shield implemented in `SystemDiskShield.java`:
+> 1. **Hardcoded Root Signatures**: Rejects known OS system drive paths across all platforms (`disk0`, `rdisk0` on macOS; `PhysicalDrive0`, `C:` on Windows; `/dev/sda`, `/dev/nvme0n1` on Linux).
+> 2. **OSHI Live Mount Inspection**: Queries active OS filesystem mounts (`/`, `/boot`, `/System`, `/etc`, `C:\Windows`) and forbids any drive matching an active mount.
+> 3. **Partition Geometry Correlation**: Rejects secondary partitions that share physical device geometry with the host boot disk. Any violation triggers immediate rejection and logs a security alert.
+
+### Q4: How is your SQLite audit log tamper-evident?
+> **Answer**: We implement a **cryptographic blockchain-style hash chain** in `AuditDb.java` and `LedgerIntegrityEngine.java`. Each audit record contains:
+> $$\text{record\_hash} = \text{SHA-256}(\text{prev\_record\_hash} \parallel \text{record\_payload})$$
+> The very first record is anchored to a known **Genesis Root Hash** (`0000...0000`). If a malicious user directly edits an SQLite row (e.g. altering a failed wipe to `PASS` or deleting a record), the hash sequence breaks. The `LedgerIntegrityEngine` can mathematically verify the entire chain and identify the exact tampered row. In addition, each record is digitally signed with an **RSA-2048 private key**.
+
+### Q5: What happens if a storage device overheats during wiping?
+> **Answer**: `ThermalThrottleController` evaluates device temperature in real-time against device-specific thermal profiles (HDDs pause at 52°C, SSDs at 65°C, NVMe at 78°C). If temperature exceeds the warning threshold, the controller injects pacing delays. If it hits the auto-pause limit, the application sends a **`SIGSTOP`** signal to the underlying `dd` process to freeze I/O immediately without aborting the job. When the drive cools down below the resume threshold, it sends **`SIGCONT`** to resume writing from the exact byte where it paused.
+
+### Q6: Why can't bad sectors simply be overwritten, and what is your Quarantine protocol?
+> **Answer**: Bad sectors are physical media defects (degraded magnetic media or worn-out NAND flash cells) that generate unrecoverable `POSIX EIO` errors. Because the drive's internal controller cannot write to these defective LBAs, **software overwriting is physically impossible**. Residual sensitive data may still reside inside those cells. Therefore, per NIST SP 800-88 Rev. 1 § 4.7 and EU GDPR Article 17, our `QuarantineEngine` aborts the software wipe, quarantines the drive, and generates a **DIN 66399 Physical Destruction Work Order** prescribing either **Magnetic Degaussing** (for HDDs, $\ge 10,000\text{ Oe}$) or **Mechanical Shredding** (for SSDs/Flash, $\le 2\text{mm}$).
+
+### Q7: How does the offline QR code verification portal work?
+> **Answer**: The application includes an embedded zero-dependency HTTP server (`WebVerificationServer.java`) listening on port 8080. When a certificate is generated via Apache PDFBox, a **ZXing QR Code** is embedded into the PDF linking to:
+> `http://<host>:8080/verify?certId=<id>&model=<model>&sig=<signature>`
+> When an auditor or client scans the QR code with their mobile phone camera, the server validates the RSA-2048 signature in real-time, displays an official cryptographic verification badge, and exposes a REST API (`/api/verify`) for automated enterprise compliance checks.
+
+### Q8: What ESG (Environmental, Social, Governance) metrics does the application compute?
+> **Answer**: In IT Asset Disposition (ITAD), physically shredding a reusable drive generates electronic waste and requires manufacturing a replacement drive. `EsgCalculator.java` models circular economy benefits: For every 500GB drive safely wiped and reused rather than shredded, it calculates:
+> * $\approx 1.4\text{ kg}$ of electronic waste diverted from landfills.
+> * $\approx 12.6\text{ kg}$ of Scope 3 greenhouse gas ($\text{CO}_2\text{e}$) emissions prevented.
+> * $\approx 0.21$ tree seedlings grown for 10 years equivalent.
+> * $\approx 18.9\text{ kWh}$ of energy conserved.
+> These metrics are embedded into every PDF certificate and audit report.
+
+---
+
+## 9. How to Run, Test, and Build the Project
+
+### 9.1. Prerequisites
 * **Java Development Kit (JDK)**: Version 17 or higher.
 * **Apache Maven**: Version 3.8+ (`mvn`).
 
-### 6.2. Running the Application Locally
-Navigate to the module directory and launch JavaFX:
+### 9.2. Running Locally
 ```bash
 cd DataWiping
 mvn javafx:run
 ```
-*(Or run the main entry point class: `com.sanitizer.gui.AppLauncher`)*.
+*(Or execute main class `com.sanitizer.gui.AppLauncher`)*.
 
-### 6.3. Running the Comprehensive Test Suite
-Execute all 34 unit and integration test suites:
+### 9.3. Running Comprehensive Test Suite
 ```bash
 cd DataWiping
 mvn test
 ```
-*(Code coverage reports are automatically generated in `DataWiping/target/site/jacoco/index.html` via JaCoCo)*.
+*(JaCoCo code coverage report available in `DataWiping/target/site/jacoco/index.html`)*.
 
-### 6.4. Building Standalone Uber-JAR
-Compile and assemble the shaded executable all-in-one JAR:
+### 9.4. Building Standalone Uber-JAR
 ```bash
 cd DataWiping
 mvn clean package
-# Output: DataWiping/target/usb-sanitizer-1.0-SNAPSHOT-all.jar
+# Artifact: DataWiping/target/usb-sanitizer-1.0-SNAPSHOT-all.jar
 ```
 
-### 6.5. Generating Native Operating System Installers
-Using the scripts in `packaging/`:
+### 9.5. Generating Native Installers
 * **macOS (DMG Installer)**:
   ```bash
   ./packaging/package-mac.sh 1.0.0
-  # Output: dist/USBSanitizer-1.0.0.dmg
   ```
 * **Linux (AppImage / DEB / Flatpak)**:
   ```bash
@@ -375,22 +598,3 @@ Using the scripts in `packaging/`:
   ```cmd
   packaging\package-win.bat 1.0.0
   ```
-
----
-
-## 7. Recommended 4-Stage Study Roadmap for Students & Reviewers
-
-To acquire complete mastery over this codebase, study the components in this sequential order:
-
-1. **Stage 1: Core Engine & Hardware Execution**
-   * Read [WipeEngine.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/engine/WipeEngine.java) and [WipeVerifier.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/engine/WipeVerifier.java).
-   * Understand how `dd` commands are formed, how progress callbacks fire, and how Shannon Entropy is calculated.
-2. **Stage 2: Safety Shields & Hardware Protections**
-   * Read [SystemDiskShield.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/shield/SystemDiskShield.java), [DiskLockShield.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/shield/DiskLockShield.java), and [ThermalThrottleController.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/detector/ThermalThrottleController.java).
-   * Trace how primary system drives are protected and how overheating drives are paused using `SIGSTOP`.
-3. **Stage 3: Cryptography, Ledger & Attestation**
-   * Read [CryptoSigner.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/crypto/CryptoSigner.java), [LedgerIntegrityEngine.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/db/LedgerIntegrityEngine.java), and [CertificateGenerator.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/pdf/CertificateGenerator.java).
-   * Trace the SHA-256 block chain from the Genesis block to the final RSA-signed PDF certificate.
-4. **Stage 4: GUI Presentation & User Experience**
-   * Read [NavigationManager.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/gui/navigation/NavigationManager.java), [WipeWizardView.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/gui/views/WipeWizardView.java), and [SectorHeatmapComponent.java](file:///Users/pranaash31/IdeaProjects/DWproject/DataWiping/src/main/java/com/sanitizer/gui/components/SectorHeatmapComponent.java).
-   * Trace the JavaFX event bus, view caching, and real-time canvas rendering.
