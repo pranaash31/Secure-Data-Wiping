@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -141,7 +142,7 @@ public class SystemConfigurationService implements ConfigurationService {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 Future<Boolean> testFuture = AlertDispatcher.sendTestNotification(draft);
-                return testFuture != null && testFuture.get();
+                return testFuture != null && testFuture.get(15, TimeUnit.SECONDS);
             } catch (Exception e) {
                 AppLogger.error(MODULE, "Failed to send test alert: " + e.getMessage(), e);
                 return false;
