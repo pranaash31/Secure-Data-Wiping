@@ -11,6 +11,7 @@ import com.sanitizer.detector.ThermalPolicy;
 import com.sanitizer.detector.ThermalPolicyManager;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
+import com.sanitizer.session.SessionAutoLockManager;
 import com.sanitizer.session.SessionContext;
 import com.sanitizer.session.UserRole;
 import com.sanitizer.util.AppLogger;
@@ -200,6 +201,25 @@ public class SystemConfigurationService implements ConfigurationService {
     @Override
     public void testAudioAlarm(AudioAlarmConfig.AlarmMode mode) {
         SoundManager.testAlarm(mode);
+    }
+
+    // ── Session Auto-Lock Security Controls ─────────────────────────────────
+
+    @Override
+    public int getAutoLockTimeoutSeconds() {
+        return SessionAutoLockManager.getInstance().getTimeoutSeconds();
+    }
+
+    @Override
+    public void saveAutoLockTimeout(int timeoutSeconds, SessionContext session) {
+        SessionAutoLockManager.getInstance().setTimeoutSeconds(timeoutSeconds);
+        SessionContext ctx = resolveSession(session);
+        SecurityAuditLogger.logConfigChange(
+                ctx.officerName(), ctx.agencyId(), ctx.role(),
+                "Session Auto-Lock Timeout",
+                timeoutSeconds == 0 ? "Disabled" : timeoutSeconds + "s"
+        );
+        AppLogger.info(MODULE, "Session auto-lock timeout updated to: " + timeoutSeconds + "s by " + ctx.officerName());
     }
 
     // ── Custom Wipe Standard & Pattern Profiles ────────────────────────────

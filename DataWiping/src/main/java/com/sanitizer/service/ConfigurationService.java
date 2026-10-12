@@ -37,6 +37,10 @@ public interface ConfigurationService {
     void saveAudioAlarmConfig(AudioAlarmConfig config);
     void testAudioAlarm(AudioAlarmConfig.AlarmMode mode);
 
+    // ── Session Auto-Lock Security Controls ─────────────────────────────────
+    int getAutoLockTimeoutSeconds();
+    void saveAutoLockTimeout(int timeoutSeconds, SessionContext session);
+
     // ── Custom Wipe Standard & Pattern Profiles ────────────────────────────
     List<WipePolicy> getAllPolicies();
     WipePolicy getDefaultPolicy();

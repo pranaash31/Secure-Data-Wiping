@@ -221,4 +221,17 @@ class SystemConfigurationServiceTest {
         assertThat(imported.getName()).isEqualTo("Export Import Policy");
         assertThat(imported.getPassCount()).isEqualTo(2);
     }
+
+    @Test
+    void testAutoLockTimeoutLifecycle() {
+        int initial = configService.getAutoLockTimeoutSeconds();
+        assertThat(initial).isGreaterThanOrEqualTo(0);
+
+        configService.saveAutoLockTimeout(900, session);
+        assertThat(configService.getAutoLockTimeoutSeconds()).isEqualTo(900);
+
+        // Reset to initial
+        configService.saveAutoLockTimeout(initial, session);
+        assertThat(configService.getAutoLockTimeoutSeconds()).isEqualTo(initial);
+    }
 }

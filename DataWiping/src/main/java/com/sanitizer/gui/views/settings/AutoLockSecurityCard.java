@@ -3,7 +3,8 @@ package com.sanitizer.gui.views.settings;
 import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
-import com.sanitizer.session.SessionAutoLockManager;
+import com.sanitizer.service.ConfigurationService;
+import com.sanitizer.service.SystemConfigurationService;
 import com.sanitizer.session.UserRole;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -15,8 +16,15 @@ import javafx.util.StringConverter;
  */
 public class AutoLockSecurityCard extends VBox {
 
+    private final ConfigurationService configService;
+
     public AutoLockSecurityCard() {
+        this(SystemConfigurationService.getInstance());
+    }
+
+    public AutoLockSecurityCard(ConfigurationService configService) {
         super(18);
+        this.configService = (configService != null) ? configService : SystemConfigurationService.getInstance();
         getStyleClass().add("card");
         buildUi();
     }
@@ -56,7 +64,7 @@ public class AutoLockSecurityCard extends VBox {
 
         ComboBox<Integer> cmbTimeout = new ComboBox<>();
         cmbTimeout.getItems().addAll(60, 300, 900, 1800, 0);
-        cmbTimeout.setValue(SessionAutoLockManager.getInstance().getTimeoutSeconds());
+        cmbTimeout.setValue(configService.getAutoLockTimeoutSeconds());
         cmbTimeout.setMaxWidth(Double.MAX_VALUE);
         cmbTimeout.setConverter(new StringConverter<>() {
             @Override
@@ -82,9 +90,7 @@ public class AutoLockSecurityCard extends VBox {
         cmbTimeout.setOnAction(e -> {
             Integer val = cmbTimeout.getValue();
             if (val != null) {
-                SessionAutoLockManager.getInstance().setTimeoutSeconds(val);
-                SecurityAuditLogger.logConfigChange(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(),
-                        "Session Auto-Lock Timeout", val == 0 ? "Disabled" : val + "s");
+                configService.saveAutoLockTimeout(val, nav.getSessionContext());
                 nav.showNotification("Auto-Lock Policy Updated",
                         "Inactivity timeout set to: " + cmbTimeout.getConverter().toString(val),
                         ToastType.SUCCESS);

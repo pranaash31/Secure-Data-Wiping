@@ -53,7 +53,7 @@ public class SettingsView {
 
         // ── Domain Modular Cards ────────────────────────────────────────
         VBox cardA11y = new AccessibilitySettingsCard();
-        VBox cardAutoLock = new AutoLockSecurityCard();
+        VBox cardAutoLock = new AutoLockSecurityCard(configService);
         VBox cardPolicyBuilder = new CustomPolicyCard(configService);
         VBox cardThermal = new ThermalPolicyCard(configService);
         VBox cardAlerts = new AlertDispatcherCard(configService);
