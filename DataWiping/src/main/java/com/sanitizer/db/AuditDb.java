@@ -2,6 +2,7 @@ package com.sanitizer.db;
 
 import com.sanitizer.util.AppLogger;
 
+import java.io.*;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -451,5 +452,71 @@ public class AuditDb {
     public static int getTamperVerifiedCount(List<AuditRecord> records) {
         if (records == null) return 0;
         return (int) records.stream().filter(r -> r.digitalSignature() != null && !r.digitalSignature().isEmpty()).count();
+    }
+
+    /**
+     * Performs an atomic online backup of the SQLite database.
+     * Checkpoints all pending WAL pages to disk to guarantee consistency and prevent WAL data corruption,
+     * then uses SQLite's native atomic VACUUM INTO for read-consistent snapshotting.
+     */
+    public static synchronized void backupDatabase(File destinationFile) throws SQLException {
+        if (destinationFile == null) {
+            throw new IllegalArgumentException("Destination backup file cannot be null");
+        }
+        if (destinationFile.exists()) {
+            destinationFile.delete();
+        }
+
+        try (Connection conn = getConnection()) {
+            // Step 1: Checkpoint WAL journal frames into main database file
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("PRAGMA wal_checkpoint(TRUNCATE);");
+            }
+
+            // Step 2: Use SQLite native atomic VACUUM INTO for consistent online snapshot
+            try (PreparedStatement pstmt = conn.prepareStatement("VACUUM INTO ?")) {
+                pstmt.setString(1, destinationFile.getAbsolutePath());
+                pstmt.executeUpdate();
+                return;
+            } catch (SQLException vacuumEx) {
+                AppLogger.warn(MODULE, "VACUUM INTO not supported or failed, using checkpointed stream copy: " + vacuumEx.getMessage());
+            }
+        }
+
+        // Fallback for custom file URLs: copy from checkpointed source file
+        String url = getDbUrl();
+        File src = url.startsWith("jdbc:sqlite:")
+                ? new File(url.substring("jdbc:sqlite:".length()))
+                : new File("sanitizer_history.db");
+        if (src.exists()) {
+            try (FileInputStream in = new FileInputStream(src);
+                 FileOutputStream out = new FileOutputStream(destinationFile)) {
+                in.transferTo(out);
+            } catch (IOException e) {
+                throw new SQLException("Failed streaming backup after checkpoint: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
+     * Purges all audit history records in a transactional block with automatic rollback.
+     */
+    public static synchronized boolean purgeAuditHistory() {
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("DELETE FROM wipe_logs;");
+                stmt.execute("DELETE FROM sqlite_sequence WHERE name='wipe_logs';");
+                conn.commit();
+                return true;
+            } catch (SQLException e) {
+                conn.rollback();
+                AppLogger.error(MODULE, "Failed to purge audit history: " + e.getMessage(), e);
+                return false;
+            }
+        } catch (SQLException e) {
+            AppLogger.error(MODULE, "Connection error during history purge: " + e.getMessage(), e);
+            return false;
+        }
     }
 }

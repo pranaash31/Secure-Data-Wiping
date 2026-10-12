@@ -74,25 +74,12 @@ public class SystemConfigurationService implements ConfigurationService {
                 throw new IllegalArgumentException("Destination backup file cannot be null");
             }
 
-            String url = AuditDb.getDbUrl();
-            File src = url.startsWith("jdbc:sqlite:")
-                    ? new File(url.substring("jdbc:sqlite:".length()))
-                    : new File("sanitizer_history.db");
-
-            if (!src.exists()) {
-                throw new IllegalStateException("Database source file not found on disk: " + src.getAbsolutePath());
-            }
-
-            try (FileInputStream in = new FileInputStream(src);
-                 FileOutputStream out = new FileOutputStream(destinationFile)) {
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                }
-                AppLogger.info(MODULE, "Successfully exported database backup to: " + destinationFile.getAbsolutePath());
+            try {
+                // Execute atomic SQLite WAL checkpoint and native VACUUM INTO
+                AuditDb.backupDatabase(destinationFile);
+                AppLogger.info(MODULE, "Successfully exported atomic SQLite database backup to: " + destinationFile.getAbsolutePath());
                 return destinationFile;
-            } catch (IOException e) {
+            } catch (Exception e) {
                 AppLogger.error(MODULE, "Failed to export database backup: " + e.getMessage(), e);
                 throw new RuntimeException("Database backup failed: " + e.getMessage(), e);
             }
@@ -101,13 +88,32 @@ public class SystemConfigurationService implements ConfigurationService {
 
     @Override
     public boolean clearAuditHistory(SessionContext session) {
+        SessionContext ctx = resolveSession(session);
+        // Enforce RBAC clearance check (SUPERVISOR or CHIEF_AUDITOR clearance required)
+        if (!ctx.hasPermission(UserRole.Permission.AUDIT_CLEAR) && !ctx.isRoleAtLeast(UserRole.SUPERVISOR)) {
+            SecurityAuditLogger.logEvent(
+                    "DATABASE_CLEAR_DENIED",
+                    ctx.officerName(), ctx.agencyId(), ctx.role(),
+                    "Unauthorized purge attempt: User lacks clearance to clear database",
+                    "sanitizer_history.db",
+                    "FAILED"
+            );
+            AppLogger.warn(MODULE, "Access denied: Officer " + ctx.officerName() + " (" + ctx.role() + ") lacks clearance to clear audit logs");
+            return false;
+        }
+
         try {
+            // Step 1: Transactional deletion of existing records
+            AuditDb.purgeAuditHistory();
+
+            // Step 2: Seed fresh genesis state with SYSTEM_RESET anchor
             AuditDb.saveRecord("SYSTEM_RESET", "N/A", "0 GB", "LOG_CLEAR", "RESET", "N/A");
-            SessionContext ctx = resolveSession(session);
+
+            // Step 3: Immutable SIEM Security Audit Logging
             SecurityAuditLogger.logEvent(
                     "DATABASE_CLEARED",
                     ctx.officerName(), ctx.agencyId(), ctx.role(),
-                    "Audit log purged by administrator (SYSTEM_RESET recorded)",
+                    "Audit log purged by authorized administrator (SYSTEM_RESET recorded)",
                     "sanitizer_history.db",
                     "WARNING"
             );

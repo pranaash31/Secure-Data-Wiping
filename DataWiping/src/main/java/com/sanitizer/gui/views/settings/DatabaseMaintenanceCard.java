@@ -105,6 +105,12 @@ public class DatabaseMaintenanceCard extends VBox {
     }
 
     private void handleClearHistory() {
+        var nav = NavigationManager.getInstance();
+        if (!nav.hasPermission(UserRole.Permission.AUDIT_CLEAR) && !nav.getRole().isAtLeast(UserRole.SUPERVISOR)) {
+            nav.showAccessDeniedDialog("Audit Ledger Purge", "SUPERVISOR / CHIEF AUDITOR");
+            return;
+        }
+
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
         confirm.setTitle("Clear Audit Log Database");
         confirm.setHeaderText("PERMANENT AUDIT HISTORY DELETION");
@@ -118,12 +124,18 @@ public class DatabaseMaintenanceCard extends VBox {
                         "Database history has been cleared.", ToastType.WARNING);
             } else {
                 NavigationManager.getInstance().showNotification("Clear Error",
-                        "Failed to clear audit log history.", ToastType.ERROR);
+                        "Failed to clear audit log history or permission denied.", ToastType.ERROR);
             }
         }
     }
 
     private void handleExportDbBackup() {
+        var nav = NavigationManager.getInstance();
+        if (!nav.hasPermission(UserRole.Permission.AUDIT_EXPORT) && !nav.hasPermission(UserRole.Permission.SETTINGS_MODIFY)) {
+            nav.showAccessDeniedDialog("Database Backup Export", "SUPERVISOR / CHIEF AUDITOR");
+            return;
+        }
+
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Backup SQLite Audit Database");
         chooser.setInitialFileName("sanitizer_history_backup.db");
