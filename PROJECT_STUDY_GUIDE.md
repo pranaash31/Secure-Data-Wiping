@@ -2,190 +2,176 @@
 ### *Defense-Grade Storage Media Sanitization, Cryptographic Ledger & Hardware Lifecycle Assurance*
 
 ```
-========================================================================================
-  STANDARDS COMPLIANCE : NIST SP 800-88 Rev. 1 | DoD 5220.22-M | DoD ECE | BSI-VS | HMG IS5
-  SECURITY & AUDIT     : RSA-2048 | SHA-256 Hash Chain | DIN 66399 | HIPAA | GDPR Art. 17
-  TECHNOLOGY STACK     : Java 17 LTS | JavaFX 21 | OSHI | Apache PDFBox | ZXing | SQLite WAL
-========================================================================================
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                              MILITARY & REGULATORY COMPLIANCE                          │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  • NIST SP 800-88 Rev. 1 (Media Sanitization)    • DoD 5220.22-M & DoD ECE (7-Pass)    │
+│  • German BSI-VS / BSI TL-03423                  • British HMG Infosec Standard 5      │
+│  • DIN 66399 (Physical Media Destruction)        • ISO/IEC 27040:2015 Storage Security │
+│  • EU GDPR Article 17 (Right to Erasure)         • HIPAA § 164.310 / FISMA NIST 800-53 │
+│  • RSA-2048 Digital Attestation                  • SHA-256 Blockchain Hash Chained DB  │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🗺️ Quick Navigation Index
-
-- [1. Executive Overview & Mission Architecture](#1-executive-overview--mission-architecture)
-- [2. Interactive UI & Navigation Flow Map](#2-interactive-ui--navigation-flow-map)
-- [3. Complete End-to-End System Architecture](#3-complete-end-to-end-system-architecture)
-- [4. Core Workflow Execution (Sequence Diagram)](#4-core-workflow-execution-sequence-diagram)
-- [5. Defensive Safety Shields & Root Disk Protection](#5-defensive-safety-shields--root-disk-protection)
-- [6. Hardware Diagnostics & S.M.A.R.T. Health Scoring Engine](#6-hardware-diagnostics--smart-health-scoring-engine)
-- [7. Thermal Throttle Controller & State Machine](#7-thermal-throttle-controller--state-machine)
-- [8. Sanitization Standards & Multi-Pass Bit Patterns](#8-sanitization-standards--multi-pass-bit-patterns)
-- [9. Mathematical Verification & Shannon Entropy Model](#9-mathematical-verification--shannon-entropy-model)
-- [10. Cryptographic Blockchain Ledger & Tamper Proofing](#10-cryptographic-blockchain-ledger--tamper-proofing)
-- [11. Hardware Quarantine & DIN 66399 Physical Destruction](#11-hardware-quarantine--din-66399-physical-destruction)
-- [12. Digital PDF Certification & Offline QR Verification Portal](#12-digital-pdf-certification--offline-qr-verification-portal)
-- [13. Environmental ESG & ITAD Carbon Calculator](#13-environmental-esg--itad-carbon-calculator)
-- [14. Role-Based Access Control (RBAC) & Session Governance](#14-role-based-access-control-rbac--session-governance)
-- [15. Complete Package & File Directory Blueprint](#15-complete-package--file-directory-blueprint)
-- [16. High-Yield Viva, Defense & Interview Masterclass](#16-high-yield-viva-defense--interview-masterclass)
-- [17. Build, Test & Deployment Playbook](#17-build-test--deployment-playbook)
-
----
-
-## 1. Executive Overview & Mission Architecture
+## 🗺️ Visual Study Index
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 THE 6 CORE PILLARS                                     │
-├──────────────────────────┬──────────────────────────┬──────────────────────────────────┤
-│ 1. PERMANENT PHYSICAL    │ 2. ZERO-RESIDUAL         │ 3. CRYPTOGRAPHIC                 │
-│    DATA DESTRUCTION      │    ENTROPY PROOF         │    IMMUTABLE LEDGER              │
-│ Direct OS block write    │ Shannon Entropy H(X)     │ SHA-256 blockchain hash chaining │
-│ targeting /dev/rdisk*    │ returns exactly 0.0000   │ + RSA-2048 digital signatures    │
-├──────────────────────────┼──────────────────────────┼──────────────────────────────────┤
-│ 4. HARDWARE QUARANTINE   │ 5. HOST SAFETY SHIELDS   │ 6. ESG & CIRCULAR                │
-│    DEFECT ISOLATION      │    & THERMAL THROTTLE    │    ECONOMY METRICS               │
-│ Auto-aborts on bad LBAs; │ Triple-layer boot guard; │ Quantifies kg e-waste diverted   │
-│ DIN 66399 destruction    │ SIGSTOP/SIGCONT pauses   │ & Scope 3 CO2 emissions saved    │
-└──────────────────────────┴──────────────────────────┴──────────────────────────────────┘
+│                                 TABLE OF CONTENTS                                      │
+├───────────────────────────────────┬────────────────────────────────────────────────────┤
+│  1. Executive Summary & Pillars   │  10. Cryptographic Blockchain Ledger               │
+│  2. Interactive Navigation Map    │  11. Hardware Quarantine & DIN 66399 Destruction   │
+│  3. 7-Tier System Architecture    │  12. PDF Certification & QR Verification Portal    │
+│  4. End-to-End Execution Sequence │  13. ESG & ITAD Carbon Mitigation Engine           │
+│  5. 3-Layer Host Safety Shield    │  14. RBAC Clearance & Session Governance           │
+│  6. S.M.A.R.T. Health Scoring     │  15. Complete Component & File Blueprint           │
+│  7. Thermal Throttle Controller   │  16. High-Yield Viva / Defense Masterclass (Q&A)   │
+│  8. Multi-Pass Bit Patterns       │  17. Build, Test & CI/CD Pipeline Playbook         │
+│  9. Shannon Entropy Verification  │                                                    │
+└───────────────────────────────────┴────────────────────────────────────────────────────┘
 ```
-
-> [!IMPORTANT]
-> **Why Software Sanitization Matters**: Simply deleting a file or formatting a drive only clears the filesystem partition table (FAT, NTFS, APFS). The underlying binary bits remain completely recoverable using raw sector carving tools (e.g., `TestDisk`, `Photorec`). **SecureErase Pro** writes low-level cryptographic patterns directly across every addressable Logical Block Address (LBA), rendering forensic data recovery physically impossible.
 
 ---
 
-## 2. Interactive UI & Navigation Flow Map
+## 1. Executive Summary & Pillars
 
-This flowchart maps the user journey across the JavaFX presentation layer orchestrated by `NavigationManager.java`:
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    THE 6 ARCHITECTURAL PILLARS                                  │
+├───────────────────────────────┬───────────────────────────────┬─────────────────────────────────┤
+│ 1. PERMANENT DATA ERASURE     │ 2. MATHEMATICAL VERIFICATION  │ 3. CRYPTOGRAPHIC INTEGRITY      │
+│ ┌───────────────────────────┐ │ ┌───────────────────────────┐ │ ┌─────────────────────────────┐ │
+│ │ Raw direct block I/O via  │ │ │ Real-time Shannon Entropy │ │ │ SHA-256 blockchain hash     │ │
+│ │ /dev/rdisk* / \\.\Phys*   │ │ │ H(X) == 0.0000 bits/byte  │ │ │ chaining + RSA-2048 signing │ │
+│ └───────────────────────────┘ │ └───────────────────────────┘ │ └─────────────────────────────┘ │
+├───────────────────────────────┼───────────────────────────────┼─────────────────────────────────┤
+│ 4. HARDWARE QUARANTINE        │ 5. DEFENSIVE SAFETY SHIELDS   │ 6. ESG CIRCULAR ECONOMY         │
+│ ┌───────────────────────────┐ │ ┌───────────────────────────┐ │ ┌─────────────────────────────┐ │
+│ │ Auto-abort on bad LBAs;   │ │ │ 3-Tier OS boot disk guard;│ │ │ Computes kg e-waste saved   │ │
+│ │ DIN 66399 shred/degauss   │ │ │ SIGSTOP/SIGCONT pauses    │ │ │ & Scope 3 CO2 emissions     │ │
+│ └───────────────────────────┘ │ └───────────────────────────┘ │ └─────────────────────────────┘ │
+└───────────────────────────────┴───────────────────────────────┴─────────────────────────────────┘
+```
+
+```mermaid
+flowchart LR
+    A["Raw Physical Media\n(USB / SSD / HDD)"] --> B["WipeEngine\n(Overwrites LBAs bs=2m)"]
+    B --> C["WipeVerifier\n(Shannon Entropy H(X))"]
+    C -->|Pass: H(X)=0.0000| D["CryptoSigner\n(RSA-2048 Seal)"]
+    C -->|Fail: Bad LBAs| E["QuarantineEngine\n(DIN 66399 Destruction)"]
+    D --> F[("AuditDb\n(Blockchain Ledger)")]
+    D --> G["PDF Certificate\n(+ QR Verification)"]
+    
+    style A fill:#f1f5f9,stroke:#64748b,stroke-width:2px
+    style B fill:#eff6ff,stroke:#2563eb,stroke-width:2px
+    style C fill:#fef3c7,stroke:#d97706,stroke-width:2px
+    style D fill:#ecfdf5,stroke:#059669,stroke-width:2px
+    style E fill:#fef2f2,stroke:#dc2626,stroke-width:2px
+    style F fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px
+    style G fill:#f5f3ff,stroke:#7c3aed,stroke-width:2px
+```
+
+---
+
+## 2. Interactive Navigation Map
 
 ```mermaid
 flowchart TD
-    START([Application Launch]) --> LOGIN[LoginView\nOfficer Name + Agency ID + PIN Auth]
+    START([Application Launch]) --> LOGIN["🔑 LoginView\n(Officer Name, Agency ID, PIN)"]
     
-    LOGIN --> SESS_CHECK{RBAC Clearance Gate}
-    SESS_CHECK -->|Tier 1: Inspector| HERO[HeroView / DashboardView\nOperational Overview & Quick Actions]
-    SESS_CHECK -->|Tier 2: Supervisor| HERO
-    SESS_CHECK -->|Tier 3: Chief Auditor| HERO
+    LOGIN --> GATE{RBAC Clearance Check}
+    GATE -->|Inspector / Supervisor / Chief Auditor| HERO["🏠 HeroView / DashboardView\n(System Overview & Quick Launch)"]
     
-    HERO --> WIZARD[WipeWizardView\n5-Step Guided Technician Wizard]
-    HERO --> BATCH[BatchWipeView\nMulti-Drive Concurrent Wiping Console]
-    HERO --> WIPING[WipingView\nSingle-Drive Live Oscilloscope & Logs]
-    HERO --> DIAG[DiskDiagnosticView\nS.M.A.R.T. Health & Interface Integrity]
-    HERO --> AUDIT[AuditView\nHistorical Ledger & PDF/CSV/XML Export]
-    HERO --> VERIFY[VerificationPortalView\nOffline QR & Digital Signature Auditor]
-    HERO --> CLIENTS[ClientManagerView\nEnterprise ITAD Client Org Manager]
-    HERO --> SETTINGS[SettingsView\nModular Security & Policy Dashboard]
+    HERO --> WIZ["🧙 WipeWizardView\n(5-Step Guided Technician Workflow)"]
+    HERO --> BAT["⚡ BatchWipeView\n(Concurrent Multi-Drive Console)"]
+    HERO --> WIP["🎯 WipingView\n(Single-Drive Live Oscilloscope)"]
+    HERO --> DIA["🩺 DiskDiagnosticView\n(S.M.A.R.T. Health & Interface)"]
+    HERO --> AUD["📜 AuditView\n(Ledger History & PDF/CSV/XML Export)"]
+    HERO --> VRF["🔍 VerificationPortalView\n(Offline QR & Signature Verifier)"]
+    HERO --> CLI["🏢 ClientManagerView\n(ITAD Corporate Client Registry)"]
+    HERO --> SET["⚙️ SettingsView\n(Modular System Configuration)"]
 
-    subgraph WIZARD_STEPS["5-Step Guided Wizard Pipeline"]
-        W1[Step 1: Select Drive] --> W2[Step 2: S.M.A.R.T. Diagnostics]
-        W2 --> W3[Step 3: Choose Sanitization Policy]
-        W3 --> W4[Step 4: Safety Confirmation Gate]
-        W4 --> W5[Step 5: Live Execution & Oscilloscope]
+    subgraph WIZARD_PIPELINE["5-Step Guided Wizard Pipeline"]
+        W1["Step 1: Select Drive"] --> W2["Step 2: S.M.A.R.T. Health"]
+        W2 --> W3["Step 3: Sanitization Policy"]
+        W3 --> W4["Step 4: Safety Warning Gate"]
+        W4 --> W5["Step 5: Live Overwrite & Verification"]
     end
+    WIZ -.-> WIZARD_PIPELINE
 
-    WIZARD -.-> WIZARD_STEPS
-
-    subgraph SETTINGS_MODULES["Modular Domain Cards (settings/*)"]
-        S_A11Y[Accessibility & WCAG]
-        S_LOCK[Auto-Lock Security PIN]
-        S_POL[Custom Multi-Pass Policies]
-        S_THERM[Thermal Threshold Rules]
-        S_ALERT[Slack/Teams/SMTP Alerts]
-        S_AUDIO[Speech Synthesizer & Chimes]
-        S_DB[Database Backup & History Purge]
-        S_CRYPTO[RSA-2048 Key Vault]
+    subgraph SETTINGS_CARDS["Settings Modular Cards (settings/*)"]
+        SC1["A11y / WCAG"] --- SC2["Auto-Lock PIN"]
+        SC3["Custom Policies"] --- SC4["Thermal Rules"]
+        SC5["Alerts Webhook"] --- SC6["Speech Synthesizer"]
+        SC7["Database Backup"] --- SC8["RSA Key Vault"]
     end
+    SET -.-> SETTINGS_CARDS
 
-    SETTINGS -.-> SETTINGS_MODULES
-
-    IDLE([Operator Inactive > 5-15 min]) --> LOCK_OVERLAY[LockScreenOverlay\nScreen Frozen: Enter PIN to Unlock]
+    IDLE([Idle Timeout > 5-15 min]) --> LOCK["🔒 LockScreenOverlay\n(PIN Re-authentication Required)"]
 ```
 
 ---
 
-## 3. Complete End-to-End System Architecture
-
-A modular 7-tier architecture separating presentation, session security, business services, safety shields, hardware execution, mathematical verification, and cryptographic output:
+## 3. 7-Tier System Architecture
 
 ```mermaid
 graph TB
-    subgraph T1["1. PRESENTATION LAYER (JavaFX 21 & CSS Design System)"]
+    subgraph T1["1. PRESENTATION LAYER (JavaFX 21 & CSS)"]
         NAV[NavigationManager Router]
-        V_WIZ[WipeWizardView]
-        V_BAT[BatchWipeView]
-        V_AUD[AuditView]
-        V_DIA[DiskDiagnosticView]
-        C_HEAT[SectorHeatmapComponent]
-        C_OSC[IoOscilloscopeComponent]
-        C_THERM[ThermalGraphComponent]
-        NAV --> V_WIZ & V_BAT & V_AUD & V_DIA
-        V_WIZ & V_BAT -.-> C_HEAT & C_OSC & C_THERM
+        VIEWS["Views: Wizard | Batch | Wiping | Diagnostics | Audit | Settings"]
+        COMPS["Visualizers: Sector Heatmap | I/O Oscilloscope | Thermal Graph"]
+        NAV --> VIEWS --> COMPS
     end
 
-    subgraph T2["2. SESSION & SECURITY LAYER"]
-        AUTH[LoginView & PIN Manager]
-        CTX[SessionContext: UserRole Tier 1/2/3]
-        AUTOLOCK[SessionAutoLockManager]
-        AUTH --> CTX --> AUTOLOCK
+    subgraph T2["2. SECURITY & SESSION LAYER"]
+        AUTH[LoginView] --> CTX[SessionContext: UserRole] --> ALOCK[SessionAutoLockManager]
     end
 
     subgraph T3["3. APPLICATION ORCHESTRATION LAYER"]
-        SW_SVC[SanitizationWorkflowService]
-        EXP_SVC[AuditExportService]
-        CFG_SVC[SystemConfigurationService]
+        SWS[SanitizationWorkflowService]
+        AES[AuditExportService]
+        SCS[SystemConfigurationService]
     end
 
     subgraph T4["4. DEFENSIVE HARDWARE SHIELDS"]
-        SHIELD_SYS[SystemDiskShield\nBlocks disk0, C:, /dev/sda & Live Mounts]
-        SHIELD_LOCK[DiskLockShield\nUnmounts Logical Partitions via diskutil/umount]
-        SHIELD_GOV[WorkerPoolGovernor\nHost CPU <= 88% & RAM >= 512MB Guard]
+        SDS[SystemDiskShield\nBlocks disk0, C:, /dev/sda]
+        DLS[DiskLockShield\nUnmounts partitions]
+        WPG[WorkerPoolGovernor\nCPU <= 88% & RAM >= 512MB]
     end
 
     subgraph T5["5. HARDWARE EXECUTION & DIAGNOSTICS"]
-        DET_USB[UsbDetector: OSHI Poller]
-        DIAG_SMART[SmartDiagnostics: 0-100 Score]
-        ENG_WIPE[WipeEngine: dd Process bs=2m]
-        CTRL_THERM[ThermalThrottleController: SIGSTOP/SIGCONT]
-        ENG_WIPE <--> CTRL_THERM
+        USB[UsbDetector: OSHI Poller]
+        SMART[SmartDiagnostics: Health Score 0-100]
+        ENG[WipeEngine: dd Process bs=2m]
+        TTC[ThermalThrottleController: SIGSTOP/CONT]
+        ENG <--> TTC
     end
 
-    subgraph T6["6. VERIFICATION & QUARANTINE ENGINE"]
-        VERIF[WipeVerifier\nShannon Entropy H(X) & SHA-256 Proof]
-        QRN_ENG[QuarantineEngine\nAssesses Unrecoverable Bad LBAs]
+    subgraph T6["6. VERIFICATION & QUARANTINE"]
+        VER[WipeVerifier\nEntropy H(X) & SHA-256]
+        QRN[QuarantineEngine\nDIN 66399 Orders]
     end
 
-    subgraph T7["7. CRYPTOGRAPHIC LEDGER & COMPLIANCE OUTPUT"]
-        CRYPTO[CryptoSigner: RSA-2048 / SHA256withRSA]
-        DB[(AuditDb SQLite WAL\nSHA-256 Blockchain Hash Chaining)]
-        LEDGER_ENG[LedgerIntegrityEngine\nMathematical Tamper Detector]
-        PDF_GEN[CertificateGenerator: Apache PDFBox]
-        QRN_GEN[QuarantineReportGenerator: DIN 66399 Orders]
-        HTTP_SRV[WebVerificationServer: Sun HttpServer :8080]
-        ALERT_DISP[AlertDispatcher: Webhooks & SMTP]
-        ESG_CALC[EsgCalculator: CO2e & E-Waste Math]
+    subgraph T7["7. CRYPTOGRAPHIC LEDGER & OUTPUT"]
+        CRY[CryptoSigner: RSA-2048]
+        DB[(AuditDb SQLite WAL\nSHA-256 Hash Chained)]
+        PDF[CertificateGenerator + ZXing QR]
+        SRV[WebVerificationServer :8080]
+        ALT[AlertDispatcher: Webhook/SMTP]
+        ESG[EsgCalculator: CO2e / e-Waste]
     end
 
-    T1 --> T2
-    T2 --> T3
-    T3 --> T4
-    T4 --> T5
-    T5 --> T6
-    
-    VERIF -->|PASS: H(X) == 0.0000| CRYPTO
-    VERIF -->|FAIL: Hardware Defect / I/O Fault| QRN_ENG
-    
-    CRYPTO --> DB & LEDGER_ENG & PDF_GEN & ALERT_DISP & ESG_CALC
-    PDF_GEN --> HTTP_SRV
-    QRN_ENG --> QRN_GEN
+    T1 --> T2 --> T3 --> T4 --> T5 --> T6
+    VER -->|Pass| CRY --> DB & PDF & ALT & ESG
+    PDF --> SRV
+    VER -->|Fail| QRN
 ```
 
 ---
 
-## 4. Core Workflow Execution (Sequence Diagram)
-
-This detailed sequence diagram illustrates the lifecycle of a complete sanitization operation across all service boundaries:
+## 4. End-to-End Execution Sequence
 
 ```mermaid
 sequenceDiagram
@@ -204,7 +190,7 @@ sequenceDiagram
     participant Alert as AlertDispatcher
 
     Tech->>UI: Select Target Drive & Policy (e.g. DoD 5220.22-M)
-    UI->>Svc: executeWorkflow(WorkflowRequest, Callbacks)
+    UI->>Svc: executeWorkflow(request, callbacks)
 
     rect rgb(238, 246, 255)
         Note over Svc,Shield: PHASE 1: PRE-FLIGHT SAFETY VALIDATION
@@ -216,7 +202,7 @@ sequenceDiagram
         Svc->>Shield: unmountAndLock(drivePath)
         Shield-->>Svc: Drive Unmounted & Locked
         Svc->>Smart: capturePreWipeSnapshot(drivePath)
-        Smart-->>Svc: Health Snapshot (Score: 98/100, Temp: 34°C)
+        Smart-->>Svc: Pre-Wipe Health (Score: 98/100, Temp: 34°C)
     end
 
     rect rgb(255, 251, 235)
@@ -267,366 +253,345 @@ sequenceDiagram
 
 ---
 
-## 5. Defensive Safety Shields & Root Disk Protection
+## 5. 3-Layer Host Safety Shield
 
-The application enforces a **3-Layer Defensive Interceptor** in `SystemDiskShield.java` to make accidental destruction of the host operating system physically impossible:
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        3-LAYER DEFENSE-IN-DEPTH FIREWALL                               │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  LAYER 1: String Signature Filter  ──▶ Blocks disk0, rdisk0, PhysDrive0, C:, /dev/sda  │
+│  LAYER 2: Live Mount Point Filter  ──▶ OSHI inspects /, /boot, /System, C:\Windows     │
+│  LAYER 3: Geometry Matching Filter ──▶ Blocks partitions sharing parent host geometry  │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ```mermaid
 flowchart TD
-    INPUT([Operator Selects Drive Path]) --> L1{LAYER 1: HARDCODED ROOT SIGNATURES\nCheck target against OS root patterns}
-    
-    L1 -->|Matches: disk0, rdisk0 (macOS)\nPhysicalDrive0, C: (Win)\n/dev/sda, /dev/nvme0n1 (Linux)| REJECT[REJECT OPERATION IMMEDIATELY]
-    
-    L1 -->|Clean| L2{LAYER 2: LIVE FILESYSTEM MOUNT INSPECTION\nOSHI queries active mounts:\n/, /boot, /System, /etc, C:\\Windows}
-    
-    L2 -->|Matches Active Mount| REJECT
-    
-    L2 -->|Clean| L3{LAYER 3: PARTITION GEOMETRY & PARENT DISK\nDoes the target partition share physical\ngeometry with the host OS boot device?}
-    
-    L3 -->|Geometry Matches Host OS| REJECT
-    
-    L3 -->|Clean| CAPACITY{CAPACITY BOUNDARY VALIDATION\nIs capacity within valid target range\n(Default: 1 GB <= Size <= 128 GB)?}
-    
-    CAPACITY -->|Out of Bounds| REJECT
-    CAPACITY -->|Approved| UNMOUNT[PASSED TO DISKLOCKSHIELD\nExecute diskutil unmountDisk / umount -f\nAcquire exclusive block lock]
-    
-    REJECT --> LOG_VIOLATION[SecurityAuditLogger: Log Unauthorized Path\nAlertDispatcher: Fire Admin Shield Alert]
-```
+    REQ([Target Drive Path Received]) --> L1{Layer 1: Hardcoded Root Names}
+    L1 -->|Matches: disk0, rdisk0, C:, /dev/sda| BLOCK["🚫 REJECT: Protected System Drive"]
+    L1 -->|Pass| L2{Layer 2: Live Mount Points}
+    L2 -->|Matches active mount: /, /boot, /etc, C:\Windows| BLOCK
+    L2 -->|Pass| L3{Layer 3: Partition Geometry}
+    L3 -->|Shares physical disk with boot volume| BLOCK
+    L3 -->|Pass| SIZE{Capacity Boundaries Check\n1 GB <= Size <= 128 GB}
+    SIZE -->|Out of Range| BLOCK
+    SIZE -->|Valid| OK["✅ APPROVED: Pass to DiskLockShield\n(Unmount & Lock Device)"]
 
-### Protection Code Reference:
-```java
-// From SystemDiskShield.java
-public static boolean isSystemDisk(String diskPath) {
-    if (diskPath == null || diskPath.isBlank()) return true;
-    String clean = diskPath.toLowerCase().trim();
-
-    // Layer 1: Platform root signatures
-    if (clean.contains("disk0") || clean.contains("rdisk0") ||
-        clean.contains("physicaldrive0") || clean.startsWith("c:") ||
-        clean.equals("/dev/sda") || clean.equals("/dev/nvme0n1")) {
-        return true;
-    }
-
-    // Layer 2: Deep live mount inspection
-    return isMountedAsRootOrSystem(clean);
-}
+    BLOCK --> ALERT["🚨 SecurityAuditLogger: Record Violation\nAlertDispatcher: Notify Administrator"]
 ```
 
 ---
 
-## 6. Hardware Diagnostics & S.M.A.R.T. Health Scoring Engine
-
-The diagnostic engine evaluates storage drive physics via S.M.A.R.T. telemetry attributes:
+## 6. S.M.A.R.T. Health Scoring
 
 ```mermaid
 flowchart LR
-    subgraph INPUTS["Telemetry Inputs"]
-        A5["ID 5: Reallocated Sectors"]
-        A173["ID 173/231: Wear Leveling %"]
-        A194["ID 194: Operating Temp (°C)"]
-        A199["ID 199: UDMA CRC Errors"]
-        A188["ID 188: Command Timeouts"]
-        A9["ID 9: Power-On Hours"]
+    subgraph INPUTS["Telemetry Attributes"]
+        I1["ID 5: Reallocated Sectors"]
+        I2["ID 173/231: Wear Level %"]
+        I3["ID 194: Operating Temp °C"]
+        I4["ID 199: UDMA CRC Errors"]
+        I5["ID 188: Command Timeouts"]
     end
 
-    subgraph ENGINE["SmartDiagnostics Engine"]
-        CALC["Compute Health Score:\nBase = 100\n- (ReallocatedSectors * 5)\n- (PendingSectors * 8)\n- (CrcErrors * 2)\n- (WearLevelPenalty)"]
+    subgraph MATH["SmartDiagnostics Formula"]
+        F["Health Score = 100\n- (ReallocatedSectors * 5)\n- (PendingSectors * 8)\n- (CrcErrors * 2)\n- (WearLevelPenalty)"]
     end
 
-    subgraph OUTPUTS["Classification & Delta"]
-        SCORE["Health Score (0 - 100)"]
-        CLASS{"Drive Status"}
-        DELTA["Pre/Post SmartDelta\nAttests zero mechanical stress"]
+    subgraph TIERS["Drive Classification"]
+        T_OK["🟢 HEALTHY (80 - 100)"]
+        T_WARN["🟡 WARNING (50 - 79)"]
+        T_CRIT["🔴 CRITICAL (0 - 49)"]
     end
 
-    INPUTS --> ENGINE
-    ENGINE --> OUTPUTS
-    CLASS -->|Score >= 80| H_OK["HEALTHY (Green)"]
-    CLASS -->|50 <= Score < 80| H_WARN["WARNING (Amber)"]
-    CLASS -->|Score < 50| H_CRIT["CRITICAL (Red)"]
+    INPUTS --> MATH --> TIERS
 ```
 
 ---
 
-## 7. Thermal Throttle Controller & State Machine
-
-Storage drives—especially NVMe SSDs and USB 3.2 thumb drives—heat up dramatically during continuous full-speed overwrites. Overheating causes NAND flash degradation and write-head wear. `ThermalThrottleController.java` manages a dynamic state machine:
+## 7. Thermal Throttle Controller
 
 ```mermaid
 stateDiagram-v2
-    [*] --> NORMAL : Wipe Execution Begins
+    [*] --> NORMAL : Wipe Started
 
     state NORMAL {
         [*] --> PollingTemp
-        PollingTemp --> PollingTemp : Temp < Warning Threshold
+        PollingTemp --> PollingTemp : Temp < Warning
     }
 
-    NORMAL --> THROTTLED : Temp >= Warning Threshold\n(HDD >= 46°C | SSD >= 55°C | NVMe >= 68°C)
-
+    NORMAL --> THROTTLED : Temp >= Warning
     state THROTTLED {
-        InjectDelay : Inject pacing sleep delay (ms)\nDissipate thermal energy passively\nWrite speed reduced slightly
+        InjectDelay : Inject sleep delays (ms)\nDissipate heat passively
     }
 
     THROTTLED --> NORMAL : Temp cools below Warning
-    THROTTLED --> PAUSED : Temp >= Auto-Pause Threshold\n(HDD >= 52°C | SSD >= 65°C | NVMe >= 78°C)
-
+    THROTTLED --> PAUSED : Temp >= Auto-Pause
     state PAUSED {
-        SendSigstop : Send SIGSTOP to OS dd process\nBlock writes halt instantly\nAudio alarm sounded\nThermal pause counter incremented
-        WaitCool : Continually monitor temperature
+        SendSigstop : Send SIGSTOP to dd\nFreeze write head instantly\nSound laboratory warning chime
+        WaitCooldown : Poll temperature decay
     }
 
-    PAUSED --> RESUMING : Temp <= Resume Threshold\n(HDD <= 42°C | SSD <= 50°C | NVMe <= 60°C)
-
+    PAUSED --> RESUMING : Temp <= Resume Threshold
     state RESUMING {
-        SendSigcont : Send SIGCONT to dd process\nExecution resumes from exact byte
+        SendSigcont : Send SIGCONT to dd\nResume write at exact byte
     }
 
     RESUMING --> NORMAL : Normal write speeds restored
-    NORMAL --> [*] : All Passes Finished
+    NORMAL --> [*] : All Passes Completed
 ```
 
-### Device-Specific Thermal Threshold Table:
-| Media Type | Warning Threshold | Auto-Pause (`SIGSTOP`) | Auto-Resume (`SIGCONT`) |
-| :--- | :---: | :---: | :---: |
-| **Magnetic HDD** | $46^\circ\text{C}$ | $52^\circ\text{C}$ | $42^\circ\text{C}$ |
-| **SATA SSD** | $55^\circ\text{C}$ | $65^\circ\text{C}$ | $50^\circ\text{C}$ |
-| **NVMe SSD** | $68^\circ\text{C}$ | $78^\circ\text{C}$ | $60^\circ\text{C}$ |
-| **USB Flash Drive** | $48^\circ\text{C}$ | $58^\circ\text{C}$ | $44^\circ\text{C}$ |
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                          DEVICE THERMAL SAFETY PROFILES                                │
+├─────────────────────┬────────────────────┬────────────────────┬────────────────────────┤
+│ Media Physics       │ Warning Threshold  │ Auto-Pause SIGSTOP │ Auto-Resume SIGCONT    │
+├─────────────────────┼────────────────────┼────────────────────┼────────────────────────┤
+│ 🧲 Magnetic HDD     │ 46°C               │ 52°C               │ 42°C                   │
+│ ⚡ SATA SSD         │ 55°C               │ 65°C               │ 50°C                   │
+│ 🚀 NVMe SSD         │ 68°C               │ 78°C               │ 60°C                   │
+│ 💾 USB Flash Drive  │ 48°C               │ 58°C               │ 44°C                   │
+└─────────────────────┴────────────────────┴────────────────────┴────────────────────────┘
+```
 
 ---
 
-## 8. Sanitization Standards & Multi-Pass Bit Patterns
-
-Different defense and international compliance bodies prescribe specific overwriting sequences:
+## 8. Multi-Pass Bit Patterns
 
 ```mermaid
 flowchart TD
-    subgraph NIST["NIST SP 800-88 Rev. 1 Clear (1 Pass)"]
-        N1["Pass 1: 0x00 (Fixed Zero Fill)"]
+    subgraph NIST["NIST SP 800-88 Rev. 1 Clear (1-Pass)"]
+        N1["Pass 1: 0x00 (Fixed Zero-Fill)"]
     end
 
-    subgraph DOD["US DoD 5220.22-M NISPOM (3 Passes)"]
-        D1["Pass 1: 0x00 (Zero Fill)"] --> D2["Pass 2: 0xFF (One Fill)"] --> D3["Pass 3: PRNG (Cryptographic Pseudo-Random)"]
+    subgraph DOD["US DoD 5220.22-M NISPOM (3-Pass)"]
+        D1["Pass 1: 0x00 (Zero)"] --> D2["Pass 2: 0xFF (One)"] --> D3["Pass 3: PRNG (Cryptographic Random)"]
     end
 
-    subgraph DODECE["US DoD 5220.22-M ECE (7 Passes)"]
-        DE1["Pass 1: 0x00"] --> DE2["Pass 2: 0xFF"] --> DE3["Pass 3: Random"] --> DE4["Pass 4: 0x96"] --> DE5["Pass 5: 0x00"] --> DE6["Pass 6: 0xFF"] --> DE7["Pass 7: Random"]
+    subgraph DODECE["US DoD 5220.22-M ECE (7-Pass)"]
+        DE1["0x00"] --> DE2["0xFF"] --> DE3["Random"] --> DE4["0x96"] --> DE5["0x00"] --> DE6["0xFF"] --> DE7["Random"]
     end
 
-    subgraph BSI["German BSI-VS / TL-03423 (7 Passes)"]
-        B1["Pass 1: 0x00"] --> B2["Pass 2: 0xFF"] --> B3["Pass 3: 0x00"] --> B4["Pass 4: 0xFF"] --> B5["Pass 5: 0xAA"] --> B6["Pass 6: 0x55"] --> B7["Pass 7: Random"]
+    subgraph BSI["German BSI-VS / TL-03423 (7-Pass)"]
+        B1["0x00"] --> B2["0xFF"] --> B3["0x00"] --> B4["0xFF"] --> B5["0xAA"] --> B6["0x55"] --> B7["Random"]
     end
 ```
 
-### Standards Comparison Matrix:
-| Standard Name | Origin | Passes | Pattern Progression | Target Security Level |
-| :--- | :--- | :---: | :--- | :--- |
-| **NIST SP 800-88 Clear** | USA (NIST) | 1 | `0x00` | Commercial / Enterprise General |
-| **DoD 5220.22-M** | USA (DoD) | 3 | `0x00` $\to$ `0xFF` $\to$ Random | Confidential / Defense Standard |
-| **DoD 5220.22-M ECE** | USA (DoD) | 7 | `0x00` $\to$ `0xFF` $\to$ Rand $\to$ `0x96` $\to$ `0x00` $\to$ `0xFF` $\to$ Rand | Top Secret / Military High Security |
-| **HMG IS5 Enhanced** | UK (CESG) | 3 | `0x00` $\to$ `0xFF` $\to$ Random | UK Crown & Government Standard |
-| **BSI-VS / TL-03423** | Germany (BSI) | 7 | `0x00` $\to$ `0xFF` $\to$ `0x00` $\to$ `0xFF` $\to$ `0xAA` $\to$ `0x55` $\to$ Rand | German Federal Classified Data |
-| **RCMP TSSIT OPS-II** | Canada (RCMP) | 7 | `0x00` $\to$ `0xFF` $\to$ `0x00` $\to$ `0xFF` $\to$ `0xAA` $\to$ `0x55` $\to$ Rand | Canadian Federal Protected |
-
 ---
 
-## 9. Mathematical Verification & Shannon Entropy Model
+## 9. Shannon Entropy Verification
 
-Post-wipe compliance auditing mathematically proves zero data remanence using **Information Theory**:
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        SHANNON ENTROPY MATHEMATICAL MODEL                              │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│                                  255                                                   │
+│                        H(X) = -  ∑   p(x_i) * log2( p(x_i) )                           │
+│                                  i=0                                                   │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  • Pure Zero-Fill (Clean):  p(0x00) = 1.0  ──▶  H(X) = 0.0000 bits/byte  (PASS)        │
+│  • Data Remanence / Noise:  p(x_i) spread  ──▶  H(X) ~ 7.99 bits/byte   (FAIL)        │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ```mermaid
 flowchart TD
-    RAW[Read Raw Physical Block Stream from Storage Media] --> HIST[Build 256-Bin Byte Frequency Histogram\nCounts of 0x00, 0x01, ..., 0xFF]
-    HIST --> PROB["Calculate Probability Distribution:\np(x_i) = Frequency(x_i) / TotalBytesSampled"]
-    PROB --> FORMULA["Compute Shannon Entropy:\nH(X) = - SUM [ p(x_i) * log2( p(x_i) ) ]"]
-    
-    FORMULA --> EVAL{Evaluate H(X)}
-    
-    EVAL -->|H(X) == 0.0000\n100% of bytes are 0x00| PASS["VERIFICATION PASS\nZero data remanence mathematically attested\nReadback SHA-256 Digest Created"]
-    EVAL -->|H(X) > 0.001\nNon-zero residual bits detected| FAIL["VERIFICATION FAIL\nMedia contaminated! Data survived overwrite!\nTrigger Quarantine Engine"]
+    RAW[Read Raw Physical Block Stream via /dev/rdisk*] --> HIST[Build 256-Bin Frequency Histogram\nCounts for 0x00, 0x01, ..., 0xFF]
+    HIST --> PROB["Calculate Byte Probabilities:\np(x_i) = Count(x_i) / TotalBytesSampled"]
+    PROB --> CALC["Compute Shannon Entropy:\nH(X) = - SUM [ p(x_i) * log2(p(x_i)) ]"]
+    CALC --> EVAL{Evaluate H(X)}
+
+    EVAL -->|H(X) == 0.0000\n100% bytes are 0x00| PASS["✅ VERIFICATION PASS\nZero data remanence mathematically attested\nReadback SHA-256 Digest Created"]
+    EVAL -->|H(X) > 0.001\nResidual non-zero bits detected| FAIL["❌ VERIFICATION FAIL\nMedia contaminated! Overwrite incomplete!\nTrigger Hardware Quarantine"]
 ```
-
-### The Mathematics:
-$$\text{Shannon Entropy: } H(X) = -\sum_{i=0}^{255} p(x_i) \log_2 p(x_i)$$
-
-* **Perfect Zero-Fill**:
-  If all bytes are `0x00`, then $p(0\text{x}00) = 1.0$ and all other $p(x_i) = 0$.
-  $$H(X) = -(1.0 \times \log_2(1.0)) = -(1.0 \times 0) = \mathbf{0.0000\text{ bits/byte}}$$
-* **Random or Residual Data**:
-  If residual encrypted or un-wiped data remains, the bytes are distributed across multiple bins, yielding $H(X) \approx 7.9 - 8.0\text{ bits/byte}$.
-* **Pass Criterion**: Verification passes **only if $H(X) \le 0.001\text{ bits/byte}$**.
 
 ---
 
-## 10. Cryptographic Blockchain Ledger & Tamper Proofing
-
-Every sanitization record is permanently sealed into an internal SQLite database (`sanitizer_history.db`) operating in high-concurrency WAL mode (`PRAGMA journal_mode=WAL;`).
+## 10. Cryptographic Blockchain Ledger
 
 ```mermaid
 flowchart LR
-    subgraph GENESIS["Block #0 (Genesis Root Anchor)"]
-        G_HASH["Genesis Hash:\n00000000000000000000000000000000..."]
+    subgraph GENESIS["Block #0 (Genesis Root)"]
+        G_H["Hash:\n000000000000000000000000..."]
     end
 
-    subgraph BLOCK1["Block #1: Drive Serial ST2000"]
-        P1["Payload: ID=1 | DoD 3-Pass | PASS | RSA Sig"]
-        PREV1["prev_hash: 00000000..."]
+    subgraph B1["Block #1: Record ST2000"]
+        P1["Payload: ID=1 | DoD | PASS"]
+        PREV1["prev_hash: 0000..."]
         H1["record_hash:\nSHA-256(prev_hash || P1)"]
     end
 
-    subgraph BLOCK2["Block #2: Drive Serial WD5000"]
-        P2["Payload: ID=2 | NIST Clear | PASS | RSA Sig"]
+    subgraph B2["Block #2: Record WD5000"]
+        P2["Payload: ID=2 | NIST | PASS"]
         PREV2["prev_hash: H1"]
         H2["record_hash:\nSHA-256(H1 || P2)"]
     end
 
-    subgraph BLOCK3["Block #3: Drive Serial SAM980"]
-        P3["Payload: ID=3 | BSI-VS 7-Pass | PASS | RSA Sig"]
+    subgraph B3["Block #3: Record SAM980"]
+        P3["Payload: ID=3 | BSI | PASS"]
         PREV3["prev_hash: H2"]
         H3["record_hash:\nSHA-256(H2 || P3)"]
     end
 
-    GENESIS --> BLOCK1
-    BLOCK1 --> BLOCK2
-    BLOCK2 --> BLOCK3
+    GENESIS --> B1 --> B2 --> B3
 
-    style BLOCK1 fill:#f0f9ff,stroke:#0284c7
-    style BLOCK2 fill:#f0f9ff,stroke:#0284c7
-    style BLOCK3 fill:#f0f9ff,stroke:#0284c7
+    style B1 fill:#eff6ff,stroke:#2563eb
+    style B2 fill:#eff6ff,stroke:#2563eb
+    style B3 fill:#eff6ff,stroke:#2563eb
 ```
 
-> [!CAUTION]
-> **Tamper Detection in Action**:
-> If an attacker opens `sanitizer_history.db` using an external SQLite browser and alters Block #2 (e.g. changing `FAIL` to `PASS`):
-> 1. The recomputed `record_hash` for Block #2 changes.
-> 2. Block #3's `prev_record_hash` will no longer match Block #2's new hash.
-> 3. `LedgerIntegrityEngine.verifyLedger()` immediately detects the corruption, stops the application, and flags the exact record ID that was tampered with.
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                          TAMPER-DETECTION MECHANISM                                    │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  IF an attacker edits Block #2 (e.g. changing FAIL to PASS in SQLite):                 │
+│  1. Block #2's new hash != original H2                                                 │
+│  2. Block #3's prev_hash (H2) NO LONGER MATCHES Block #2's new hash                   │
+│  3. LedgerIntegrityEngine immediately flags TAMPERED BLOCK at Row ID #2                │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 11. Hardware Quarantine & DIN 66399 Physical Destruction
-
-When a drive encounters bad sectors (`POSIX EIO`), software sanitization **cannot guarantee complete erasure**. The system automatically triggers the Quarantine Protocol:
+## 11. Hardware Quarantine & DIN 66399 Destruction
 
 ```mermaid
 flowchart TD
-    FAIL[Sanitization Failure Detected\nBad LBAs / Read-Write Timeout / S.M.A.R.T. Collapse] --> ASSESS[QuarantineEngine: Assess Hardware Physics]
-    
-    ASSESS --> DETECT_MEDIA{Determine Storage Media Physics}
-    
-    DETECT_MEDIA -->|Magnetic HDD\nRotational magnetic platters| DEGAUSS[Prescribe MAGNETIC DEGAUSSING\nStandard: NSA/CSS Manual 9-12 / DIN 66399 H-5\nCoercivity Field: >= 10,000 Oersted\nRenders magnetic domains permanently inert]
-    
-    DETECT_MEDIA -->|Solid State / Flash\nNVMe SSD / SATA SSD / USB Pen Drive| SHRED[Prescribe MECHANICAL SHREDDING\nStandard: DIN 66399 E-4 / NIST SP 800-88\nParticle Size: <= 2mm cross-cut\nPhysically disintegrates silicon NAND dies]
-    
-    DEGAUSS --> GEN_ORDER[QuarantineReportGenerator: Generate Official PDF]
-    SHRED --> GEN_ORDER
-    
-    GEN_ORDER --> PDF_OUT["Quarantine_Report_QRN_<timestamp>.pdf\n- Granular Failing LBA Address Table\n- Digital Attestation Signature\n- Officer Chain-of-Custody Sign-Off"]
+    FAIL[Sanitization Failure Detected\nBad LBAs / POSIX EIO / S.M.A.R.T. Failure] --> ASSESS[QuarantineEngine: Assess Media Physics]
+
+    ASSESS --> MEDIA{Storage Media Physics}
+
+    MEDIA -->|Magnetic HDD\nRotational Platters| DEGAUSS[Prescribe MAGNETIC DEGAUSSING\nStandard: NSA/CSS Manual 9-12 / DIN 66399 H-5\nMagnetic Field: >= 10,000 Oersted\nRenders magnetic domains permanently inert]
+
+    MEDIA -->|Solid State / Flash\nNVMe / SATA SSD / USB Flash| SHRED[Prescribe MECHANICAL SHREDDING\nStandard: DIN 66399 E-4 / NIST SP 800-88\nCross-cut Particle Size: <= 2mm\nPhysically disintegrates NAND silicon dies]
+
+    DEGAUSS --> ORDER[Generate DIN 66399 Destruction Work Order PDF]
+    SHRED --> ORDER
+
+    ORDER --> OUT["📄 Quarantine_Report_QRN_<timestamp>.pdf\n• Granular Failing LBA Address Table\n• Digital Attestation Hash\n• Custody Transfer & Officer Sign-Off"]
 ```
 
 ---
 
-## 12. Digital PDF Certification & Offline QR Verification Portal
+## 12. PDF Certification & QR Verification Portal
 
 ```mermaid
 flowchart TD
-    RECORD[Wipe Audit Record Finalized] --> SIGN[CryptoSigner: Sign with RSA-2048 Private Key\nSHA256withRSA -> Base64 Signature]
-    
-    SIGN --> QR[ZXing Engine: Generate Dynamic QR Code\nEncodes URL: http://<ip>:8080/verify?certId=...&sig=...]
-    
-    QR --> PDF[Apache PDFBox: Render Certificate\n- Official Defense Banner\n- Drive Model, Serial, Capacity\n- Pre/Post S.M.A.R.T. Health Delta\n- Thermal Telemetry Log\n- ESG Circular Economy Metrics\n- Embedded ZXing QR Code & RSA Signature]
-    
-    PDF --> SERVER[WebVerificationServer: Port 8080 Active]
-    
-    MOBILE([Auditor Scans QR with Smartphone Camera]) --> SERVER
-    SERVER --> WEBPAGE[Mobile Web Portal\nDark-mode authenticated certificate preview\nCryptographic valid/tampered badge]
-    SERVER --> REST_API[REST API: GET /api/verify\nJSON payload for enterprise B2B compliance]
+    REC[Audit Record Sealed] --> SIGN[CryptoSigner: RSA-2048 Digital Sign\nSHA256withRSA -> Base64]
+    SIGN --> QR[ZXing Engine: Embed Dynamic QR Code\nhttp://<host>:8080/verify?certId=...&sig=...]
+    QR --> PDF[Apache PDFBox: Render Certificate PDF\n- Official Defense Header Banner\n- Drive Serial, Model, Capacity\n- S.M.A.R.T. Pre/Post Health Delta\n- Thermal Telemetry Logs\n- ESG Circular Economy Metrics\n- Embedded ZXing QR Code & RSA Signature]
+    PDF --> SERVER[WebVerificationServer: Listening on :8080]
+
+    PHONE([Auditor Scans QR with Phone Camera]) --> SERVER
+    SERVER --> PAGE[Mobile Verification Webpage\nDark-mode authenticated certificate view\nLive authentic/tampered badge]
+    SERVER --> REST[REST API Endpoint: GET /api/verify\nJSON payload for enterprise compliance]
 ```
 
 ---
 
-## 13. Environmental ESG & ITAD Carbon Calculator
+## 13. ESG & ITAD Carbon Mitigation Engine
 
-When drives are sanitized and reused rather than physically destroyed, substantial electronic waste and manufacturing emissions are avoided:
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        CIRCULAR ECONOMY ESG EQUATIONS                                  │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  e-Waste Diverted (kg) = N * 1.4 kg * ( Capacity / 500 GB )^0.25                       │
+│  Scope 3 GHG Saved (kg CO2e) = N * 12.6 kg * ( Capacity / 500 GB )^0.30                │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ```mermaid
 flowchart LR
-    DRIVE[Sanitized & Reused Storage Drive\nBaseline: 500 GB Storage Media] --> ESG[EsgCalculator Engine]
-    
-    ESG --> M1["e-Waste Diverted: ~1.4 kg / drive\n(Prevents hazardous landfill contamination)"]
-    ESG --> M2["Scope 3 GHG Prevented: ~12.6 kg CO2e / drive\n(Avoids manufacturing replacement drive)"]
-    ESG --> M3["Tree Seedling Equivalent: ~0.21 trees\n(Equivalent carbon sequestration over 10 years)"]
-    ESG --> M4["Energy Conserved: ~18.9 kWh / drive\n(Raw materials extraction & fabrication saved)"]
-```
+    DRIVE["Sanitized Storage Drive\n(Baseline: 500 GB)"] --> ESG["EsgCalculator Engine"]
 
-### ESG Formulas:
-$$\text{e-Waste Diverted (kg)} = N_{\text{drives}} \times 1.4\text{ kg} \times \left(\frac{\text{Capacity in GB}}{500}\right)^{0.25}$$
-$$\text{Scope 3 CO}_2\text{e Saved (kg)} = N_{\text{drives}} \times 12.6\text{ kg} \times \left(\frac{\text{Capacity in GB}}{500}\right)^{0.30}$$
+    ESG --> M1["♻️ e-Waste Diverted: ~1.4 kg\n(Avoids hazardous landfill toxins)"]
+    ESG --> M2["🌱 Scope 3 GHG Saved: ~12.6 kg CO2e\n(Avoids manufacturing new drive)"]
+    ESG --> M3["🌲 Tree Seedling Equiv: ~0.21 trees\n(10 years carbon sequestration)"]
+    ESG --> M4["⚡ Energy Conserved: ~18.9 kWh\n(Silicon & metals refining saved)"]
+```
 
 ---
 
-## 14. Role-Based Access Control (RBAC) & Session Governance
+## 14. RBAC Clearance & Session Governance
 
-The system enforces strict principle-of-least-privilege clearance tiers:
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                          3-TIER RBAC CLEARANCE MATRIX                                  │
+├──────────────────────┬──────────────────────┬──────────────────────────────────────────┤
+│ Clearance Tier       │ Title                │ Permitted Operations                     │
+├──────────────────────┼──────────────────────┼──────────────────────────────────────────┤
+│ 🟢 Tier 1            │ INSPECTOR            │ Guided/Batch Wiping, Diagnostics, PDFs   │
+│ 🟡 Tier 2            │ SUPERVISOR           │ Custom Policies, Thermal Rules, Alerts   │
+│ 🔴 Tier 3            │ CHIEF AUDITOR        │ Key Vault, Ledger Verify, DB Purge/Reset │
+└──────────────────────┴──────────────────────┴──────────────────────────────────────────┘
+```
 
 ```mermaid
 flowchart TD
-    subgraph T1["Tier 1: INSPECTOR (Technician)"]
-        T1_A[Execute Guided & Manual Wipes]
-        T1_B[Run S.M.A.R.T. Hardware Diagnostics]
-        T1_C[View Real-Time Oscilloscope & Heatmap]
+    subgraph T1["Tier 1: INSPECTOR"]
+        T1_A[Execute Guided & Batch Wipes]
+        T1_B[Run S.M.A.R.T. Diagnostics]
+        T1_C[View Telemetry & Oscilloscope]
         T1_D[Generate Single PDF Certificates]
     end
 
-    subgraph T2["Tier 2: SUPERVISOR (Manager)"]
+    subgraph T2["Tier 2: SUPERVISOR"]
         T2_A[All Tier 1 Privileges]
-        T2_B[Create & Edit Custom Multi-Pass Policies]
-        T2_C[Configure Thermal Thresholds & Limits]
-        T2_D[Manage Slack/Teams/SMTP Alert Rules]
-        T2_E[Export Full Corporate Audit Packages]
+        T2_B[Create & Edit Custom Policies]
+        T2_C[Adjust Thermal Safety Thresholds]
+        T2_D[Configure Alert Webhooks & SMTP]
+        T2_E[Export Full Audit Batches]
     end
 
-    subgraph T3["Tier 3: CHIEF AUDITOR (Executive)"]
+    subgraph T3["Tier 3: CHIEF AUDITOR"]
         T3_A[All Tier 2 Privileges]
         T3_B[Cryptographic Key Vault Management]
         T3_C[Verify Blockchain Ledger Integrity]
         T3_D[Database Backup & History Purge]
-        T3_E[System-Wide SIEM Security Audit Logging]
+        T3_E[System-Wide SIEM Security Audits]
     end
 
-    T1 --> T2
-    T2 --> T3
+    T1 --> T2 --> T3
 ```
 
 ---
 
-## 15. Complete Package & File Directory Blueprint
+## 15. Complete Component & File Blueprint
 
-```
-DWproject/
-├── README.md                          # Repository overview
-├── PROJECT_STUDY_GUIDE.md             # This comprehensive master manual
-├── dist/                              # Compiled native installation packages
-│   └── USBSanitizer-1.0.0.dmg         # macOS DMG distribution installer
-├── packaging/                         # Multi-platform installer build toolchain
-│   ├── build-all.sh                   # Master platform detection & packaging router
-│   ├── package-mac.sh                 # macOS DMG & App bundle packager (jpackage)
-│   ├── package-linux.sh               # Linux RPM / DEB packager
-│   ├── package-appimage.sh            # Linux portable AppImage builder
-│   ├── package-flatpak.sh             # Linux Flatpak packaging script
-│   └── package-win.bat / .ps1         # Windows MSI / EXE / ZIP packaging scripts
-├── .github/workflows/                 # CI/CD automation pipelines
-│   ├── ci.yml                         # Automated Maven compile and 34 JUnit 5 tests
-│   └── release.yml                    # Multi-platform release artifact generation
-└── DataWiping/                        # Core Java Application Maven Module
-    ├── pom.xml                        # Maven dependencies & build configurations
-    └── src/
-        ├── main/resources/            # Application assets, styling, and i18n
-        │   ├── css/style.css          # Executive theme design system (~1,670 lines)
-        │   ├── icons/icon.png         # High-resolution application brand icon
-        │   └── i18n/messages_*.props  # Localized strings: EN, DE, FR, ES, HI
-        ├── test/java/com/sanitizer/   # 34 comprehensive JUnit 5 test suites (100% passing)
-        └── main/java/com/sanitizer/   # Core source packages
+```mermaid
+graph TB
+    subgraph CORE_SERVICES["Application Service Orchestrators"]
+        S1[SanitizationWorkflowService]
+        S2[AuditExportService]
+        S3[SystemConfigurationService]
+    end
+
+    subgraph ENGINE_SHIELDS["Hardware Engine & Safety Shields"]
+        E1[WipeEngine]
+        E2[WipeVerifier]
+        H1[SystemDiskShield]
+        H2[DiskLockShield]
+        H3[WorkerPoolGovernor]
+        D1[UsbDetector]
+        D2[SmartDiagnostics]
+        D3[ThermalThrottleController]
+    end
+
+    subgraph CRYPTO_LEDGER["Cryptography & Audit Ledger"]
+        C1[CryptoSigner]
+        C2[AuditDb]
+        C3[LedgerIntegrityEngine]
+        C4[CertificateGenerator]
+        C5[WebVerificationServer]
+        C6[QuarantineEngine]
+    end
+
+    S1 --> H1 & H2 & H3
+    S1 --> E1 & E2
+    S1 --> D1 & D2 & D3
+    S1 --> C1 & C2 & C4 & C6
+    S2 --> C2 & C3 & C4
+    S3 --> C2 & D3
 ```
 
 ### Complete Source Code File Map:
@@ -662,90 +627,277 @@ DWproject/
 
 ---
 
-## 16. High-Yield Viva, Defense & Interview Masterclass
+## 16. High-Yield Viva, Defense & Interview Masterclass (Q&A)
 
-Use these authoritative answers to ace technical viva examinations, project defenses, and system design interviews.
-
-### Q1: Why does your application write directly to raw character devices (`/dev/rdisk*`) instead of standard file I/O?
-> **Model Answer**: Standard file I/O operations go through the operating system's Virtual File System (VFS), filesystem cache, and kernel write buffers. The OS may delay writing, cache writes in RAM, or skip blocks via wear-leveling/journaling. By opening raw block devices (e.g. `/dev/rdisk*` on macOS, `/dev/sd*` on Linux, `\\\\.\\PhysicalDrive*` on Windows) with `bs=2m`, we bypass kernel caching layers and write directly to physical sectors on the storage media. This is a mandatory requirement of NIST SP 800-88 Rev. 1 for media sanitization.
-
-### Q2: How does Shannon Entropy mathematically prove that a drive has zero residual data?
-> **Model Answer**: Shannon Entropy measures the average information density (uncertainty) in bits per byte across a probability distribution of 256 byte values ($0\text{x}00$ through $0\text{xFF}$):
-> $$H(X) = -\sum_{i=0}^{255} p(x_i) \log_2 p(x_i)$$
-> If a drive has been completely sanitized with zero-fill, 100% of the bytes read back are `0x00` ($p(0\text{x}00) = 1.0$, and all other $p(x_i) = 0$). Since $1 \times \log_2(1) = 0$, the entropy score is **exactly $0.0000\text{ bits/byte}$**. If even a single byte or residual file fragment survives, $H(X) > 0.001$, which immediately fails verification and flags the drive as contaminated.
-
-### Q3: How do you prevent accidental destruction of the host operating system drive?
-> **Model Answer**: We employ a three-tier defense-in-depth shield implemented in `SystemDiskShield.java`:
-> 1. **Hardcoded Root Signatures**: Rejects known OS system drive paths across all platforms (`disk0`, `rdisk0` on macOS; `PhysicalDrive0`, `C:` on Windows; `/dev/sda`, `/dev/nvme0n1` on Linux).
-> 2. **OSHI Live Mount Inspection**: Queries active OS filesystem mounts (`/`, `/boot`, `/System`, `/etc`, `C:\Windows`) and forbids any drive matching an active mount.
-> 3. **Partition Geometry Correlation**: Rejects secondary partitions that share physical device geometry with the host boot disk. Any violation triggers immediate rejection and logs a security alert.
-
-### Q4: How is your SQLite audit log tamper-evident?
-> **Model Answer**: We implement a **cryptographic blockchain-style hash chain** in `AuditDb.java` and `LedgerIntegrityEngine.java`. Each audit record contains:
-> $$\text{record\_hash} = \text{SHA-256}(\text{prev\_record\_hash} \parallel \text{record\_payload})$$
-> The very first record is anchored to a known **Genesis Root Hash** (`0000...0000`). If a malicious user directly edits an SQLite row (e.g. altering a failed wipe to `PASS` or deleting a record), the hash sequence breaks. The `LedgerIntegrityEngine` can mathematically verify the entire chain and identify the exact tampered row. In addition, each record is digitally signed with an **RSA-2048 private key**.
-
-### Q5: What happens if a storage device overheats during wiping?
-> **Model Answer**: `ThermalThrottleController` evaluates device temperature in real-time against device-specific thermal profiles (HDDs pause at 52°C, SSDs at 65°C, NVMe at 78°C). If temperature exceeds the warning threshold, the controller injects pacing delays. If it hits the auto-pause limit, the application sends a **`SIGSTOP`** signal to the underlying `dd` process to freeze I/O immediately without aborting the job. When the drive cools down below the resume threshold, it sends **`SIGCONT`** to resume writing from the exact byte where it paused.
-
-### Q6: Why can't bad sectors simply be overwritten, and what is your Quarantine protocol?
-> **Model Answer**: Bad sectors are physical media defects (degraded magnetic media or worn-out NAND flash cells) that generate unrecoverable `POSIX EIO` errors. Because the drive's internal controller cannot write to these defective LBAs, **software overwriting is physically impossible**. Residual sensitive data may still reside inside those cells. Therefore, per NIST SP 800-88 Rev. 1 § 4.7 and EU GDPR Article 17, our `QuarantineEngine` aborts the software wipe, quarantines the drive, and generates a **DIN 66399 Physical Destruction Work Order** prescribing either **Magnetic Degaussing** (for HDDs, $\ge 10,000\text{ Oe}$) or **Mechanical Shredding** (for SSDs/Flash, $\le 2\text{mm}$).
-
-### Q7: How does the offline QR code verification portal work?
-> **Model Answer**: The application includes an embedded zero-dependency HTTP server (`WebVerificationServer.java`) listening on port 8080. When a certificate is generated via Apache PDFBox, a **ZXing QR Code** is embedded into the PDF linking to:
-> `http://<host>:8080/verify?certId=<id>&model=<model>&sig=<signature>`
-> When an auditor or client scans the QR code with their mobile phone camera, the server validates the RSA-2048 signature in real-time, displays an official cryptographic verification badge, and exposes a REST API (`/api/verify`) for automated enterprise compliance checks.
-
-### Q8: What ESG (Environmental, Social, Governance) metrics does the application compute?
-> **Model Answer**: In IT Asset Disposition (ITAD), physically shredding a reusable drive generates electronic waste and requires manufacturing a replacement drive. `EsgCalculator.java` models circular economy benefits: For every 500GB drive safely wiped and reused rather than shredded, it calculates:
-> * $\approx 1.4\text{ kg}$ of electronic waste diverted from landfills.
-> * $\approx 12.6\text{ kg}$ of Scope 3 greenhouse gas ($\text{CO}_2\text{e}$) emissions prevented.
-> * $\approx 0.21$ tree seedlings grown for 10 years equivalent.
-> * $\approx 18.9\text{ kWh}$ of energy conserved.
-> These metrics are embedded into every PDF certificate and audit report.
+Each question below includes a **visual flowchart, memory card box, and authoritative model answer**.
 
 ---
 
-## 17. Build, Test & Deployment Playbook
+### Q1: Why write directly to raw block devices (`/dev/rdisk*`) instead of standard file I/O?
 
-### 17.1. Prerequisites
-* **Java Development Kit (JDK)**: Version 17 LTS or higher.
-* **Apache Maven**: Version 3.8+ (`mvn`).
-
-### 17.2. Launching Locally (JavaFX)
-```bash
-cd DataWiping
-mvn javafx:run
 ```
-*(Or execute main class `com.sanitizer.gui.AppLauncher` directly from IntelliJ IDEA).*
-
-### 17.3. Running All 34 Unit & Integration Tests
-```bash
-cd DataWiping
-mvn test
-```
-*(JaCoCo test coverage report generated in `DataWiping/target/site/jacoco/index.html`)*.
-
-### 17.4. Building Shaded Executable Uber-JAR
-```bash
-cd DataWiping
-mvn clean package
-# Output: DataWiping/target/usb-sanitizer-1.0-SNAPSHOT-all.jar
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  CONCEPT BOX: File I/O vs Direct Block I/O                                             │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  Standard File I/O:  App ──▶ VFS ──▶ Page Cache ──▶ Delayed Write ──▶ Remanence Risk!  │
+│  Direct Block I/O:   App ──▶ /dev/rdisk* (bs=2m) ──▶ Physical Sectors ──▶ 100% ERASED │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 17.5. Multi-Platform Installer Packaging
-* **macOS (DMG Installer via jpackage)**:
-  ```bash
-  ./packaging/package-mac.sh 1.0.0
-  # Output: dist/USBSanitizer-1.0.0.dmg
-  ```
-* **Linux (AppImage / DEB / Flatpak)**:
-  ```bash
-  ./packaging/package-linux.sh 1.0.0
-  ./packaging/package-appimage.sh 1.0.0
-  ./packaging/package-flatpak.sh 1.0.0
-  ```
-* **Windows (MSI / EXE)**:
-  ```cmd
-  packaging\package-win.bat 1.0.0
-  ```
+```mermaid
+flowchart TD
+    subgraph WRONG["❌ Standard File I/O (Unsafe)"]
+        F1[Application File Write] --> F2[Virtual File System VFS]
+        F2 --> F3[OS Kernel Page Cache]
+        F3 --> F4[Delayed Lazy Flush to Disk]
+        F4 --> F5[RISK: Unwritten blocks, wear-leveling bypass, cached remnants]
+    end
+
+    subgraph RIGHT["✅ Direct Block Character Device (SecureErase)"]
+        D1[Application dd Process] --> D2["Raw Device: /dev/rdisk* / \\\\.\\PhysicalDrive*"]
+        D2 --> D3["Direct Physical Sector Addressing (bs=2m)"]
+        D3 --> D4["Bypasses all OS caches & guarantees physical bit-flip on disk"]
+    end
+```
+
+> **Authoritative Viva Answer**:
+> "Standard file I/O operations travel through the OS Virtual File System (VFS), buffer cache, and delayed write queues. The OS kernel may cache writes in RAM or skip blocks via wear-leveling and journaling. In contrast, opening raw character block devices (`/dev/rdisk*` on macOS, `/dev/sd*` on Linux, `\\\\.\\PhysicalDrive*` on Windows) bypasses kernel page caching and sends low-level write commands straight to physical Logical Block Addresses (LBAs). This is an explicit requirement of **NIST SP 800-88 Rev. 1 Section 2.4**."
+
+---
+
+### Q2: How does Shannon Entropy mathematically prove that zero residual data survives?
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  CONCEPT BOX: Shannon Entropy Range                                                    │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  Clean Zero-Fill  ──▶ All bytes 0x00 ──▶ p(0x00)=1.0 ──▶ H(X) = 0.0000 bits/byte (PASS)│
+│  Residual / Noise ──▶ Bytes distributed              ──▶ H(X) ~ 7.99 bits/byte  (FAIL)│
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```mermaid
+flowchart LR
+    A["Raw Readback Stream"] --> B["Build 256 Bins\n(0x00 to 0xFF)"]
+    B --> C["Compute p(x_i)"]
+    C --> D["H(X) = -SUM [ p*log2(p) ]"]
+    D --> E{"H(X) Score"}
+    E -->|0.0000| F["PASS: 100% Zero-Fill"]
+    E -->|> 0.001| G["FAIL: Data Remanence Detected"]
+```
+
+> **Authoritative Viva Answer**:
+> "Shannon Entropy measures average information uncertainty in bits per byte across 256 possible byte values:
+> $$H(X) = -\sum_{i=0}^{255} p(x_i) \log_2 p(x_i)$$
+> When a drive is cleanly zero-filled, 100% of the bytes read back are `0x00`, so $p(0\text{x}00) = 1.0$ and all other $p(x_i) = 0$. Since $\log_2(1.0) = 0$, the entropy score is **exactly $0.0000\text{ bits/byte}$**. If even a tiny residual data fragment or encryption artifact remains, bytes distribute across bins and entropy jumps to $\approx 7.9-8.0$. Our threshold of $H(X) \le 0.001$ mathematically certifies zero data remanence."
+
+---
+
+### Q3: How do you prevent accidental destruction of the host operating system disk?
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  CONCEPT BOX: 3-Tier Security Interceptor                                              │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  Filter 1: Path Check    ──▶ Rejects disk0, rdisk0, C:, PhysicalDrive0, /dev/sda       │
+│  Filter 2: Mount Check   ──▶ OSHI inspects live mounts: /, /boot, /System, C:\Windows  │
+│  Filter 3: Geometry Check──▶ Rejects partitions sharing device geometry with host boot │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```mermaid
+flowchart TD
+    IN[Target Disk Selected] --> T1{Tier 1: Signature Check}
+    T1 -->|Matches disk0 / C: / /dev/sda| BLK[BLOCKED IMMEDIATELY]
+    T1 -->|Clean| T2{Tier 2: Live Mount Points}
+    T2 -->|Mounted as / or C:\Windows| BLK
+    T2 -->|Clean| T3{Tier 3: Shared Geometry}
+    T3 -->|Shares physical disk with boot disk| BLK
+    T3 -->|Clean| ALLOW[APPROVED FOR SANITIZATION]
+```
+
+> **Authoritative Viva Answer**:
+> "We implement a triple-layer defensive interceptor in `SystemDiskShield.java`:
+> 1. **Hardcoded Root Signatures**: Blocks known platform boot names (`disk0`/`rdisk0` on macOS, `PhysicalDrive0`/`C:` on Windows, `/dev/sda`/`/dev/nvme0n1` on Linux).
+> 2. **OSHI Live Mount Inspection**: Queries operating system mount tables to detect any partition mounted at `/`, `/boot`, `/System`, `/etc`, or `C:\Windows`.
+> 3. **Partition Geometry Correlation**: Rejects secondary partitions that share a parent physical spindle or controller with an active boot volume. Any violation aborts execution and dispatches a security alarm."
+
+---
+
+### Q4: How is your SQLite audit log tamper-evident?
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  CONCEPT BOX: Cryptographic Blockchain Hash Chain                                     │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  Record N Hash = SHA-256( Record N-1 Hash || Record N Payload Data )                   │
+│  Anchored at Genesis Root: 000000000000000000000000000000000000000000000000...         │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```mermaid
+flowchart LR
+    G["Genesis: 000...000"] --> R1["Record 1\nprev: 000...\nhash: H1"]
+    R1 --> R2["Record 2\nprev: H1\nhash: H2"]
+    R2 --> R3["Record 3\nprev: H2\nhash: H3"]
+
+    subgraph TAMPER["Attacker Alters Record 2 in DB"]
+        T_R2["Record 2 Modified!\nHash changes to H2_BAD"]
+        T_R3["Record 3 prev_hash (H2)\n!= H2_BAD\nCHAIN BROKEN!"]
+        T_R2 -.-> T_R3
+    end
+
+    style T_R2 fill:#fee2e2,stroke:#ef4444
+    style T_R3 fill:#fee2e2,stroke:#ef4444
+```
+
+> **Authoritative Viva Answer**:
+> "We implement a blockchain-style SHA-256 hash chaining architecture in `AuditDb.java` and `LedgerIntegrityEngine.java`. Each row stores:
+> $$\text{record\_hash} = \text{SHA-256}(\text{prev\_record\_hash} \parallel \text{record\_payload})$$
+> Anchored to a known Genesis hash (`0000...0000`). If an attacker alters any field in SQLite (e.g., turning a `FAIL` into a `PASS` or deleting a record), the cryptographic chain breaks downstream. The `LedgerIntegrityEngine` mathematically traverses the chain, detects tampering, and flags the exact corrupted record ID."
+
+---
+
+### Q5: What happens if a storage drive overheats during wiping?
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  CONCEPT BOX: Thermal Throttle Auto-Pause & Resume                                     │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  Warning Temp ──▶ Injects sleep delays to dissipate heat passively                    │
+│  Pause Temp   ──▶ Sends SIGSTOP to dd (write heads halt, job NOT killed)               │
+│  Resume Temp  ──▶ Sends SIGCONT to dd (writing resumes seamlessly from same byte)      │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```mermaid
+flowchart TD
+    T_POLL[Check Drive Temperature] --> T_EVAL{Temperature Level}
+    T_EVAL -->|Safe Range| T_NORM[Normal Overwrite Speed]
+    T_EVAL -->|>= Warning (e.g. HDD 46°C)| T_THROT[Inject Sleep Delays (Pacing)]
+    T_EVAL -->|>= Auto-Pause (e.g. HDD 52°C)| T_PAUSE[Send SIGSTOP to dd\nFreeze Write Process\nSound Audio Alarm]
+
+    T_PAUSE --> T_WAIT[Poll Temperature Decay]
+    T_WAIT -->|<= Resume Temp (e.g. HDD 42°C)| T_RESUME[Send SIGCONT to dd\nResume Write Seamlessly]
+    T_RESUME --> T_NORM
+```
+
+> **Authoritative Viva Answer**:
+> "`ThermalThrottleController` evaluates temperature against media-specific thermal policies (HDD pauses at 52°C, SSD at 65°C, NVMe at 78°C). When warning limits are reached, pacing delays dissipate heat passively. If critical limits are reached, the controller sends a **`SIGSTOP`** signal to the underlying `dd` process. This halts disk I/O immediately without aborting the job. Once the drive cools below the resume threshold, it sends **`SIGCONT`** to seamlessly resume block overwriting from the exact byte where it paused."
+
+---
+
+### Q6: Why can't bad sectors simply be overwritten, and what is your Quarantine protocol?
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  CONCEPT BOX: Defective Media Physics & DIN 66399 Destruction                          │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  Bad LBAs reject writes (POSIX EIO) ──▶ Software wipe IMPOSSIBLE                       │
+│  Rotational Magnetic HDDs           ──▶ Magnetic Degaussing (>= 10,000 Oersted)        │
+│  Silicon Flash / SSDs / USB         ──▶ Mechanical Shredding (<= 2mm particles)        │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```mermaid
+flowchart TD
+    EIO[Bad LBA Encountered\nPOSIX EIO Error] --> WHY[Why Software Fails:\nDrive controller reallocates block or rejects write\nSensitive plaintext data remains trapped in bad cells]
+    WHY --> DECIDE{Media Physics}
+    DECIDE -->|Rotational HDD| DEG[Prescribe Degaussing\nNSA/CSS Manual 9-12\nDIN 66399 H-5\nField >= 10,000 Oe]
+    DECIDE -->|SSD / NVMe / Flash| SHRED[Prescribe Mechanical Shredding\nDIN 66399 E-4\nCross-cut particle <= 2mm]
+    DEG --> WORK_ORDER[Generate Official DIN 66399 Destruction Order PDF]
+    SHRED --> WORK_ORDER
+```
+
+> **Authoritative Viva Answer**:
+> "Bad sectors are physical media defects (worn NAND flash planes or degraded magnetic oxide). When `dd` attempts to write to a bad LBA, the drive controller returns an unrecoverable `POSIX EIO` hardware error. Because the drive cannot write to these defective sectors, software sanitization cannot guarantee 100% erasure—residual data remains trapped inside. Per **NIST SP 800-88 Rev. 1 § 4.7** and **EU GDPR Article 17**, the drive is quarantined, and the `QuarantineEngine` generates a **DIN 66399 Physical Destruction Work Order** prescribing **Magnetic Degaussing** ($\ge 10,000\text{ Oe}$) for HDDs or **Mechanical Shredding** ($\le 2\text{mm}$) for SSDs and flash."
+
+---
+
+### Q7: How does the offline QR code verification portal work?
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  CONCEPT BOX: Zero-Dependency Embedded Web Verification                                │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  PDF Generator ──▶ ZXing embeds QR: http://<ip>:8080/verify?certId=...&sig=...         │
+│  Smartphone    ──▶ Camera scans QR ──▶ Connects to Sun HttpServer on port 8080         │
+│  Server Engine ──▶ Validates RSA-2048 signature ──▶ Displays Authenticity Badge        │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```mermaid
+flowchart LR
+    A["CertificateGenerator\n(Apache PDFBox)"] --> B["ZXing QR Engine\n(Embeds URL in PDF)"]
+    B --> C["Client / Auditor\n(Scans with Phone)"]
+    C --> D["WebVerificationServer\n(:8080 /verify)"]
+    D --> E["CryptoSigner\n(Verifies RSA Sig)"]
+    E --> F["Mobile UI Webpage\n(Verified Authentic Badge)"]
+```
+
+> **Authoritative Viva Answer**:
+> "The application bundles an embedded, zero-dependency HTTP server (`WebVerificationServer.java` utilizing `com.sun.net.httpserver.HttpServer`) listening on port 8080. When a certificate is generated, a dynamic **ZXing QR Code** is embedded in the PDF linking to:
+> `http://<host>:8080/verify?certId=<id>&model=<model>&sig=<sig>`
+> When an auditor scans the QR code with their mobile phone, the server validates the RSA-2048 digital signature against the audit database and displays a mobile-friendly authenticated certificate preview. It also exposes a REST API (`/api/verify`) for automated enterprise compliance verification."
+
+---
+
+### Q8: What ESG metrics does the application compute?
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  CONCEPT BOX: ITAD ESG Carbon Avoidance (Per 500GB Drive Reused)                       │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  • e-Waste Diverted:  ~1.4 kg / drive       • Scope 3 CO2e Saved:  ~12.6 kg CO2e / drive│
+│  • Energy Conserved:  ~18.9 kWh / drive     • Tree Seedling Equiv: ~0.21 trees / drive  │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```mermaid
+flowchart TD
+    INPUT[500GB Storage Device Sanitized & Reused] --> CALC[EsgCalculator Engine]
+    CALC --> R1["1.4 kg e-Waste Diverted from Landfills"]
+    CALC --> R2["12.6 kg CO2e Emissions Prevented"]
+    CALC --> R3["18.9 kWh Manufacturing Energy Conserved"]
+    CALC --> R4["0.21 Tree Seedlings Sequestering Carbon for 10 Years"]
+```
+
+> **Authoritative Viva Answer**:
+> "In IT Asset Disposition (ITAD), physically shredding reusable drives generates e-waste and forces manufacturers to produce replacement hardware. `EsgCalculator.java` models circular economy benefits: For every standard 500GB drive sanitized and reused rather than shredded, it computes:
+> * $\approx 1.4\text{ kg}$ of electronic waste diverted from landfills.
+> * $\approx 12.6\text{ kg}$ of Scope 3 greenhouse gas ($\text{CO}_2\text{e}$) emissions prevented.
+> * $\approx 18.9\text{ kWh}$ of manufacturing energy conserved.
+> * $\approx 0.21$ tree seedlings grown for 10 years equivalent.
+> These ESG metrics are embedded directly into every PDF compliance certificate and corporate audit report."
+
+---
+
+## 17. Build, Test & CI/CD Pipeline Playbook
+
+```mermaid
+flowchart LR
+    SRC[Git Source Repo] --> MVN[Maven Compile\nmvn clean compile]
+    MVN --> TEST["JUnit 5 Test Suite\n(34 Test Suites / 100% Pass)"]
+    TEST --> COV["JaCoCo Code Coverage\n(target/site/jacoco)"]
+    COV --> SHADE["Maven Shade Plugin\n(Executable Uber-JAR)"]
+    SHADE --> PACK["jpackage Toolchain\n(packaging/*)"]
+
+    PACK --> MAC["🍏 macOS DMG\nUSBSanitizer-1.0.0.dmg"]
+    PACK --> WIN["🪟 Windows MSI / EXE\nUSBSanitizer-Setup.exe"]
+    PACK --> LNX["🐧 Linux AppImage / DEB\nUSBSanitizer.AppImage"]
+```
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                          TERMINAL COMMAND QUICK-REFERENCE                              │
+├─────────────────────────┬──────────────────────────────────────────────────────────────┤
+│ Action                  │ Command                                                      │
+├─────────────────────────┼──────────────────────────────────────────────────────────────┤
+│ 🚀 Run Locally (JavaFX) │ cd DataWiping && mvn javafx:run                              │
+│ 🧪 Run All 34 Tests     │ cd DataWiping && mvn test                                    │
+│ 📦 Build All-in-One JAR │ cd DataWiping && mvn clean package                           │
+│ 🍏 Build macOS DMG      │ ./packaging/package-mac.sh 1.0.0                             │
+│ 🐧 Build Linux Packages │ ./packaging/package-linux.sh 1.0.0                           │
+│ 🪟 Build Windows MSI    │ packaging\package-win.bat 1.0.0                              │
+└─────────────────────────┴──────────────────────────────────────────────────────────────┘
+```
