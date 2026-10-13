@@ -351,17 +351,13 @@ public class NavigationManager {
 
     public void showAccessDeniedDialog(String resourceName, String requiredRole) {
         Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle("Access Restricted (RBAC)");
-        alert.setHeaderText("INSUFFICIENT ROLE CLEARANCE");
-        alert.setContentText(String.format(
-                "Access to %s is restricted.\n\n" +
-                "• Your Active Role: %s (%s)\n" +
-                "• Required Role:    %s\n\n" +
-                "Please authenticate with higher clearance or contact the Chief Compliance Auditor.",
+        alert.setTitle(I18n.get("dialog.rbac.title"));
+        alert.setHeaderText(I18n.get("dialog.rbac.header"));
+        alert.setContentText(I18n.get("dialog.rbac.content",
                 resourceName, getOfficerName(), getRole(), requiredRole
         ));
         alert.showAndWait();
-        showNotification("Access Denied", "Insufficient role clearance for " + resourceName,
+        showNotification(I18n.get("dialog.rbac.denied"), I18n.get("dialog.rbac.toast", resourceName),
                 ToastType.WARNING);
     }
 

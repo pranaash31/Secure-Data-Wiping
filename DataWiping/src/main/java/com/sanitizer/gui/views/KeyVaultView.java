@@ -4,6 +4,7 @@ import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
+import com.sanitizer.i18n.I18n;
 import com.sanitizer.session.UserRole;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -272,9 +273,9 @@ public class KeyVaultView {
         }
 
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("Rotate Cryptographic Keypair");
-        confirm.setHeaderText("Generate New RSA Signing Keypair");
-        confirm.setContentText("Generating a new keypair will sign future certificates with the new private key. Proceed?");
+        confirm.setTitle(I18n.get("dialog.keyvault.rotate.title"));
+        confirm.setHeaderText(I18n.get("dialog.keyvault.rotate.header"));
+        confirm.setContentText(I18n.get("dialog.keyvault.rotate.content"));
 
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
             CryptoSigner.rotateKeyPair();

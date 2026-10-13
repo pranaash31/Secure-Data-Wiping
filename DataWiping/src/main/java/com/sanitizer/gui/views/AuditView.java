@@ -5,6 +5,7 @@ import com.sanitizer.audit.SecurityAuditRecord;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
+import com.sanitizer.i18n.I18n;
 import com.sanitizer.service.AuditExportService;
 import com.sanitizer.service.AuditService;
 import com.sanitizer.service.ExportFormat;
@@ -399,7 +400,7 @@ public class AuditView {
 
     public static void showSecurityLedgerVerificationDialog(SecurityAuditLogger.SecurityLedgerVerificationResult result) {
         Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle("Security Audit Trail — SHA-256 Block Chain Proof");
+        dialog.setTitle(I18n.get("audit.title") + " — SHA-256 Proof");
         dialog.setHeaderText(null);
 
         DialogPane dp = dialog.getDialogPane();
@@ -631,7 +632,7 @@ public class AuditView {
 
     public static void showLedgerVerificationDialog(com.sanitizer.db.LedgerIntegrityEngine.LedgerVerificationResult result) {
         Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle("SQLite Audit Ledger — Cryptographic Integrity Proof");
+        dialog.setTitle(I18n.get("audit.title") + " — Cryptographic Proof");
         dialog.setHeaderText(null);
 
         DialogPane dp = dialog.getDialogPane();

@@ -3,6 +3,7 @@ package com.sanitizer.gui.views.settings;
 import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
+import com.sanitizer.i18n.I18n;
 import com.sanitizer.policy.WipePass;
 import com.sanitizer.policy.WipePatternType;
 import com.sanitizer.policy.WipePolicy;
@@ -402,7 +403,7 @@ public class CustomPolicyCard extends VBox {
 
         String name = txtPolicyName.getText().trim();
         if (name.isEmpty()) {
-            NavigationManager.getInstance().showNotification("Validation Error", "Policy name cannot be empty.", ToastType.ERROR);
+            NavigationManager.getInstance().showNotification("Validation Error", I18n.get("dialog.policy.name_empty"), ToastType.ERROR);
             return;
         }
 
@@ -439,7 +440,7 @@ public class CustomPolicyCard extends VBox {
         configService.savePolicy(current, currentSession());
         refreshPolicySelectorItems();
         cmbPolicySelector.setValue(current);
-        NavigationManager.getInstance().showNotification("Policy Saved", "Wipe policy profile updated successfully.", ToastType.SUCCESS);
+        NavigationManager.getInstance().showNotification("Policy Saved", I18n.get("dialog.policy.saved"), ToastType.SUCCESS);
     }
 
     private void handleDeleteCurrentPolicy() {
@@ -457,7 +458,7 @@ public class CustomPolicyCard extends VBox {
         if (deleted) {
             refreshPolicySelectorItems();
             loadPolicyIntoForm(configService.getDefaultPolicy());
-            NavigationManager.getInstance().showNotification("Policy Deleted", "Policy profile removed.", ToastType.WARNING);
+            NavigationManager.getInstance().showNotification("Policy Deleted", I18n.get("dialog.policy.deleted"), ToastType.WARNING);
         }
     }
 

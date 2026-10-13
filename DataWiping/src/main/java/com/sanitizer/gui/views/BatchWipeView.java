@@ -11,6 +11,7 @@ import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
+import com.sanitizer.i18n.I18n;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
 import com.sanitizer.service.SanitizationWorkflowService;
@@ -404,12 +405,9 @@ public class BatchWipeView {
                 ? cmbGlobalStandard.getValue() : WipePolicyManager.getInstance().getDefaultPolicy();
 
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("BATCH DATA SANITIZATION CONFIRMATION");
-        confirm.setHeaderText("CONCURRENT PERMANENT MEDIA SANITIZATION");
-        confirm.setContentText(String.format(
-                "You are about to launch concurrent multi-threaded sanitization on %d target drive(s) simultaneously using %s.\n\nAre you sure you want to proceed?",
-                drives.size(), globalPolicy.getName()
-        ));
+        confirm.setTitle(I18n.get("dialog.batch.confirm.title"));
+        confirm.setHeaderText(I18n.get("dialog.batch.confirm.header"));
+        confirm.setContentText(I18n.get("dialog.batch.confirm.content", drives.size()));
 
         Optional<ButtonType> res = confirm.showAndWait();
         if (res.isEmpty() || res.get() != ButtonType.OK) return;

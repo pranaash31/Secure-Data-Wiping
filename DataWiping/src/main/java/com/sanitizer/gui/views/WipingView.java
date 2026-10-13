@@ -17,6 +17,7 @@ import com.sanitizer.gui.components.IoOscilloscopeComponent;
 import com.sanitizer.gui.components.SectorHeatmapComponent;
 import com.sanitizer.gui.components.ThermalGraphComponent;
 import com.sanitizer.gui.navigation.NavigationManager;
+import com.sanitizer.i18n.I18n;
 import com.sanitizer.policy.WipePolicy;
 import com.sanitizer.policy.WipePolicyManager;
 import com.sanitizer.quarantine.QuarantineRecord;
@@ -374,7 +375,7 @@ public class WipingView {
     private void handleWipeExecution() {
         UsbDetector.UsbDriveInfo target = cmbDrives.getSelectionModel().getSelectedItem();
         if (target == null) {
-            showAlert(Alert.AlertType.WARNING, "No Target Selected", "Please select a USB drive from the dropdown first.");
+            showAlert(Alert.AlertType.WARNING, I18n.get("dialog.wipe.no_target.title"), I18n.get("dialog.wipe.no_target.msg"));
             return;
         }
 
@@ -382,7 +383,7 @@ public class WipingView {
         SmartReport report = SmartDiagnostics.inspectDrive(target);
         if (report != null && !report.healthScore().isWipePermittedWithoutOverride()) {
             Alert healthAlert = new Alert(Alert.AlertType.WARNING);
-            healthAlert.setTitle("PRE-WIPE HEALTH SAFEGUARD WARNING");
+            healthAlert.setTitle(I18n.get("dialog.wipe.health_warn.title"));
             healthAlert.setHeaderText("DRIVE HEALTH DEFECTS DETECTED (Score: " + report.healthScore().score() + "/100)");
             healthAlert.setContentText("The automated pre-wipe diagnostics detected critical hardware defects:\n\n" +
                     String.join("\n• ", report.healthScore().warnings()) +
@@ -399,7 +400,7 @@ public class WipingView {
             com.sanitizer.detector.SmartDiagnostics.InterfaceAnomalyResult iface = report.interfaceAnomaly();
             String severityLabel = iface.severity().getLabel();
             Alert ifaceAlert = new Alert(Alert.AlertType.WARNING);
-            ifaceAlert.setTitle("⚠️ INTERFACE ANOMALY — PORT / CABLE DEGRADATION DETECTED");
+            ifaceAlert.setTitle(I18n.get("dialog.wipe.iface_warn.title"));
             ifaceAlert.setHeaderText(
                     String.format("USB Bus Communication Errors Detected [%s]", severityLabel));
             ifaceAlert.setContentText(
@@ -428,16 +429,11 @@ public class WipingView {
         boolean isTestMode = chkTestMode.isSelected();
 
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("CONFIRM DATA SANITIZATION");
-        confirm.setHeaderText("PERMANENT MEDIA DATA DESTRUCTION WARNING");
-        confirm.setContentText(String.format(
-                "Target Device: %s (%s)\nBlock Path: %s\nSanitization Standard: %s\nPattern: %s\nMode: %s\n\n" +
-                "Are you sure you want to execute sector sanitization? ALL DATA WILL BE PERMANENTLY DESTROYED!",
+        confirm.setTitle(I18n.get("dialog.wipe.confirm.title"));
+        confirm.setHeaderText(I18n.get("dialog.wipe.confirm.header"));
+        confirm.setContentText(I18n.get("dialog.wipe.confirm.content",
                 target.model(), target.formattedSize(), target.systemPath(),
-                selectedPolicy.getName(),
-                selectedPolicy.getPatternSummary(),
-                isTestMode ? "Fast Test Mode (1 GB Cap)" : "FULL DRIVE SANITIZATION"
-        ));
+                target.formattedSize(), selectedPolicy.getName()));
 
         Optional<ButtonType> res = confirm.showAndWait();
         if (res.isEmpty() || res.get() != ButtonType.OK) {

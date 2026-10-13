@@ -25,7 +25,7 @@ public class AccessibilityHelpDialog {
         if (owner != null) {
             dialog.initOwner(owner);
         }
-        dialog.setTitle("SecureErase Pro — Accessibility & Keyboard Navigation (WCAG 2.1 AA / Section 508)");
+        dialog.setTitle(I18n.get("app.title") + " — " + I18n.get("a11y.section_title"));
 
         VBox root = new VBox(20);
         root.setPadding(new Insets(24));

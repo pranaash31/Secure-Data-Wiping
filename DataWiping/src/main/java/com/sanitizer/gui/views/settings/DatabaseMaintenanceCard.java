@@ -113,19 +113,19 @@ public class DatabaseMaintenanceCard extends VBox {
         }
 
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("Clear Audit Log Database");
-        confirm.setHeaderText("PERMANENT AUDIT HISTORY DELETION");
-        confirm.setContentText("Are you sure you want to clear all recorded sanitization audit logs from SQLite?");
+        confirm.setTitle(I18n.get("dialog.db.clear.title"));
+        confirm.setHeaderText(I18n.get("dialog.db.clear.header"));
+        confirm.setContentText(I18n.get("dialog.db.clear.content"));
 
         Optional<ButtonType> res = confirm.showAndWait();
         if (res.isPresent() && res.get() == ButtonType.OK) {
             boolean success = configService.clearAuditHistory(currentSession());
             if (success) {
                 NavigationManager.getInstance().showNotification("Audit Log Cleared",
-                        "Database history has been cleared.", ToastType.WARNING);
+                        I18n.get("dialog.db.clear.success"), ToastType.WARNING);
             } else {
                 NavigationManager.getInstance().showNotification("Clear Error",
-                        "Failed to clear audit log history or permission denied.", ToastType.ERROR);
+                        I18n.get("dialog.db.clear.error"), ToastType.ERROR);
             }
         }
     }
@@ -138,7 +138,7 @@ public class DatabaseMaintenanceCard extends VBox {
         }
 
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Backup SQLite Audit Database");
+        chooser.setTitle(I18n.get("dialog.db.backup.title"));
         chooser.setInitialFileName("sanitizer_history_backup.db");
         File dest = chooser.showSaveDialog(null);
 

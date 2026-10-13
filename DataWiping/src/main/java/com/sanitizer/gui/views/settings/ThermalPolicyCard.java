@@ -193,8 +193,8 @@ public class ThermalPolicyCard extends VBox {
 
         if (!allValid) {
             Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Invalid Thermal Thresholds");
-            alert.setHeaderText("Thermal Policy Constraint Violation");
+            alert.setTitle(I18n.get("dialog.thermal.invalid.title"));
+            alert.setHeaderText(I18n.get("dialog.thermal.invalid.header"));
             alert.setContentText(errorMsg.toString());
             alert.showAndWait();
             return;

@@ -3,6 +3,7 @@ package com.sanitizer.gui.views;
 import com.sanitizer.db.AuditDb;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
+import com.sanitizer.i18n.I18n;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -318,8 +319,8 @@ public class ClientManagerView {
 
     private void handleDeleteClient(ClientRecord record) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Confirm Client Removal");
-        alert.setHeaderText("Remove Client Organization");
+        alert.setTitle(I18n.get("dialog.client.delete.title"));
+        alert.setHeaderText(I18n.get("dialog.client.delete.header"));
         alert.setContentText("Are you sure you want to remove " + record.name + " from the client registry?");
 
         Optional<ButtonType> res = alert.showAndWait();
