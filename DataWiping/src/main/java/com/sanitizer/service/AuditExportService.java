@@ -37,7 +37,7 @@ public class AuditExportService implements AuditService {
     private static final DateTimeFormatter FILE_TIMESTAMP_FMT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
             .withZone(ZoneId.systemDefault());
 
-    private final ExecutorService executor;
+    private volatile ExecutorService executor;
 
     /**
      * Thread-safe Initialization-on-Demand Holder Singleton.
@@ -51,16 +51,27 @@ public class AuditExportService implements AuditService {
     }
 
     public AuditExportService() {
+        this.executor = createExecutor();
+    }
+
+    public AuditExportService(ExecutorService executor) {
+        this.executor = executor != null ? executor : createExecutor();
+    }
+
+    private static ExecutorService createExecutor() {
         AtomicInteger threadCount = new AtomicInteger(1);
-        this.executor = Executors.newFixedThreadPool(4, r -> {
+        return Executors.newFixedThreadPool(4, r -> {
             Thread t = new Thread(r, "audit-export-worker-" + threadCount.getAndIncrement());
             t.setDaemon(true);
             return t;
         });
     }
 
-    public AuditExportService(ExecutorService executor) {
-        this.executor = executor != null ? executor : Executors.newCachedThreadPool();
+    private synchronized ExecutorService getExecutor() {
+        if (executor == null || executor.isShutdown()) {
+            this.executor = createExecutor();
+        }
+        return executor;
     }
 
     private SessionContext resolveSession(SessionContext session) {
@@ -108,7 +119,7 @@ public class AuditExportService implements AuditService {
                 AppLogger.error(MODULE, "Batch export failed: " + e.getMessage(), e);
                 return ExportResult.failure("Export Failed: " + e.getMessage(), e);
             }
-        }, executor);
+        }, getExecutor());
     }
 
     @Override
@@ -152,7 +163,7 @@ public class AuditExportService implements AuditService {
                 AppLogger.error(MODULE, "Full package export failed: " + e.getMessage(), e);
                 return ExportResult.failure("Package Export Failed: " + e.getMessage(), e);
             }
-        }, executor);
+        }, getExecutor());
     }
 
     @Override
@@ -182,7 +193,7 @@ public class AuditExportService implements AuditService {
                 AppLogger.error(MODULE, "PDF certificate export failed: " + e.getMessage(), e);
                 return ExportResult.failure("PDF Export Error: " + e.getMessage(), e);
             }
-        }, executor);
+        }, getExecutor());
     }
 
     @Override
@@ -225,7 +236,7 @@ public class AuditExportService implements AuditService {
                 AppLogger.error(MODULE, "Quarantine report export failed: " + e.getMessage(), e);
                 return ExportResult.failure("Quarantine Report Error: " + e.getMessage(), e);
             }
-        }, executor);
+        }, getExecutor());
     }
 
     @Override
@@ -354,5 +365,14 @@ public class AuditExportService implements AuditService {
         }
         String payload = record.driveModel() + "|" + record.serialNumber() + "|" + record.capacity() + "|" + record.wipeStandard() + "|" + record.status();
         return CryptoSigner.verifySignature(payload, record.digitalSignature());
+    }
+
+    /**
+     * Shuts down the audit export thread pool executor.
+     */
+    public synchronized void shutdown() {
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdownNow();
+        }
     }
 }

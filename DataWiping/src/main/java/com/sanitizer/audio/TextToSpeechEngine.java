@@ -97,4 +97,13 @@ public class TextToSpeechEngine {
             return false;
         }
     }
+
+    /**
+     * Shuts down the text-to-speech executor.
+     */
+    public synchronized void shutdown() {
+        if (!ttsExecutor.isShutdown()) {
+            ttsExecutor.shutdownNow();
+        }
+    }
 }

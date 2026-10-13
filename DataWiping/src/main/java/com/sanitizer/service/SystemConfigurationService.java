@@ -36,7 +36,7 @@ public class SystemConfigurationService implements ConfigurationService {
 
     private static final String MODULE = "SystemConfigService";
 
-    private final ExecutorService executor;
+    private volatile ExecutorService executor;
 
     /** Thread-safe Initialization-on-Demand Holder Singleton. */
     private static class InstanceHolder {
@@ -48,16 +48,27 @@ public class SystemConfigurationService implements ConfigurationService {
     }
 
     public SystemConfigurationService() {
+        this.executor = createExecutor();
+    }
+
+    public SystemConfigurationService(ExecutorService executor) {
+        this.executor = (executor != null) ? executor : createExecutor();
+    }
+
+    private static ExecutorService createExecutor() {
         AtomicInteger count = new AtomicInteger(1);
-        this.executor = Executors.newFixedThreadPool(3, r -> {
+        return Executors.newFixedThreadPool(3, r -> {
             Thread t = new Thread(r, "config-service-worker-" + count.getAndIncrement());
             t.setDaemon(true);
             return t;
         });
     }
 
-    public SystemConfigurationService(ExecutorService executor) {
-        this.executor = (executor != null) ? executor : Executors.newCachedThreadPool();
+    private synchronized ExecutorService getExecutor() {
+        if (executor == null || executor.isShutdown()) {
+            this.executor = createExecutor();
+        }
+        return executor;
     }
 
     private SessionContext resolveSession(SessionContext session) {
@@ -82,7 +93,7 @@ public class SystemConfigurationService implements ConfigurationService {
                 AppLogger.error(MODULE, "Failed to export database backup: " + e.getMessage(), e);
                 throw new RuntimeException("Database backup failed: " + e.getMessage(), e);
             }
-        }, executor);
+        }, getExecutor());
     }
 
     @Override
@@ -152,7 +163,7 @@ public class SystemConfigurationService implements ConfigurationService {
                 AppLogger.error(MODULE, "Failed to send test alert: " + e.getMessage(), e);
                 return false;
             }
-        }, executor);
+        }, getExecutor());
     }
 
     // ── Hardware Thermal Throttling Policies ───────────────────────────────
@@ -275,5 +286,14 @@ public class SystemConfigurationService implements ConfigurationService {
     @Override
     public WipePolicy importPolicyFromFile(File sourceFile) throws IOException, IllegalArgumentException {
         return WipePolicyManager.importPolicyFromFile(sourceFile);
+    }
+
+    /**
+     * Shuts down the configuration service executor.
+     */
+    public synchronized void shutdown() {
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdownNow();
+        }
     }
 }

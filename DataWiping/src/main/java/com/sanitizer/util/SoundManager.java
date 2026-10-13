@@ -391,4 +391,13 @@ public class SoundManager {
         }
         return buffer;
     }
+
+    /**
+     * Shuts down the audio playback executor service.
+     */
+    public static synchronized void shutdown() {
+        if (!audioExecutor.isShutdown()) {
+            audioExecutor.shutdownNow();
+        }
+    }
 }

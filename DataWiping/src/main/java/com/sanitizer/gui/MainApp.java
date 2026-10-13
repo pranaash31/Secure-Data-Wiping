@@ -11,6 +11,11 @@ public class MainApp extends Application {
         NavigationManager.getInstance().init(stage);
     }
 
+    @Override
+    public void stop() {
+        NavigationManager.getInstance().shutdownApplication();
+    }
+
     public static void main(String[] args) {
         launch(args);
     }

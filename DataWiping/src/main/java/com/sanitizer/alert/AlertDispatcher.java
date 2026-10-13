@@ -15,11 +15,22 @@ import java.util.concurrent.Future;
 public class AlertDispatcher {
 
     private static final String MODULE = "AlertDispatcher";
-    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(2, r -> {
-        Thread t = new Thread(r, "Alert-Dispatcher-Worker");
-        t.setDaemon(true);
-        return t;
-    });
+    private static volatile ExecutorService executor = createExecutor();
+
+    private static ExecutorService createExecutor() {
+        return Executors.newFixedThreadPool(2, r -> {
+            Thread t = new Thread(r, "Alert-Dispatcher-Worker");
+            t.setDaemon(true);
+            return t;
+        });
+    }
+
+    private static synchronized ExecutorService getExecutor() {
+        if (executor == null || executor.isShutdown()) {
+            executor = createExecutor();
+        }
+        return executor;
+    }
 
     /**
      * Dispatches notification when a multi-drive batch wipe job completes.
@@ -160,7 +171,7 @@ public class AlertDispatcher {
      * Sends an immediate test alert to verify webhook and SMTP connectivity.
      */
     public static Future<Boolean> sendTestNotification(AlertConfig config) {
-        return EXECUTOR.submit(() -> {
+        return getExecutor().submit(() -> {
             Map<String, Object> details = new LinkedHashMap<>();
             details.put("Alert Engine Version", "SecureErase Pro v2.0 Enterprise");
             details.put("Configured Webhook", config.isWebhookEnabled() ? config.getWebhookPlatform().getDisplayName() : "Disabled");
@@ -184,17 +195,30 @@ public class AlertDispatcher {
     }
 
     private static void dispatchAsync(AlertConfig config, WebhookDispatcher.AlertPayload payload) {
-        EXECUTOR.submit(() -> {
-            try {
-                if (config.isWebhookEnabled()) {
-                    WebhookDispatcher.dispatch(config, payload);
+        try {
+            getExecutor().submit(() -> {
+                try {
+                    if (config.isWebhookEnabled()) {
+                        WebhookDispatcher.dispatch(config, payload);
+                    }
+                    if (config.isSmtpEnabled()) {
+                        SmtpEmailDispatcher.dispatch(config, payload);
+                    }
+                } catch (Exception e) {
+                    AppLogger.error(MODULE, "Async alert dispatch encountered error: " + e.getMessage(), e);
                 }
-                if (config.isSmtpEnabled()) {
-                    SmtpEmailDispatcher.dispatch(config, payload);
-                }
-            } catch (Exception e) {
-                AppLogger.error(MODULE, "Async alert dispatch encountered error: " + e.getMessage(), e);
-            }
-        });
+            });
+        } catch (Exception e) {
+            AppLogger.debug(MODULE, "Alert dispatch task rejected: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Shuts down the alert dispatcher background thread pool.
+     */
+    public static synchronized void shutdown() {
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdownNow();
+        }
     }
 }

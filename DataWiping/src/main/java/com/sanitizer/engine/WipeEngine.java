@@ -21,11 +21,22 @@ public class WipeEngine {
 
     // Concurrent multi-threaded pool supporting 8+ simultaneous drive wiping operations
     private static final int THREAD_POOL_SIZE = Math.max(8, Runtime.getRuntime().availableProcessors() * 2);
-    private static final ExecutorService batchExecutor = Executors.newFixedThreadPool(THREAD_POOL_SIZE, r -> {
-        Thread t = new Thread(r, "WipeEngine-Worker");
-        t.setDaemon(true);
-        return t;
-    });
+    private static volatile ExecutorService batchExecutor = createBatchExecutor();
+
+    private static ExecutorService createBatchExecutor() {
+        return Executors.newFixedThreadPool(THREAD_POOL_SIZE, r -> {
+            Thread t = new Thread(r, "WipeEngine-Worker");
+            t.setDaemon(true);
+            return t;
+        });
+    }
+
+    private static synchronized ExecutorService getBatchExecutor() {
+        if (batchExecutor == null || batchExecutor.isShutdown()) {
+            batchExecutor = createBatchExecutor();
+        }
+        return batchExecutor;
+    }
 
     private static final Map<String, Future<Boolean>> activeWipeTasks = new ConcurrentHashMap<>();
     private static final Map<String, Process> activeDdProcesses = new ConcurrentHashMap<>();
@@ -210,7 +221,7 @@ public class WipeEngine {
             Consumer<String> logCallback,
             Consumer<Boolean> completionCallback
     ) {
-        Future<Boolean> future = batchExecutor.submit(() -> {
+        Future<Boolean> future = getBatchExecutor().submit(() -> {
             boolean success = false;
             com.sanitizer.shield.WorkerPoolGovernor.getInstance().acquireSlot(systemPath);
             try {
@@ -509,5 +520,31 @@ public class WipeEngine {
                 new ProcessBuilder("kill", "-CONT", String.valueOf(pid)).start().waitFor();
             }
         } catch (Exception ignored) {}
+    }
+
+    /**
+     * Gracefully terminates active wiping operations and shuts down worker thread pools.
+     */
+    public static synchronized void shutdown() {
+        AppLogger.info(MODULE, "Shutting down WipeEngine background workers...");
+        for (Map.Entry<String, Process> entry : activeDdProcesses.entrySet()) {
+            try {
+                if (entry.getValue() != null && entry.getValue().isAlive()) {
+                    entry.getValue().destroyForcibly();
+                }
+            } catch (Exception ignored) {}
+        }
+        activeDdProcesses.clear();
+
+        for (Future<Boolean> task : activeWipeTasks.values()) {
+            if (task != null && !task.isDone()) {
+                task.cancel(true);
+            }
+        }
+        activeWipeTasks.clear();
+
+        if (!batchExecutor.isShutdown()) {
+            batchExecutor.shutdownNow();
+        }
     }
 }

@@ -1,7 +1,11 @@
 package com.sanitizer.gui.navigation;
 
 import com.sanitizer.a11y.AccessibilityManager;
+import com.sanitizer.alert.AlertDispatcher;
+import com.sanitizer.audio.TextToSpeechEngine;
 import com.sanitizer.audit.SecurityAuditLogger;
+import com.sanitizer.detector.UsbDetector;
+import com.sanitizer.engine.WipeEngine;
 import com.sanitizer.gui.components.AccessibilityHelpDialog;
 import com.sanitizer.gui.components.CommandPaletteDialog;
 import com.sanitizer.gui.components.ToastNotification;
@@ -21,11 +25,15 @@ import com.sanitizer.gui.views.VerificationPortalView;
 import com.sanitizer.gui.views.WipeWizardView;
 import com.sanitizer.gui.views.WipingView;
 import com.sanitizer.i18n.I18n;
+import com.sanitizer.server.WebVerificationServer;
+import com.sanitizer.service.AuditExportService;
+import com.sanitizer.service.SystemConfigurationService;
 import com.sanitizer.session.SessionAutoLockManager;
 import com.sanitizer.session.SessionContext;
 import com.sanitizer.session.UserRole;
 import com.sanitizer.update.UpdateManager;
 import com.sanitizer.util.AppLogger;
+import com.sanitizer.util.SoundManager;
 import javafx.application.Platform;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
@@ -41,6 +49,7 @@ import javafx.stage.Stage;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class NavigationManager {
 
@@ -86,6 +95,9 @@ public class NavigationManager {
                 });
             }
         });
+
+        // Register JVM-level graceful shutdown hook for process termination
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdownApplication, "App-Graceful-Shutdown-Hook"));
     }
 
     /** Thread-safe Initialization-on-Demand Holder Singleton. */
@@ -100,6 +112,12 @@ public class NavigationManager {
     /** Entry point: show static web-style Hero landing page maximized to screen bounds. */
     public void init(Stage stage) {
         this.primaryStage = stage;
+
+        // Window close handler — cleanly terminates all daemon executors
+        primaryStage.setOnCloseRequest(event -> {
+            shutdownApplication();
+            Platform.exit();
+        });
 
         Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
         primaryStage.setX(bounds.getMinX());
@@ -395,5 +413,72 @@ public class NavigationManager {
 
     public boolean hasPermission(UserRole.Permission permission) {
         return getSessionContext().hasPermission(permission);
+    }
+
+    // ── Graceful Lifecycle Shutdown & Daemon Cleanup ─────────────────────────
+    private final AtomicBoolean isShutdown = new AtomicBoolean(false);
+
+    /**
+     * Centralized application shutdown coordinator.
+     * Safely terminates all background executors, scheduled timers, daemons, and HTTP servers.
+     */
+    public synchronized void shutdownApplication() {
+        if (!isShutdown.compareAndSet(false, true)) {
+            return;
+        }
+        AppLogger.info(MODULE, "=== INITIATING GRACEFUL APPLICATION SHUTDOWN ===");
+
+        // 1. Stop UI Inactivity Timeline Monitor
+        try {
+            SessionAutoLockManager.getInstance().stopInactivityMonitor();
+        } catch (Exception e) {
+            AppLogger.warn(MODULE, "Error stopping SessionAutoLockManager: " + e.getMessage());
+        }
+
+        // 2. Shut down hardware USB polling executor
+        try {
+            UsbDetector.shutdown();
+        } catch (Exception e) {
+            AppLogger.warn(MODULE, "Error shutting down UsbDetector: " + e.getMessage());
+        }
+
+        // 3. Stop embedded HTTP QR verification web server
+        try {
+            WebVerificationServer.stopServer();
+        } catch (Exception e) {
+            AppLogger.warn(MODULE, "Error stopping WebVerificationServer: " + e.getMessage());
+        }
+
+        // 4. Shut down audio synthesis and TTS voice executors
+        try {
+            SoundManager.shutdown();
+            TextToSpeechEngine.getInstance().shutdown();
+        } catch (Exception e) {
+            AppLogger.warn(MODULE, "Error shutting down audio subsystems: " + e.getMessage());
+        }
+
+        // 5. Shut down real-time webhook & email alert dispatcher
+        try {
+            AlertDispatcher.shutdown();
+        } catch (Exception e) {
+            AppLogger.warn(MODULE, "Error shutting down AlertDispatcher: " + e.getMessage());
+        }
+
+        // 6. Terminate active wiping operations and thread pool
+        try {
+            WipeEngine.shutdown();
+        } catch (Exception e) {
+            AppLogger.warn(MODULE, "Error shutting down WipeEngine: " + e.getMessage());
+        }
+
+        // 7. Shut down service layer async worker pools
+        try {
+            SystemConfigurationService.getInstance().shutdown();
+            AuditExportService.getInstance().shutdown();
+        } catch (Exception e) {
+            AppLogger.warn(MODULE, "Error shutting down service executors: " + e.getMessage());
+        }
+
+        AppLogger.info(MODULE, "=== APPLICATION SHUTDOWN COMPLETED CLEANLY ===");
     }
 }
