@@ -1,6 +1,5 @@
 package com.sanitizer.gui.views.settings;
 
-import com.sanitizer.audit.SecurityAuditLogger;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.service.ConfigurationService;
