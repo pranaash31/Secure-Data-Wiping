@@ -716,19 +716,6 @@
     -fx-font-size: 12px;
     -fx-text-fill: #64748B;
 }
-.header-box {
-    -fx-background-color: #0F172A;
-    -fx-padding: 20 28;
-}
-.header-title {
-    -fx-font-size: 20px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #FFFFFF;
-}
-.header-subtitle {
-    -fx-font-size: 12px;
-    -fx-text-fill: #94A3B8;
-}
 
 /* ─── DIALOGS ───────────────────────────────────────────────────────────── */
 .dialog-pane {
@@ -881,15 +868,6 @@
 .dark-theme .kpi-label { -fx-text-fill: #637E9A; }
 
 .dark-theme .form-label { -fx-text-fill: #8BA0BF; }
-
-/* ─── SECTION HEADER BOX (SanitizerController) ─────────────────────────── */
-.dark-theme .header-box {
-    -fx-background-color: #0C1220;
-    -fx-border-color: #1E2D44;
-    -fx-border-width: 0 0 1 0;
-}
-.dark-theme .header-title  { -fx-text-fill: #E8EEFA; }
-.dark-theme .header-subtitle { -fx-text-fill: #637E9A; }
 
 /* ─── BADGES ───────────────────────────────────────────────────────────── */
 .dark-theme .badge-success {
@@ -1317,7 +1295,6 @@
 .high-contrast-dark .section-label,
 .high-contrast-dark .card-title,
 .high-contrast-dark .settings-section-title,
-.high-contrast-dark .header-title,
 .high-contrast-dark .hero-brand-name,
 .high-contrast-dark .login-title {
     -fx-text-fill: #FFD700;
@@ -1330,7 +1307,6 @@
 .high-contrast-dark .label-muted,
 .high-contrast-dark .settings-key-label,
 .high-contrast-dark .settings-value-label,
-.high-contrast-dark .header-subtitle,
 .high-contrast-dark .login-subtitle {
     -fx-text-fill: #FFFFFF;
     -fx-font-weight: bold;
@@ -1496,7 +1472,6 @@
 .high-contrast-light .section-label,
 .high-contrast-light .card-title,
 .high-contrast-light .settings-section-title,
-.high-contrast-light .header-title,
 .high-contrast-light .hero-brand-name,
 .high-contrast-light .login-title,
 .high-contrast-light .kpi-value {
