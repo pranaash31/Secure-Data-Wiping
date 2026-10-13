@@ -8,6 +8,7 @@ import com.sanitizer.i18n.I18n;
 import com.sanitizer.service.ConfigurationService;
 import com.sanitizer.service.SystemConfigurationService;
 import com.sanitizer.session.SessionContext;
+import com.sanitizer.session.UserRole;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -106,7 +107,7 @@ public class DatabaseMaintenanceCard extends VBox {
 
     private void handleClearHistory() {
         var nav = NavigationManager.getInstance();
-        if (!nav.hasPermission(UserRole.Permission.AUDIT_CLEAR) && !nav.getRole().isAtLeast(UserRole.SUPERVISOR)) {
+        if (!nav.hasPermission(UserRole.Permission.AUDIT_CLEAR) && !nav.getUserRole().isAtLeast(UserRole.SUPERVISOR)) {
             nav.showAccessDeniedDialog("Audit Ledger Purge", "SUPERVISOR / CHIEF AUDITOR");
             return;
         }
