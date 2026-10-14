@@ -1,17 +1,16 @@
 package com.sanitizer.gui.views;
 
 import com.sanitizer.detector.SmartDiagnostics;
-import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.detector.ThermalPolicy;
 import com.sanitizer.detector.ThermalPolicyManager;
+import com.sanitizer.detector.UsbDetector;
 import com.sanitizer.gui.components.IoOscilloscopeComponent;
 import com.sanitizer.gui.components.ThermalGraphComponent;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
-import javafx.application.Platform;
+import com.sanitizer.gui.viewmodel.DiskDiagnosticViewModel;
 import javafx.beans.property.SimpleStringProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
+import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
@@ -19,12 +18,11 @@ import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 
-import java.util.List;
-
 public class DiskDiagnosticView {
 
     private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(22);
+    private final DiskDiagnosticViewModel viewModel;
 
     private ComboBox<UsbDetector.UsbDriveInfo> cmbDrives;
     private Button btnScan;
@@ -78,16 +76,31 @@ public class DiskDiagnosticView {
 
     // SMART Telemetry Table
     private TableView<SmartDiagnostics.SmartAttribute> smartTable;
-    private ObservableList<SmartDiagnostics.SmartAttribute> smartData = FXCollections.observableArrayList();
 
     public DiskDiagnosticView() {
+        this(new DiskDiagnosticViewModel());
+    }
+
+    public DiskDiagnosticView(DiskDiagnosticViewModel viewModel) {
+        this.viewModel = viewModel;
         buildUi();
-        refreshDriveList();
-        UsbDetector.registerListener(drives -> Platform.runLater(() -> updateDriveList(drives)));
+        bindViewModel();
+
+        // Lifecycle: start listening & refresh initial drives
+        viewModel.startListening();
+        viewModel.refreshDrives();
     }
 
     public Parent getRoot() {
         return scrollRoot;
+    }
+
+    public DiskDiagnosticViewModel getViewModel() {
+        return viewModel;
+    }
+
+    public void dispose() {
+        viewModel.stopListening();
     }
 
     @SuppressWarnings("unchecked")
@@ -100,12 +113,16 @@ public class DiskDiagnosticView {
 
         rootContainer.setPadding(new Insets(24, 28, 28, 28));
 
-        // F5 = rescan drives
-        rootContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
+        // Lifecycle management: unregister USB hardware listener when navigating away,
+        // and re-register when view is attached to an active scene.
+        scrollRoot.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
+                viewModel.startListening();
                 newScene.setOnKeyPressed(ev -> {
-                    if (ev.getCode() == KeyCode.F5) refreshDriveList();
+                    if (ev.getCode() == KeyCode.F5) viewModel.refreshDrives();
                 });
+            } else {
+                viewModel.stopListening();
             }
         });
 
@@ -125,7 +142,7 @@ public class DiskDiagnosticView {
 
         btnScan = new Button("🔄 Scan All Drives (F5)");
         btnScan.getStyleClass().add("button-primary");
-        btnScan.setOnAction(e -> refreshDriveList());
+        btnScan.setOnAction(e -> viewModel.refreshDrives());
         btnScan.setTooltip(new Tooltip("Rescan all connected hardware drives (F5)"));
 
         header.getChildren().addAll(titleBox, hSpacer, btnScan);
@@ -156,14 +173,14 @@ public class DiskDiagnosticView {
             }
         });
         cmbDrives.setButtonCell(cmbDrives.getCellFactory().call(null));
-        cmbDrives.setOnAction(e -> loadSelectedDriveDiagnostics());
+        cmbDrives.setOnAction(e -> viewModel.reloadCurrentDriveDiagnostics());
         cmbDrives.setOnKeyPressed(ev -> {
-            if (ev.getCode() == KeyCode.ENTER) loadSelectedDriveDiagnostics();
+            if (ev.getCode() == KeyCode.ENTER) viewModel.reloadCurrentDriveDiagnostics();
         });
 
         btnLoad = new Button("Load S.M.A.R.T.");
         btnLoad.getStyleClass().add("button-primary");
-        btnLoad.setOnAction(e -> loadSelectedDriveDiagnostics());
+        btnLoad.setOnAction(e -> viewModel.reloadCurrentDriveDiagnostics());
 
         btnSelfTest = new Button("⚡ Run Diagnostic Self-Test");
         btnSelfTest.getStyleClass().add("button-secondary");
@@ -178,14 +195,10 @@ public class DiskDiagnosticView {
         preWipeAssessmentBox = new HBox(16);
         preWipeAssessmentBox.setAlignment(Pos.CENTER_LEFT);
         preWipeAssessmentBox.getStyleClass().add("card");
-        preWipeAssessmentBox.setStyle("-fx-background-color: #ECFDF5; -fx-border-color: #A7F3D0; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 14 20;");
 
         VBox preWipeContent = new VBox(3);
-        lblPreWipeVerdict = new Label("PRE-WIPE HEALTH ASSESSMENT: AUTOMATICALLY VERIFIED");
-        lblPreWipeVerdict.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #065F46;");
-
-        lblPreWipeDetails = new Label("Drive health is certified optimal. Drive is cleared for high-speed low-level block sanitization.");
-        lblPreWipeDetails.setStyle("-fx-font-size: 11px; -fx-text-fill: #047857;");
+        lblPreWipeVerdict = new Label();
+        lblPreWipeDetails = new Label();
         preWipeContent.getChildren().addAll(lblPreWipeVerdict, lblPreWipeDetails);
         HBox.setHgrow(preWipeContent, Priority.ALWAYS);
 
@@ -198,14 +211,11 @@ public class DiskDiagnosticView {
         VBox healthCard = createStatCard("PRE-WIPE HEALTH SCORE");
         HBox hScoreBox = new HBox(8);
         hScoreBox.setAlignment(Pos.CENTER_LEFT);
-        lblHealthValue = new Label("-- / 100");
-        lblHealthValue.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #10B981;");
-        lblHealthScoreBadge = new Label("HEALTHY");
-        lblHealthScoreBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 3 8; -fx-background-radius: 4px; -fx-background-color: #ECFDF5; -fx-text-fill: #059669;");
+        lblHealthValue = new Label();
+        lblHealthScoreBadge = new Label();
         hScoreBox.getChildren().addAll(lblHealthValue, lblHealthScoreBadge);
 
-        lblHealthDesc = new Label("Zero critical failure indicators detected.");
-        lblHealthDesc.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B;");
+        lblHealthDesc = new Label();
         lblHealthDesc.setWrapText(true);
         healthCard.getChildren().addAll(hScoreBox, lblHealthDesc);
 
@@ -213,44 +223,35 @@ public class DiskDiagnosticView {
         VBox tempCard = createStatCard("DRIVE TEMPERATURE");
         HBox tBox = new HBox(8);
         tBox.setAlignment(Pos.CENTER_LEFT);
-        lblTempValue = new Label("-- °C");
-        lblTempValue.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #2563EB;");
-        lblThermalBadge = new Label("NORMAL");
-        lblThermalBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 3 8; -fx-background-radius: 4px; -fx-background-color: #EFF6FF; -fx-text-fill: #2563EB;");
+        lblTempValue = new Label();
+        lblThermalBadge = new Label();
         tBox.getChildren().addAll(lblTempValue, lblThermalBadge);
 
-        lblTempDesc = new Label("Operating within safe thermal limits (<48°C).");
-        lblTempDesc.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B;");
+        lblTempDesc = new Label();
         lblTempDesc.setWrapText(true);
         tempCard.getChildren().addAll(tBox, lblTempDesc);
 
         // Card 3: Power-On Hours
         VBox hoursCard = createStatCard("POWER-ON HOURS");
-        lblHoursValue = new Label("-- hrs");
-        lblHoursValue.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #7C3AED;");
-        lblHoursDesc = new Label("Operational runtime lifespan.");
-        lblHoursDesc.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B;");
+        lblHoursValue = new Label();
+        lblHoursDesc = new Label();
         lblHoursDesc.setWrapText(true);
         hoursCard.getChildren().addAll(lblHoursValue, lblHoursDesc);
 
         // Card 4: Reallocated Sectors & Bad Blocks
         VBox sectorsCard = createStatCard("SECTOR DEFECTS");
-        lblSectorsValue = new Label("0 BAD / 0 REALLOC");
-        lblSectorsValue.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #10B981;");
-        lblSectorsDesc = new Label("Media surface is clean. No bad sectors.");
-        lblSectorsDesc.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B;");
+        lblSectorsValue = new Label();
+        lblSectorsDesc = new Label();
         lblSectorsDesc.setWrapText(true);
         sectorsCard.getChildren().addAll(lblSectorsValue, lblSectorsDesc);
 
         // Card 5: Flash Wear Leveling
         VBox wearCard = createStatCard("NAND WEAR LEVELING");
-        lblWearValue = new Label("100% Life Left");
-        lblWearValue.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #059669;");
+        lblWearValue = new Label();
         pbWearLevel = new ProgressBar(1.0);
         pbWearLevel.setMaxWidth(Double.MAX_VALUE);
         pbWearLevel.setPrefHeight(6);
-        lblWearDesc = new Label("NAND endurance optimal.");
-        lblWearDesc.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B;");
+        lblWearDesc = new Label();
         lblWearDesc.setWrapText(true);
         wearCard.getChildren().addAll(lblWearValue, pbWearLevel, lblWearDesc);
 
@@ -351,7 +352,6 @@ public class DiskDiagnosticView {
         colStatus.setPrefWidth(110);
 
         smartTable.getColumns().addAll(colId, colAttr, colVal, colWorst, colThresh, colRaw, colStatus);
-        smartTable.setItems(smartData);
 
         smartCard.getChildren().addAll(smartTitleRow, smartTable);
 
@@ -364,7 +364,6 @@ public class DiskDiagnosticView {
         interfaceAnomalyBox = new HBox(16);
         interfaceAnomalyBox.setAlignment(Pos.CENTER_LEFT);
         interfaceAnomalyBox.getStyleClass().add("card");
-        interfaceAnomalyBox.setStyle("-fx-background-color: #FFF7ED; -fx-border-color: #FED7AA; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 14 20;");
         interfaceAnomalyBox.setManaged(false);
         interfaceAnomalyBox.setVisible(false);
 
@@ -372,19 +371,116 @@ public class DiskDiagnosticView {
         anomalyIcon.setStyle("-fx-font-size: 22px;");
 
         VBox anomalyContent = new VBox(3);
-        lblAnomalyTitle = new Label("INTERFACE ANOMALY DETECTED — USB PORT / CABLE DEGRADATION");
-        lblAnomalyTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #92400E;");
-        lblAnomalyDiagnosis = new Label("");
-        lblAnomalyDiagnosis.setStyle("-fx-font-size: 11px; -fx-text-fill: #B45309;");
+        lblAnomalyTitle = new Label();
+        lblAnomalyDiagnosis = new Label();
         lblAnomalyDiagnosis.setWrapText(true);
-        lblAnomalyPrompt = new Label("");
-        lblAnomalyPrompt.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #C2410C;");
+        lblAnomalyPrompt = new Label();
         anomalyContent.getChildren().addAll(lblAnomalyTitle, lblAnomalyDiagnosis, lblAnomalyPrompt);
         HBox.setHgrow(anomalyContent, Priority.ALWAYS);
 
         interfaceAnomalyBox.getChildren().addAll(anomalyIcon, anomalyContent);
 
         rootContainer.getChildren().addAll(header, selectorRow, preWipeAssessmentBox, interfaceAnomalyBox, healthRow, ioOscilloscope, thermalGraph, specsRow);
+    }
+
+    private void bindViewModel() {
+        // Spec labels
+        lblModelValue.textProperty().bind(viewModel.modelProperty());
+        lblSerialValue.textProperty().bind(viewModel.serialProperty());
+        lblCapacityValue.textProperty().bind(viewModel.capacityProperty());
+        lblTotalBlocksValue.textProperty().bind(viewModel.totalBlocksProperty());
+        lblPathValue.textProperty().bind(viewModel.pathProperty());
+
+        // Health Card
+        lblHealthValue.textProperty().bind(viewModel.healthValueProperty());
+        lblHealthValue.styleProperty().bind(viewModel.healthValueStyleProperty());
+        lblHealthScoreBadge.textProperty().bind(viewModel.healthScoreBadgeProperty());
+        lblHealthScoreBadge.styleProperty().bind(viewModel.healthScoreBadgeStyleProperty());
+        lblHealthDesc.textProperty().bind(viewModel.healthDescProperty());
+
+        // Temperature Card
+        lblTempValue.textProperty().bind(viewModel.tempValueProperty());
+        lblTempValue.styleProperty().bind(viewModel.tempValueStyleProperty());
+        lblThermalBadge.textProperty().bind(viewModel.thermalBadgeProperty());
+        lblThermalBadge.styleProperty().bind(viewModel.thermalBadgeStyleProperty());
+        lblTempDesc.textProperty().bind(viewModel.tempDescProperty());
+
+        // Power-On Hours Card
+        lblHoursValue.textProperty().bind(viewModel.hoursValueProperty());
+        lblHoursDesc.textProperty().bind(viewModel.hoursDescProperty());
+
+        // Sector Defects Card
+        lblSectorsValue.textProperty().bind(viewModel.sectorsValueProperty());
+        lblSectorsValue.styleProperty().bind(viewModel.sectorsValueStyleProperty());
+        lblSectorsDesc.textProperty().bind(viewModel.sectorsDescProperty());
+
+        // Flash Wear Leveling Card
+        lblWearValue.textProperty().bind(viewModel.wearValueProperty());
+        lblWearValue.styleProperty().bind(viewModel.wearValueStyleProperty());
+        pbWearLevel.progressProperty().bind(viewModel.wearProgressProperty());
+        lblWearDesc.textProperty().bind(viewModel.wearDescProperty());
+
+        // Pre-Wipe Health Assessment Banner
+        preWipeAssessmentBox.styleProperty().bind(viewModel.preWipeBoxStyleProperty());
+        lblPreWipeVerdict.textProperty().bind(viewModel.preWipeVerdictProperty());
+        lblPreWipeVerdict.styleProperty().bind(viewModel.preWipeVerdictStyleProperty());
+        lblPreWipeDetails.textProperty().bind(viewModel.preWipeDetailsProperty());
+
+        // Interface Anomaly Banner
+        interfaceAnomalyBox.styleProperty().bind(viewModel.interfaceAnomalyBoxStyleProperty());
+        interfaceAnomalyBox.visibleProperty().bind(viewModel.interfaceAnomalyVisibleProperty());
+        interfaceAnomalyBox.managedProperty().bind(viewModel.interfaceAnomalyVisibleProperty());
+        lblAnomalyTitle.textProperty().bind(viewModel.anomalyTitleProperty());
+        lblAnomalyTitle.styleProperty().bind(viewModel.anomalyTitleStyleProperty());
+        lblAnomalyDiagnosis.textProperty().bind(viewModel.anomalyDiagnosisProperty());
+        lblAnomalyDiagnosis.styleProperty().bind(viewModel.anomalyDiagnosisStyleProperty());
+        lblAnomalyPrompt.textProperty().bind(viewModel.anomalyPromptProperty());
+        lblAnomalyPrompt.styleProperty().bind(viewModel.anomalyPromptStyleProperty());
+
+        // SMART Attributes Table
+        smartTable.setItems(viewModel.getSmartAttributes());
+
+        // Drive Combo Box
+        cmbDrives.setItems(viewModel.getDrives());
+        cmbDrives.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !newVal.equals(viewModel.selectedDriveProperty().get())) {
+                viewModel.selectDrive(newVal);
+            }
+        });
+        viewModel.selectedDriveProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !newVal.equals(cmbDrives.getSelectionModel().getSelectedItem())) {
+                cmbDrives.getSelectionModel().select(newVal);
+            } else if (newVal == null) {
+                cmbDrives.getSelectionModel().clearSelection();
+            }
+        });
+
+        // Prompt text update on drives list changes
+        viewModel.getDrives().addListener((ListChangeListener<UsbDetector.UsbDriveInfo>) c -> {
+            if (viewModel.getDrives().isEmpty()) {
+                cmbDrives.setPromptText("No USB target drives connected");
+            } else {
+                cmbDrives.setPromptText("Scanning connected hardware drives...");
+            }
+        });
+
+        // Telemetry components (ThermalGraph & IoOscilloscope) update on report changes
+        viewModel.currentReportProperty().addListener((obs, oldReport, newReport) -> {
+            UsbDetector.UsbDriveInfo drive = viewModel.selectedDriveProperty().get();
+            if (newReport != null && drive != null) {
+                if (thermalGraph != null) {
+                    ThermalPolicy policy = ThermalPolicyManager.getInstance().getPolicyForDrive(drive.model(), drive.systemPath(), drive.sizeBytes());
+                    thermalGraph.setPolicy(policy);
+                    thermalGraph.addSample(newReport.temperatureCelsius());
+                }
+                if (ioOscilloscope != null) {
+                    ioOscilloscope.setDeviceContext(drive.model(), drive.systemPath(), drive.sizeBytes());
+                }
+            } else {
+                if (thermalGraph != null) thermalGraph.reset();
+                if (ioOscilloscope != null) ioOscilloscope.reset();
+            }
+        });
     }
 
     private Label createSpecLabel(String text) {
@@ -403,181 +499,8 @@ public class DiskDiagnosticView {
         return card;
     }
 
-    private void refreshDriveList() {
-        List<UsbDetector.UsbDriveInfo> drives = UsbDetector.getConnectedUsbDrives();
-        updateDriveList(drives);
-    }
-
-    private void updateDriveList(List<UsbDetector.UsbDriveInfo> drives) {
-        UsbDetector.UsbDriveInfo current = cmbDrives.getSelectionModel().getSelectedItem();
-        cmbDrives.setItems(FXCollections.observableArrayList(drives));
-
-        if (drives.isEmpty()) {
-            cmbDrives.setPromptText("No USB target drives connected");
-            lblHealthValue.setText("-- / 100");
-            lblHealthScoreBadge.setText("NO DEVICE");
-            lblHealthScoreBadge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 3 8; -fx-background-radius: 4px; -fx-background-color: #FEF2F2; -fx-text-fill: #EF4444;");
-            lblHealthDesc.setText("Connect a USB drive to run hardware diagnostics.");
-
-            lblTempValue.setText("-- °C");
-            lblThermalBadge.setText("OFFLINE");
-            lblHoursValue.setText("-- hrs");
-            lblSectorsValue.setText("0 BAD / 0 REALLOC");
-            lblWearValue.setText("--% Life");
-            pbWearLevel.setProgress(0);
-
-            preWipeAssessmentBox.setStyle("-fx-background-color: #F8FAFC; -fx-border-color: #E2E8F0; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 14 20;");
-            lblPreWipeVerdict.setText("PRE-WIPE HEALTH ASSESSMENT: WAITING FOR DEVICE");
-            lblPreWipeVerdict.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #64748B;");
-            lblPreWipeDetails.setText("Insert a storage device to evaluate Pre-Wipe Health Score & thermal safety limits.");
-
-            lblModelValue.setText("No drive connected");
-            lblSerialValue.setText("--");
-            lblCapacityValue.setText("--");
-            lblTotalBlocksValue.setText("--");
-            lblPathValue.setText("--");
-            smartData.clear();
-            if (ioOscilloscope != null) ioOscilloscope.reset();
-            if (thermalGraph != null) thermalGraph.reset();
-        } else {
-            if (current != null && drives.contains(current)) {
-                cmbDrives.getSelectionModel().select(current);
-            } else {
-                cmbDrives.getSelectionModel().select(0);
-            }
-            loadSelectedDriveDiagnostics();
-        }
-    }
-
-    private void loadSelectedDriveDiagnostics() {
-        UsbDetector.UsbDriveInfo drive = cmbDrives.getSelectionModel().getSelectedItem();
-        if (drive == null) return;
-
-        // Dynamic Specs Calculation
-        lblModelValue.setText(drive.model());
-        lblSerialValue.setText(drive.serial());
-        lblCapacityValue.setText(drive.formattedSize() + " (" + String.format("%,d", drive.sizeBytes()) + " bytes)");
-
-        long totalBlocks = drive.sizeBytes() / 512;
-        lblTotalBlocksValue.setText(String.format("%,d sectors", totalBlocks));
-        lblPathValue.setText(drive.systemPath());
-
-        // Perform Deep SMART Diagnostics Inspection
-        SmartDiagnostics.SmartReport report = SmartDiagnostics.inspectDrive(drive);
-
-        // Update Thermal Graph Policy and Feed Live Sample
-        if (thermalGraph != null && report != null) {
-            ThermalPolicy policy = ThermalPolicyManager.getInstance().getPolicyForDrive(drive.model(), drive.systemPath(), drive.sizeBytes());
-            thermalGraph.setPolicy(policy);
-            thermalGraph.addSample(report.temperatureCelsius());
-        }
-        if (ioOscilloscope != null) {
-            ioOscilloscope.setDeviceContext(drive.model(), drive.systemPath(), drive.sizeBytes());
-        }
-
-        // Health Score & Status
-        SmartDiagnostics.HealthScoreResult health = report.healthScore();
-        lblHealthValue.setText(health.score() + " / 100");
-        lblHealthScoreBadge.setText(health.status().name());
-        lblHealthScoreBadge.setStyle(String.format(
-                "-fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 3 8; -fx-background-radius: 4px; -fx-background-color: %s; -fx-text-fill: %s;",
-                health.status().getBgColor(), health.status().getTextColor()
-        ));
-        lblHealthValue.setStyle(String.format("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: %s;", health.status().getTextColor()));
-        lblHealthDesc.setText(health.recommendation());
-
-        // Temperature & Thermal Status
-        lblTempValue.setText(report.temperatureCelsius() + " °C");
-        lblThermalBadge.setText(report.thermalStatus().name());
-        lblThermalBadge.setStyle(String.format(
-                "-fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 3 8; -fx-background-radius: 4px; -fx-background-color: %s; -fx-text-fill: %s;",
-                report.thermalStatus().getBgColor(), report.thermalStatus().getTextColor()
-        ));
-        lblTempValue.setStyle(String.format("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: %s;", report.thermalStatus().getTextColor()));
-
-        if (report.temperatureCelsius() >= 60) {
-            lblTempDesc.setText("CRITICAL THERMAL LEVEL: Drive will auto-pause if wiped now.");
-        } else if (report.temperatureCelsius() >= 48) {
-            lblTempDesc.setText("ELEVATED TEMPERATURE: Operating near upper thermal threshold.");
-        } else {
-            lblTempDesc.setText("Operating within safe thermal limits (<48°C).");
-        }
-
-        // Power-On Hours & Lifespan
-        lblHoursValue.setText(String.format("%,d hrs", report.powerOnHours()));
-        double yearsEst = Math.max(0.1, (double) report.powerOnHours() / (24 * 365.25));
-        lblHoursDesc.setText(String.format("Approx. %.1f years runtime | %d power cycles", yearsEst, report.powerCycleCount()));
-
-        // Sector Defects (Bad Blocks & Reallocated Sectors)
-        lblSectorsValue.setText(String.format("%d BAD / %d REALLOC", report.badBlocks(), report.reallocatedSectors()));
-        if (report.badBlocks() > 0 || report.reallocatedSectors() > 0) {
-            lblSectorsValue.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #EF4444;");
-            lblSectorsDesc.setText("Sector defects detected on media surface.");
-        } else {
-            lblSectorsValue.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #10B981;");
-            lblSectorsDesc.setText("Media surface is clean. Zero bad sectors detected.");
-        }
-
-        // Wear Leveling
-        lblWearValue.setText(report.wearLevelingPercent() + "% Remaining Life");
-        pbWearLevel.setProgress(report.wearLevelingPercent() / 100.0);
-        if (report.wearLevelingPercent() < 50) {
-            lblWearDesc.setText("High flash wear. Consider device retirement.");
-            lblWearValue.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #D97706;");
-        } else {
-            lblWearDesc.setText("NAND flash endurance optimal for rewriting.");
-            lblWearValue.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #059669;");
-        }
-
-        // Update Pre-Wipe Health Assessment Banner
-        if (health.isWipePermittedWithoutOverride()) {
-            preWipeAssessmentBox.setStyle("-fx-background-color: #ECFDF5; -fx-border-color: #A7F3D0; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 14 20;");
-            lblPreWipeVerdict.setText("PRE-WIPE HEALTH ASSESSMENT: PASSED (" + health.score() + "/100 - " + health.status().name() + ")");
-            lblPreWipeVerdict.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #065F46;");
-            lblPreWipeDetails.setText(health.recommendation());
-        } else {
-            preWipeAssessmentBox.setStyle("-fx-background-color: #FEF2F2; -fx-border-color: #FECACA; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 14 20;");
-            lblPreWipeVerdict.setText("PRE-WIPE HEALTH ASSESSMENT: CRITICAL WARNING (" + health.score() + "/100 - " + health.status().name() + ")");
-            lblPreWipeVerdict.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #991B1B;");
-            lblPreWipeDetails.setText(String.join(" | ", health.warnings()) + ". " + health.recommendation());
-        }
-
-        // Interface Anomaly & Port Degradation Banner
-        SmartDiagnostics.InterfaceAnomalyResult iface = report.interfaceAnomaly();
-        if (iface != null && iface.isDegraded()) {
-            String severityLabel = iface.severity().getLabel();
-            String titleSuffix = iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL
-                    ? " — USB PORT / CABLE DEGRADATION ["+severityLabel+"]"
-                    : " — INTERMITTENT LINK ANOMALY ["+severityLabel+"]";
-            String borderColor = iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL ? "#FCA5A5" : "#FED7AA";
-            String bgColor    = iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL ? "#FEF2F2" : "#FFF7ED";
-            String titleColor = iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL ? "#991B1B" : "#92400E";
-            String diagColor  = iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL ? "#DC2626" : "#B45309";
-            String promptColor= iface.severity() == SmartDiagnostics.InterfaceSeverity.CRITICAL ? "#B91C1C" : "#C2410C";
-
-            interfaceAnomalyBox.setStyle("-fx-background-color: "+bgColor+"; -fx-border-color: "+borderColor+"; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 14 20;");
-            lblAnomalyTitle.setText("⚠️  INTERFACE ANOMALY DETECTED" + titleSuffix);
-            lblAnomalyTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: "+titleColor+";");
-            lblAnomalyDiagnosis.setText(
-                    String.format("CRC Errors (ID 199): %d  |  Command Timeouts (ID 188): %d  —  %s",
-                            iface.crcErrors(), iface.commandTimeouts(), iface.rootCauseDiagnosis()));
-            lblAnomalyDiagnosis.setStyle("-fx-font-size: 11px; -fx-text-fill: "+diagColor+";");
-            lblAnomalyPrompt.setText("→  " + iface.userPrompt());
-            lblAnomalyPrompt.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: "+promptColor+";");
-            interfaceAnomalyBox.setVisible(true);
-            interfaceAnomalyBox.setManaged(true);
-        } else {
-            interfaceAnomalyBox.setVisible(false);
-            interfaceAnomalyBox.setManaged(false);
-        }
-
-        // SMART Table Data
-        smartData.clear();
-        smartData.addAll(report.attributes());
-    }
-
     private void runSmartSelfTest() {
-        UsbDetector.UsbDriveInfo drive = cmbDrives.getSelectionModel().getSelectedItem();
+        UsbDetector.UsbDriveInfo drive = viewModel.selectedDriveProperty().get();
         if (drive == null) return;
 
         NavigationManager.getInstance().showNotification(
@@ -586,7 +509,7 @@ public class DiskDiagnosticView {
                 ToastType.INFO
         );
 
-        loadSelectedDriveDiagnostics();
+        viewModel.reloadCurrentDriveDiagnostics();
 
         // Simulate a mini diagnostic telemetry check into thermal and I/O graphs
         if (thermalGraph != null) {
@@ -604,4 +527,3 @@ public class DiskDiagnosticView {
         }
     }
 }
-
