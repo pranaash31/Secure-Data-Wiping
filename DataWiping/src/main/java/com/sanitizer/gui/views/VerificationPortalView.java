@@ -1,10 +1,8 @@
 package com.sanitizer.gui.views;
 
-import com.sanitizer.crypto.CryptoSigner;
-import com.sanitizer.db.AuditDb;
 import com.sanitizer.esg.EsgCalculator;
 import com.sanitizer.pdf.CertificateGenerator;
-import com.sanitizer.server.WebVerificationServer;
+import com.sanitizer.service.CertificateVerificationService;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
@@ -14,15 +12,13 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 
-import java.awt.Desktop;
 import java.io.File;
-import java.net.URI;
-import java.util.List;
 
 public class VerificationPortalView {
 
     private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(20);
+    private final CertificateVerificationService verificationService;
 
     private TextField txtTokenInput;
     private Label lblResultBadge;
@@ -42,6 +38,11 @@ public class VerificationPortalView {
     private String currentVerifyUrl = null;
 
     public VerificationPortalView() {
+        this(CertificateVerificationService.getInstance());
+    }
+
+    public VerificationPortalView(CertificateVerificationService verificationService) {
+        this.verificationService = verificationService != null ? verificationService : CertificateVerificationService.getInstance();
         buildUi();
     }
 
@@ -225,7 +226,7 @@ public class VerificationPortalView {
     }
 
     private void verifyPdfFile(File file) {
-        CertificateGenerator.CertificateVerificationResult result = CertificateGenerator.verifyPdfCertificate(file);
+        CertificateGenerator.CertificateVerificationResult result = verificationService.verifyPdfCertificate(file);
 
         if (result.isValid()) {
             lblResultBadge.setText("AUTHENTIC & VERIFIED");
@@ -252,100 +253,57 @@ public class VerificationPortalView {
 
         txtSignature.setText(result.digitalSignature() != null ? result.digitalSignature() : "No signature found");
 
-        AuditDb.AuditRecord mockRec = new AuditDb.AuditRecord(
-                1,
-                "2026-09-17 12:00:00",
-                result.driveModel() != null ? result.driveModel() : "USB Storage",
-                result.serialNumber() != null ? result.serialNumber() : "N/A",
-                result.capacity() != null ? result.capacity() : "N/A",
-                result.wipeStandard() != null ? result.wipeStandard() : "DoD 5220.22-M",
-                result.status() != null ? result.status() : "SUCCESS",
-                result.digitalSignature()
-        );
-        currentVerifyUrl = WebVerificationServer.generateVerificationUrl(mockRec);
-        btnOpenWebPortal.setDisable(false);
+        currentVerifyUrl = verificationService.generateVerificationUrl(result);
+        btnOpenWebPortal.setDisable(currentVerifyUrl == null);
     }
 
     private void handleTokenVerification() {
         String input = txtTokenInput.getText().trim();
         if (input.isBlank()) return;
 
-        // Try extracting parameters if input is a URL
-        String model = extractParam(input, "model");
-        String serial = extractParam(input, "serial");
-        String cap = extractParam(input, "cap");
-        String std = extractParam(input, "std");
-        String status = extractParam(input, "status");
-        String sig = extractParam(input, "sig");
-        String certId = extractParam(input, "certId");
+        var result = verificationService.verifyTokenUrl(input);
 
-        if (sig != null && !sig.isBlank() && model != null) {
-            String payload = model + "|" + serial + "|" + cap + "|" + std + "|" + status;
-            boolean isValid = CryptoSigner.verifySignature(payload, sig);
-
-            if (isValid) {
+        if (result.isFormatValid()) {
+            if (result.isValid()) {
                 lblResultBadge.setText("AUTHENTIC & VERIFIED");
                 lblResultBadge.getStyleClass().setAll("badge-success");
-                lblResultTitle.setText("✅ " + certId + " — AUTHENTIC");
+                lblResultTitle.setText("✅ " + result.certificateId() + " — AUTHENTIC");
                 lblResultDesc.setText("Cryptographic verification passed via Web Portal token.");
             } else {
                 lblResultBadge.setText("INVALID / TAMPERED");
                 lblResultBadge.getStyleClass().setAll("badge-danger");
-                lblResultTitle.setText("❌ " + certId + " — SIGNATURE MISMATCH");
+                lblResultTitle.setText("❌ " + result.certificateId() + " — SIGNATURE MISMATCH");
                 lblResultDesc.setText("Token signature mismatch or payload modified.");
             }
 
-            lblCertId.setText(certId != null ? certId : "SAN-CERT-TOKEN");
-            lblDeviceModel.setText(model);
-            lblSerial.setText(serial);
-            lblCapacity.setText(cap);
-            lblMethod.setText(std);
-            lblStatus.setText(status);
-            txtSignature.setText(sig);
+            lblCertId.setText(result.certificateId());
+            lblDeviceModel.setText(result.driveModel());
+            lblSerial.setText(result.serialNumber());
+            lblCapacity.setText(result.capacity());
+            lblMethod.setText(result.wipeStandard());
+            lblStatus.setText(result.status());
+            txtSignature.setText(result.digitalSignature());
 
-            EsgCalculator.EsgMetrics esg = EsgCalculator.calculate(cap);
+            EsgCalculator.EsgMetrics esg = result.esgMetrics();
             lblEsgFootprint.setText("🌱 ESG Sustainability Proof: Diverted ~" + String.format(java.util.Locale.US, "%.1f", esg.eWasteDivertedKg()) +
                     " kg e-waste | Avoided ~" + String.format(java.util.Locale.US, "%.1f", esg.co2EmissionsSavedKg()) + " kg CO₂ (Scope 3 GHG)");
 
-            currentVerifyUrl = input;
+            currentVerifyUrl = result.verificationUrl();
             btnOpenWebPortal.setDisable(false);
         } else {
             lblResultBadge.setText("FORMAT ERROR");
             lblResultBadge.getStyleClass().setAll("badge-warning");
-            lblResultDesc.setText("Could not parse verification parameters from token URL.");
-        }
-    }
-
-    private String extractParam(String query, String key) {
-        if (!query.contains(key + "=")) return "";
-        int start = query.indexOf(key + "=") + key.length() + 1;
-        int end = query.indexOf("&", start);
-        if (end == -1) end = query.length();
-        try {
-            return java.net.URLDecoder.decode(query.substring(start, end), java.nio.charset.StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            return query.substring(start, end);
+            lblResultDesc.setText(result.message());
         }
     }
 
     private void openWebPortalUrl() {
         if (currentVerifyUrl == null) return;
-        try {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(new URI(currentVerifyUrl));
-            }
-        } catch (Exception ignored) {}
+        verificationService.openInBrowser(currentVerifyUrl);
     }
 
     private void loadLatestAuditIfAvailable() {
-        List<AuditDb.AuditRecord> records = AuditDb.getAllRecords();
-        if (!records.isEmpty()) {
-            AuditDb.AuditRecord latest = records.get(0);
-            File certFile = new File("Sanitization_Certificate_" + latest.id() + ".pdf");
-            if (certFile.exists()) {
-                verifyPdfFile(certFile);
-            }
-        }
+        verificationService.findLatestCertificateFile().ifPresent(this::verifyPdfFile);
     }
 
     private void addGridRow(GridPane grid, int row, String lbl1, Label val1, String lbl2, Label val2) {

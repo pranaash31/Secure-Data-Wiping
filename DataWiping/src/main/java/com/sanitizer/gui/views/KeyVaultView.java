@@ -34,6 +34,11 @@ public class KeyVaultView {
     private Label certAgencyPreview;
 
     public KeyVaultView() {
+        this(KeyManagementService.getInstance());
+    }
+
+    public KeyVaultView(KeyManagementService keyManagementService) {
+        this.keyManagementService = keyManagementService != null ? keyManagementService : KeyManagementService.getInstance();
         buildUi();
     }
 
@@ -93,7 +98,7 @@ public class KeyVaultView {
         lblCreatedValue = new Label("2025-01-01 09:00:00 UTC");
         lblCreatedValue.getStyleClass().add("settings-value-label");
 
-        lblFingerprintValue = new Label(CryptoSigner.getPublicKeyFingerprint());
+        lblFingerprintValue = new Label(keyManagementService.getPublicKeyFingerprint());
         lblFingerprintValue.getStyleClass().add("settings-value-label");
 
         Object[][] keyData = {
@@ -276,11 +281,11 @@ public class KeyVaultView {
         confirm.setContentText(I18n.get("dialog.keyvault.rotate.content"));
 
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
-            CryptoSigner.rotateKeyPair();
-            String newKeyId = "SE-KEY-" + (System.currentTimeMillis() / 1000);
+            keyManagementService.rotateKeyPair();
+            String newKeyId = keyManagementService.generateKeyId();
             lblKeyIdValue.setText(newKeyId);
             lblCreatedValue.setText("NOW (Active)");
-            lblFingerprintValue.setText(CryptoSigner.getPublicKeyFingerprint());
+            lblFingerprintValue.setText(keyManagementService.getPublicKeyFingerprint());
 
             SecurityAuditLogger.logKeyAction(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "ROTATED_KEYPAIR", newKeyId);
 
@@ -303,18 +308,8 @@ public class KeyVaultView {
         File file = chooser.showSaveDialog(rootContainer.getScene() != null ? rootContainer.getScene().getWindow() : null);
 
         if (file != null) {
-            try (FileWriter writer = new FileWriter(file)) {
-                String pemContent;
-                if ("PUBLIC KEY".equalsIgnoreCase(keyType)) {
-                    pemContent = CryptoSigner.getPublicKeyPem();
-                } else if ("PRIVATE KEY".equalsIgnoreCase(keyType)) {
-                    pemContent = CryptoSigner.getPrivateKeyPem();
-                } else {
-                    pemContent = "-----BEGIN " + keyType + "-----\n" +
-                            CryptoSigner.signData("KEY_EXPORT_" + defaultName) + "\n" +
-                            "-----END " + keyType + "-----\n";
-                }
-                writer.write(pemContent);
+            try {
+                keyManagementService.exportKeyToFile(file, keyType, defaultName);
 
                 SecurityAuditLogger.logKeyAction(nav.getOfficerName(), nav.getAgencyId(), nav.getRole(), "EXPORTED_" + keyType.toUpperCase(), file.getAbsolutePath());
 
