@@ -25,5 +25,9 @@ class WipingViewTest {
 
         assertThat(view).isNotNull();
         assertThat(view.getRoot()).isNotNull();
+        assertThat(view.isListening()).isTrue();
+
+        view.dispose();
+        assertThat(view.isListening()).isFalse();
     }
 }

@@ -70,10 +70,36 @@ public class BatchWipeView {
     // Real-time telemetry snapshot per drive
     private final Map<String, WipeMetrics> liveMetricsMap = new ConcurrentHashMap<>();
 
+    private final java.util.function.Consumer<java.util.List<UsbDetector.UsbDriveInfo>> usbListener =
+            drives -> Platform.runLater(this::refreshQueue);
+    private boolean isListening = false;
+
+    public synchronized void startListening() {
+        if (!isListening) {
+            UsbDetector.registerListener(usbListener);
+            isListening = true;
+        }
+    }
+
+    public synchronized void stopListening() {
+        if (isListening) {
+            UsbDetector.unregisterListener(usbListener);
+            isListening = false;
+        }
+    }
+
+    public synchronized boolean isListening() {
+        return isListening;
+    }
+
+    public void dispose() {
+        stopListening();
+    }
+
     public BatchWipeView() {
         buildUi();
         refreshQueue();
-        UsbDetector.registerListener(drives -> Platform.runLater(this::refreshQueue));
+        startListening();
     }
 
     public Parent getRoot() {
@@ -82,6 +108,16 @@ public class BatchWipeView {
 
     private void buildUi() {
         rootContainer.setPadding(new Insets(24, 28, 28, 28));
+
+        // Lifecycle management: unregister USB hardware listener when navigating away,
+        // and re-register when view is attached to an active scene.
+        rootContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                startListening();
+            } else {
+                stopListening();
+            }
+        });
 
         // ── Header ──────────────────────────────────────────────────────
         HBox header = new HBox(16);

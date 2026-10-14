@@ -73,10 +73,36 @@ public class WipingView {
     private ThermalGraphComponent thermalGraph;
     private TextArea txtLogOutput;
 
+    private final java.util.function.Consumer<java.util.List<UsbDetector.UsbDriveInfo>> usbListener =
+            drives -> Platform.runLater(() -> updateDriveList(drives));
+    private boolean isListening = false;
+
+    public synchronized void startListening() {
+        if (!isListening) {
+            UsbDetector.registerListener(usbListener);
+            isListening = true;
+        }
+    }
+
+    public synchronized void stopListening() {
+        if (isListening) {
+            UsbDetector.unregisterListener(usbListener);
+            isListening = false;
+        }
+    }
+
+    public synchronized boolean isListening() {
+        return isListening;
+    }
+
+    public void dispose() {
+        stopListening();
+    }
+
     public WipingView() {
         buildUi();
         refreshDriveList();
-        UsbDetector.registerListener(drives -> Platform.runLater(() -> updateDriveList(drives)));
+        startListening();
     }
 
     public Parent getRoot() {
@@ -92,14 +118,18 @@ public class WipingView {
 
         rootContainer.setPadding(new Insets(24));
 
-        // Global keyboard shortcuts: F5 = refresh drives
-        rootContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
+        // Lifecycle management: unregister USB hardware listener when navigating away,
+        // and re-register when view is attached to an active scene.
+        scrollRoot.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
+                startListening();
                 newScene.setOnKeyPressed(ev -> {
                     if (ev.getCode() == KeyCode.F5) {
                         refreshDriveList();
                     }
                 });
+            } else {
+                stopListening();
             }
         });
 
