@@ -1,10 +1,8 @@
-package com.sanitizer.gui.views;
-
 import com.sanitizer.audit.SecurityAuditLogger;
-import com.sanitizer.crypto.CryptoSigner;
 import com.sanitizer.gui.components.ToastNotification.ToastType;
 import com.sanitizer.gui.navigation.NavigationManager;
 import com.sanitizer.i18n.I18n;
+import com.sanitizer.service.KeyManagementService;
 import com.sanitizer.session.UserRole;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -14,12 +12,12 @@ import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 
 public class KeyVaultView {
 
     private final VBox rootContainer = new VBox(24);
+    private final KeyManagementService keyManagementService;
 
     private Label lblFingerprintValue;
     private Label lblKeyIdValue;
