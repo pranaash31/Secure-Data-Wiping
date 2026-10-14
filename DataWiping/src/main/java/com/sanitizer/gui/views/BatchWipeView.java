@@ -20,6 +20,7 @@ import com.sanitizer.service.WorkflowRequest;
 import com.sanitizer.service.WorkflowResult;
 import com.sanitizer.shield.WorkerPoolGovernor;
 import com.sanitizer.util.SoundManager;
+import com.sanitizer.gui.navigation.ViewLifecycle;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -35,7 +36,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
-public class BatchWipeView {
+public class BatchWipeView implements ViewLifecycle {
 
     private final VBox rootContainer = new VBox(18);
     private VBox driveQueueContainer;
@@ -92,8 +93,19 @@ public class BatchWipeView {
         return isListening;
     }
 
-    public void dispose() {
+    @Override
+    public void onActivated() {
+        startListening();
+        refreshQueue();
+    }
+
+    @Override
+    public void onDeactivated() {
         stopListening();
+    }
+
+    public void dispose() {
+        onDeactivated();
     }
 
     public BatchWipeView() {

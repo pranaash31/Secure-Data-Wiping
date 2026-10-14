@@ -22,11 +22,13 @@ import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 
+import com.sanitizer.gui.navigation.ViewLifecycle;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class DashboardView {
+public class DashboardView implements ViewLifecycle {
 
     private static final String MODULE = "DashboardView";
 
@@ -57,6 +59,16 @@ public class DashboardView {
 
     public Parent getRoot() {
         return scrollRoot;
+    }
+
+    @Override
+    public void onActivated() {
+        refreshData();
+    }
+
+    @Override
+    public void onDeactivated() {
+        // No background polling tasks in DashboardView
     }
 
     @SuppressWarnings("unchecked")

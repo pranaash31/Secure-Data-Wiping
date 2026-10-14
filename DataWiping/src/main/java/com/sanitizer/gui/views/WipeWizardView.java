@@ -21,6 +21,8 @@ import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 
+import com.sanitizer.gui.navigation.ViewLifecycle;
+
 import java.io.File;
 import java.util.List;
 
@@ -30,7 +32,7 @@ import java.util.List;
  * automated health checks, plain-language policy recommendations, explicit confirmations,
  * live execution telemetry, and instant PDF compliance certificates.
  */
-public class WipeWizardView {
+public class WipeWizardView implements ViewLifecycle {
 
     private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(24);
@@ -81,6 +83,19 @@ public class WipeWizardView {
 
     public Parent getRoot() {
         return scrollRoot;
+    }
+
+    @Override
+    public void onActivated() {
+        // Refresh step state or connected drives on activation
+        if (currentStep == 1) {
+            refreshStepView();
+        }
+    }
+
+    @Override
+    public void onDeactivated() {
+        // Cancel timers/active listeners if wizard is abandoned
     }
 
     private void buildUi() {

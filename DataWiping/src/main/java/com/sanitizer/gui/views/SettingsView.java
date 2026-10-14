@@ -11,11 +11,13 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.*;
 
+import com.sanitizer.gui.navigation.ViewLifecycle;
+
 /**
  * SettingsView acts solely as the master layout container assembling modular,
  * domain-specific settings cards into a responsive enterprise configuration dashboard.
  */
-public class SettingsView {
+public class SettingsView implements ViewLifecycle {
 
     private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(24);
@@ -32,6 +34,16 @@ public class SettingsView {
 
     public Parent getRoot() {
         return scrollRoot;
+    }
+
+    @Override
+    public void onActivated() {
+        // Reload configuration if needed
+    }
+
+    @Override
+    public void onDeactivated() {
+        // Cleanup if any
     }
 
     private void buildUi() {

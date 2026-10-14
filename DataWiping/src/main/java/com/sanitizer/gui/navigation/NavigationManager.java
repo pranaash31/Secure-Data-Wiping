@@ -65,14 +65,18 @@ public class NavigationManager {
     private SessionContext sessionContext;
     private boolean isAuthenticated = false;
 
-    // View Node Cache (ViewKey -> Root Node)
-    private final Map<String, Node> viewCache = new HashMap<>();
+    // Active View Lifecycle Hook
+    private ViewLifecycle activeViewLifecycle;
+
+    /**
+     * View entry holding a JavaFX Node scene root and its associated lifecycle hook.
+     */
+    public record ViewEntry(Node rootNode, ViewLifecycle lifecycle) {}
 
     private NavigationManager() {
-        // When locale changes, invalidate cached views and refresh current active view
+        // When locale changes, refresh current active view with fresh localized components
         I18n.addListener(locale -> {
             if (isAuthenticated && mainLayout != null) {
-                viewCache.clear();
                 navigateTo(currentActiveView);
                 if (primaryStage != null) {
                     primaryStage.setTitle(I18n.get("app.title") + " — " + I18n.get("topbar.badge") + " | " + getOfficerName());
@@ -159,9 +163,16 @@ public class NavigationManager {
 
     // ── Login ────────────────────────────────────────────────────────────────
     public void showLoginView() {
+        if (activeViewLifecycle != null) {
+            try {
+                activeViewLifecycle.onDeactivated();
+            } catch (Exception e) {
+                AppLogger.warn(MODULE, "Error deactivating view on login transition: " + e.getMessage());
+            }
+            activeViewLifecycle = null;
+        }
         this.isAuthenticated = false;
         this.sessionContext = null;
-        this.viewCache.clear();
         Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
         LoginView loginView = new LoginView(this);
         Parent root = loginView.getRoot();
@@ -337,34 +348,102 @@ public class NavigationManager {
             return;
         }
 
-        this.currentActiveView = key;
-        Node viewNode = viewCache.get(key);
-
-        if (viewNode == null) {
-            AppLogger.info(MODULE, "Instantiating view: " + key);
-            viewNode = createViewNode(key);
-            viewCache.put(key, viewNode);
-        } else {
-            AppLogger.info(MODULE, "Loaded view from cache: " + key);
+        // Deactivate outgoing view before transitioning to cleanly detach listeners & cancel timers
+        if (activeViewLifecycle != null) {
+            try {
+                activeViewLifecycle.onDeactivated();
+            } catch (Exception e) {
+                AppLogger.warn(MODULE, "Error deactivating view [" + currentActiveView + "]: " + e.getMessage());
+            }
+            activeViewLifecycle = null;
         }
 
-        mainLayout.setContent(viewNode, key);
+        this.currentActiveView = key;
+        AppLogger.info(MODULE, "Instantiating fresh view via ViewLifecycle factory: " + key);
+        ViewEntry entry = createViewEntry(key);
+
+        mainLayout.setContent(entry.rootNode(), key);
+
+        if (entry.lifecycle() != null) {
+            this.activeViewLifecycle = entry.lifecycle();
+            try {
+                this.activeViewLifecycle.onActivated();
+            } catch (Exception e) {
+                AppLogger.warn(MODULE, "Error activating view [" + key + "]: " + e.getMessage());
+            }
+        }
     }
 
-    private Node createViewNode(String key) {
+    /**
+     * View Factory instantiating fresh views with their lifecycle hooks.
+     * Eliminates static UI scene graph caching and memory retention.
+     */
+    public ViewEntry createViewEntry(String key) {
         return switch (key) {
-            case "dashboard"   -> new DashboardView().getRoot();
-            case "wizard", "wipewizard" -> new WipeWizardView().getRoot();
-            case "wiping"      -> new WipingView().getRoot();
-            case "batchwipe"   -> new BatchWipeView().getRoot();
-            case "diagnostics" -> new DiskDiagnosticView().getRoot();
-            case "clients"     -> new ClientManagerView().getRoot();
-            case "keyvault"     -> new KeyVaultView().getRoot();
-            case "audit"        -> new AuditView().getRoot();
-            case "verify", "verification" -> new VerificationPortalView().getRoot();
-            case "settings"     -> new SettingsView().getRoot();
-            default            -> new DashboardView().getRoot();
+            case "dashboard"   -> {
+                DashboardView v = new DashboardView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
+            case "wizard", "wipewizard" -> {
+                WipeWizardView v = new WipeWizardView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
+            case "wiping"      -> {
+                WipingView v = new WipingView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
+            case "batchwipe"   -> {
+                BatchWipeView v = new BatchWipeView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
+            case "diagnostics" -> {
+                DiskDiagnosticView v = new DiskDiagnosticView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
+            case "clients"     -> {
+                ClientManagerView v = new ClientManagerView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
+            case "keyvault"    -> {
+                KeyVaultView v = new KeyVaultView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
+            case "audit"       -> {
+                AuditView v = new AuditView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
+            case "verify", "verification" -> {
+                VerificationPortalView v = new VerificationPortalView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
+            case "settings"    -> {
+                SettingsView v = new SettingsView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
+            default            -> {
+                DashboardView v = new DashboardView();
+                yield new ViewEntry(v.getRoot(), v);
+            }
         };
+    }
+
+    public Node createViewNode(String key) {
+        return createViewEntry(key).rootNode();
+    }
+
+    public ViewLifecycle getActiveViewLifecycle() {
+        return activeViewLifecycle;
+    }
+
+    public void clearViewCache() {
+        if (activeViewLifecycle != null) {
+            try {
+                activeViewLifecycle.onDeactivated();
+            } catch (Exception e) {
+                AppLogger.warn(MODULE, "Error deactivating view on clearViewCache: " + e.getMessage());
+            }
+            activeViewLifecycle = null;
+        }
     }
 
     public void showAccessDeniedDialog(String resourceName, String requiredRole) {
@@ -427,6 +506,16 @@ public class NavigationManager {
             return;
         }
         AppLogger.info(MODULE, "=== INITIATING GRACEFUL APPLICATION SHUTDOWN ===");
+
+        // 0. Deactivate active view lifecycle if mounted
+        if (activeViewLifecycle != null) {
+            try {
+                activeViewLifecycle.onDeactivated();
+            } catch (Exception e) {
+                AppLogger.warn(MODULE, "Error deactivating view during shutdown: " + e.getMessage());
+            }
+            activeViewLifecycle = null;
+        }
 
         // 1. Stop UI Inactivity Timeline Monitor
         try {

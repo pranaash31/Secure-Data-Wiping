@@ -38,10 +38,12 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
+import com.sanitizer.gui.navigation.ViewLifecycle;
+
 import java.util.List;
 import java.util.Optional;
 
-public class WipingView {
+public class WipingView implements ViewLifecycle {
 
     private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(20);
@@ -95,8 +97,19 @@ public class WipingView {
         return isListening;
     }
 
-    public void dispose() {
+    @Override
+    public void onActivated() {
+        startListening();
+        refreshDriveList();
+    }
+
+    @Override
+    public void onDeactivated() {
         stopListening();
+    }
+
+    public void dispose() {
+        onDeactivated();
     }
 
     public WipingView() {

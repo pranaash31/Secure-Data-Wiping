@@ -13,10 +13,12 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 
+import com.sanitizer.gui.navigation.ViewLifecycle;
+
 import java.io.File;
 import java.io.IOException;
 
-public class KeyVaultView {
+public class KeyVaultView implements ViewLifecycle {
 
     private final VBox rootContainer = new VBox(24);
     private final KeyManagementService keyManagementService;
@@ -46,6 +48,18 @@ public class KeyVaultView {
 
     public Parent getRoot() {
         return rootContainer;
+    }
+
+    @Override
+    public void onActivated() {
+        if (lblFingerprintValue != null) {
+            lblFingerprintValue.setText(keyManagementService.getPublicKeyFingerprint());
+        }
+    }
+
+    @Override
+    public void onDeactivated() {
+        // No background tasks
     }
 
     private void buildUi() {

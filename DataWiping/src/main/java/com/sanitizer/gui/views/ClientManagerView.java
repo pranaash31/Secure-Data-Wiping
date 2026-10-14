@@ -16,7 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class ClientManagerView {
+import com.sanitizer.gui.navigation.ViewLifecycle;
+
+public class ClientManagerView implements ViewLifecycle {
 
     public static class ClientRecord {
         public String name;
@@ -51,6 +53,16 @@ public class ClientManagerView {
 
     public Parent getRoot() {
         return rootContainer;
+    }
+
+    @Override
+    public void onActivated() {
+        // Refresh client data if needed
+    }
+
+    @Override
+    public void onDeactivated() {
+        // Cleanup if any
     }
 
     private void initDefaultData() {

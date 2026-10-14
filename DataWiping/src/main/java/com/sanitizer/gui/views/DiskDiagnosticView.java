@@ -12,13 +12,14 @@ import com.sanitizer.gui.viewmodel.DiskDiagnosticViewModel;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
+import com.sanitizer.gui.navigation.ViewLifecycle;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 
-public class DiskDiagnosticView {
+public class DiskDiagnosticView implements ViewLifecycle {
 
     private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(22);
@@ -99,8 +100,19 @@ public class DiskDiagnosticView {
         return viewModel;
     }
 
-    public void dispose() {
+    @Override
+    public void onActivated() {
+        viewModel.startListening();
+        viewModel.refreshDrives();
+    }
+
+    @Override
+    public void onDeactivated() {
         viewModel.stopListening();
+    }
+
+    public void dispose() {
+        onDeactivated();
     }
 
     @SuppressWarnings("unchecked")

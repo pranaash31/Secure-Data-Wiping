@@ -23,11 +23,13 @@ import javafx.scene.layout.*;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 
+import com.sanitizer.gui.navigation.ViewLifecycle;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AuditView {
+public class AuditView implements ViewLifecycle {
 
     private final VBox rootContainer = new VBox(16);
     private final AuditService auditService;
@@ -56,6 +58,17 @@ public class AuditView {
 
     public Parent getRoot() {
         return rootContainer;
+    }
+
+    @Override
+    public void onActivated() {
+        loadAuditHistory();
+        loadSecurityHistory();
+    }
+
+    @Override
+    public void onDeactivated() {
+        // No background polling in AuditView
     }
 
     private void buildUi() {

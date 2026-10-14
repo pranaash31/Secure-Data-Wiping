@@ -14,7 +14,9 @@ import javafx.stage.FileChooser;
 
 import java.io.File;
 
-public class VerificationPortalView {
+import com.sanitizer.gui.navigation.ViewLifecycle;
+
+public class VerificationPortalView implements ViewLifecycle {
 
     private final ScrollPane scrollRoot = new ScrollPane();
     private final VBox rootContainer = new VBox(20);
@@ -48,6 +50,16 @@ public class VerificationPortalView {
 
     public Parent getRoot() {
         return scrollRoot;
+    }
+
+    @Override
+    public void onActivated() {
+        loadLatestAuditIfAvailable();
+    }
+
+    @Override
+    public void onDeactivated() {
+        // No background tasks
     }
 
     private void buildUi() {
