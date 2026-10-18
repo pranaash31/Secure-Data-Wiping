@@ -7,8 +7,12 @@ import com.sanitizer.policy.WipePolicyManager;
 import com.sanitizer.util.AppLogger;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -40,6 +44,7 @@ public class WipeEngine {
 
     private static final Map<String, Future<Boolean>> activeWipeTasks = new ConcurrentHashMap<>();
     private static final Map<String, Process> activeDdProcesses = new ConcurrentHashMap<>();
+    private static final Map<String, Thread> activeFeederThreads = new ConcurrentHashMap<>();
 
     public enum WipeStandard {
         NIST_800_88_CLEAR, // 1 Pass (0x00 Zero Fill)
@@ -125,6 +130,7 @@ public class WipeEngine {
                     policy.getOrganization(), policy.getPatternSummary()));
 
             double passSlice = 100.0 / totalPasses;
+            int lastPatternByte = 0x00; // Tracks previous byte for COMPLEMENT passes
 
             for (int i = 0; i < totalPasses; i++) {
                 WipePass pass = passes.get(i);
@@ -132,9 +138,9 @@ public class WipeEngine {
                 double startPct = i * passSlice;
                 double endPct = (i + 1) * passSlice;
 
-                String sourcePath = "/dev/zero";
-                if (pass.getPatternType() == WipePatternType.PSEUDO_RANDOM) {
-                    sourcePath = "/dev/urandom";
+                int effectiveByte = resolveEffectiveByte(pass, lastPatternByte);
+                if (effectiveByte >= 0) {
+                    lastPatternByte = effectiveByte;
                 }
 
                 log(logCallback, String.format("[%s] Pass %d/%d: %s (%s)...",
@@ -142,7 +148,8 @@ public class WipeEngine {
 
                 boolean passSuccess = runDdCommand(
                         systemPath,
-                        sourcePath,
+                        pass,
+                        effectiveByte,
                         targetBytes,
                         isTestMode,
                         currentPass,
@@ -248,8 +255,13 @@ public class WipeEngine {
     public static boolean cancelWipeTask(String systemPath) {
         Future<Boolean> future = activeWipeTasks.remove(systemPath);
         Process proc = activeDdProcesses.remove(systemPath);
+        Thread feeder = activeFeederThreads.remove(systemPath);
 
         boolean cancelled = false;
+
+        if (feeder != null && feeder.isAlive()) {
+            feeder.interrupt();
+        }
 
         if (proc != null && proc.isAlive()) {
             AppLogger.info(MODULE, "Terminating active dd process for " + systemPath);
@@ -290,19 +302,54 @@ public class WipeEngine {
         if (logCallback != null) logCallback.accept(msg);
     }
 
-    private static boolean runDdCommand(String systemPath, String sourcePath, long targetBytes, boolean isTestMode,
+    /**
+     * Resolves the concrete single-byte value for passes that write fixed or complemented bytes.
+     * Returns -1 for non-deterministic patterns (such as CSPRNG random).
+     */
+    public static int resolveEffectiveByte(WipePass pass, int prevByte) {
+        if (pass == null) return 0x00;
+        return switch (pass.getPatternType()) {
+            case ZERO_FILL -> 0x00;
+            case ONE_FILL -> 0xFF;
+            case CUSTOM_BYTE -> pass.getCustomByteValue() & 0xFF;
+            case COMPLEMENT -> (~prevByte) & 0xFF;
+            case PSEUDO_RANDOM -> -1;
+        };
+    }
+
+    private static boolean runDdCommand(String systemPath, WipePass pass, int effectiveByte, long targetBytes, boolean isTestMode,
                                         int currentPass, int totalPasses, String passName,
                                         Consumer<WipeMetrics> metricsCallback, Consumer<String> logCallback,
                                         Consumer<com.sanitizer.quarantine.LbaFailureRecord> badSectorCallback,
                                         double startPct, double endPct) {
         List<String> command = new ArrayList<>();
         command.add("dd");
-        command.add("if=" + sourcePath);
+
+        boolean useFeeder = false;
+        boolean isRandomPattern = false;
+        byte fillByte = 0;
+
+        WipePatternType patternType = (pass != null) ? pass.getPatternType() : WipePatternType.ZERO_FILL;
+
+        if (patternType == WipePatternType.ZERO_FILL && new File("/dev/zero").exists()) {
+            command.add("if=/dev/zero");
+        } else if (patternType == WipePatternType.PSEUDO_RANDOM && new File("/dev/urandom").exists()) {
+            command.add("if=/dev/urandom");
+        } else if (patternType == WipePatternType.PSEUDO_RANDOM) {
+            useFeeder = true;
+            isRandomPattern = true;
+        } else {
+            // ONE_FILL (0xFF), CUSTOM_BYTE (e.g. 0x96, 0xAA), COMPLEMENT, or ZERO_FILL when /dev/zero is absent
+            useFeeder = true;
+            fillByte = (byte) (effectiveByte & 0xFF);
+        }
+
         command.add("of=" + systemPath);
         command.add("bs=2m");
 
-        if (isTestMode) {
-            command.add("count=500"); // 1 GB cap for fast testing
+        if (isTestMode && !useFeeder) {
+            long blocks = Math.max(1, targetBytes / (2 * 1024 * 1024));
+            command.add("count=" + blocks);
         }
 
         command.add("status=progress");
@@ -317,12 +364,48 @@ public class WipeEngine {
             Process process = pb.start();
 
             activeDdProcesses.put(systemPath, process);
+
+            Thread feederThread = null;
+            if (useFeeder) {
+                final boolean randomFeeder = isRandomPattern;
+                final byte patternByte = fillByte;
+                final long wipeTarget = targetBytes;
+                feederThread = new Thread(() -> {
+                    try (OutputStream os = process.getOutputStream()) {
+                        byte[] chunk = new byte[2 * 1024 * 1024];
+                        if (!randomFeeder) {
+                            Arrays.fill(chunk, patternByte);
+                        }
+                        long remaining = wipeTarget;
+                        while (remaining > 0 && process.isAlive() && !Thread.currentThread().isInterrupted()) {
+                            int toWrite = (int) Math.min(chunk.length, remaining);
+                            if (randomFeeder) {
+                                java.util.concurrent.ThreadLocalRandom.current().nextBytes(chunk);
+                            }
+                            os.write(chunk, 0, toWrite);
+                            remaining -= toWrite;
+                        }
+                        os.flush();
+                    } catch (IOException ignored) {
+                        // Normal termination when process closes input or exits
+                    }
+                }, "WipeEngine-PatternFeeder-" + systemPath);
+                feederThread.setDaemon(true);
+                activeFeederThreads.put(systemPath, feederThread);
+                feederThread.start();
+            } else {
+                try {
+                    process.getOutputStream().close();
+                } catch (IOException ignored) {}
+            }
+
             com.sanitizer.detector.ThermalThrottleController throttleController = new com.sanitizer.detector.ThermalThrottleController();
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     if (Thread.currentThread().isInterrupted()) {
+                        if (feederThread != null) feederThread.interrupt();
                         process.destroyForcibly();
                         return false;
                     }
@@ -397,6 +480,7 @@ public class WipeEngine {
                             try {
                                 Thread.sleep(1000);
                             } catch (InterruptedException ie) {
+                                if (feederThread != null) feederThread.interrupt();
                                 process.destroyForcibly();
                                 return false;
                             }
@@ -435,6 +519,7 @@ public class WipeEngine {
                         try {
                             Thread.sleep(throttleDecision.delayMillis());
                         } catch (InterruptedException ie) {
+                            if (feederThread != null) feederThread.interrupt();
                             process.destroyForcibly();
                             return false;
                         }
@@ -489,6 +574,16 @@ public class WipeEngine {
                 }
             } finally {
                 activeDdProcesses.remove(systemPath);
+                activeFeederThreads.remove(systemPath);
+                if (feederThread != null && feederThread.isAlive()) {
+                    feederThread.interrupt();
+                }
+            }
+
+            if (feederThread != null) {
+                try {
+                    feederThread.join(2000);
+                } catch (InterruptedException ignored) {}
             }
 
             return process.waitFor() == 0;
@@ -527,6 +622,15 @@ public class WipeEngine {
      */
     public static synchronized void shutdown() {
         AppLogger.info(MODULE, "Shutting down WipeEngine background workers...");
+        for (Thread feeder : activeFeederThreads.values()) {
+            try {
+                if (feeder != null && feeder.isAlive()) {
+                    feeder.interrupt();
+                }
+            } catch (Exception ignored) {}
+        }
+        activeFeederThreads.clear();
+
         for (Map.Entry<String, Process> entry : activeDdProcesses.entrySet()) {
             try {
                 if (entry.getValue() != null && entry.getValue().isAlive()) {
