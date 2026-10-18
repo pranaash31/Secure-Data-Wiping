@@ -153,6 +153,7 @@ public class SanitizationWorkflowService implements SanitizationService {
                     request.systemPath(),
                     request.sizeBytes(),
                     request.verificationMode(),
+                    request.policy(),
                     request.isTestMode(),
                     callbacks.verificationProgressCallback(),
                     callbacks.logCallback()
