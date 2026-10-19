@@ -72,13 +72,7 @@ public class SystemDiskShield {
                     String.format("CRITICAL SAFETY SHIELD: Primary Windows boot volume (%s) protected!", systemPath));
         }
 
-        // Root/Boot Linux drive patterns
-        if (norm.equals("/dev/sda") || norm.startsWith("/dev/sda") || norm.equals("/dev/nvme0n1") || norm.startsWith("/dev/nvme0n1p")) {
-            return SafetyVerdict.blocked(systemPath,
-                    String.format("CRITICAL SAFETY SHIELD: Primary Linux root/boot drive (%s) protected!", systemPath));
-        }
-
-        // 3. Deep Live Mount Inspection via OSHI
+        // 3. Deep Live Mount Inspection via OSHI (Protects whichever drive hosts root /, /boot, etc.)
         try {
             OperatingSystem os = new SystemInfo().getOperatingSystem();
             List<OSFileStore> fileStores = os.getFileSystem().getFileStores();
@@ -108,6 +102,25 @@ public class SystemDiskShield {
             }
         } catch (Exception e) {
             AppLogger.warn(MODULE, "Mount inspection fallback warning: " + e.getMessage());
+        }
+
+        // 3b. Linux /proc/mounts fallback
+        File procMounts = new File("/proc/mounts");
+        if (procMounts.exists() && procMounts.canRead()) {
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(procMounts))) {
+                String line;
+                String targetBaseDisk = extractBaseDiskIdentifier(norm);
+                while ((line = reader.readLine()) != null) {
+                    String[] parts = line.split("\\s+");
+                    if (parts.length >= 2 && isCriticalMount(parts[1])) {
+                        String volBaseDisk = extractBaseDiskIdentifier(parts[0]);
+                        if (!targetBaseDisk.isEmpty() && targetBaseDisk.equalsIgnoreCase(volBaseDisk)) {
+                            return SafetyVerdict.blocked(systemPath,
+                                    String.format("CRITICAL SAFETY SHIELD: Storage device hosts active OS mount [%s -> %s]!", parts[1], parts[0]));
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
         }
 
         // 4. File Root Directory Fallback

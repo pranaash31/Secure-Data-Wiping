@@ -31,38 +31,63 @@ class UsbDetectorTest {
     }
 
     @Test
-    @DisplayName("Pen Drive Size Filter accepts valid range (1 GB to 128 GB)")
+    @DisplayName("Drive Size Filter accepts valid range including multi-terabyte external drives (No 128 GB cap)")
     void testValidPenDriveSizeFilter() {
         long minSizeBytes = 1L * 1024 * 1024 * 1024; // 1 GB
         long midSizeBytes = 32L * 1024 * 1024 * 1024; // 32 GB
-        long maxSizeBytes = 128L * 1024 * 1024 * 1024; // 128 GB
+        long largeSizeBytes = 500L * 1024 * 1024 * 1024; // 500 GB External SSD
+        long tbSizeBytes = 2L * 1024 * 1024 * 1024 * 1024; // 2 TB External SSD
 
         assertThat(UsbDetector.isValidPenDriveSize(minSizeBytes)).isTrue();
         assertThat(UsbDetector.isValidPenDriveSize(midSizeBytes)).isTrue();
-        assertThat(UsbDetector.isValidPenDriveSize(maxSizeBytes)).isTrue();
+        assertThat(UsbDetector.isValidPenDriveSize(largeSizeBytes)).isTrue();
+        assertThat(UsbDetector.isValidPenDriveSize(tbSizeBytes)).isTrue();
     }
 
     @Test
-    @DisplayName("Pen Drive Size Filter rejects sizes out of range (<1 GB or >128 GB)")
+    @DisplayName("Drive Size Filter rejects invalid sizes (<= 0 or below minimum threshold)")
     void testInvalidPenDriveSizeFilter() {
-        long tooSmall = 500L * 1024 * 1024; // 500 MB
-        long tooLarge = 500L * 1024 * 1024 * 1024; // 500 GB (External HDD / NVMe)
+        long zeroSize = 0L;
+        long negativeSize = -1L;
+        long tooSmall = 50L * 1024 * 1024; // 50 MB (below 100 MB threshold)
 
+        assertThat(UsbDetector.isValidPenDriveSize(zeroSize)).isFalse();
+        assertThat(UsbDetector.isValidPenDriveSize(negativeSize)).isFalse();
         assertThat(UsbDetector.isValidPenDriveSize(tooSmall)).isFalse();
-        assertThat(UsbDetector.isValidPenDriveSize(tooLarge)).isFalse();
     }
 
-    @ParameterizedTest(name = "System drive or internal SSD candidate: name={0}, model={0} is blocked")
+    @ParameterizedTest(name = "Internal host hardware: {0} is blocked")
     @ValueSource(strings = {
             "disk0",
             "Apple Macintosh HD",
             "Internal NVMe SSD",
-            "SATA Primary Drive",
-            "APFS System Container"
+            "Apple Internal Storage"
     })
     void testSystemOrSsdDiskFilterBlocksInternalDrives(String systemIdentifier) {
         boolean isSystemDisk = UsbDetector.isSystemOrSsdDisk(systemIdentifier, systemIdentifier, systemIdentifier);
         assertThat(isSystemDisk).isTrue();
+    }
+
+    @ParameterizedTest(name = "External USB SSD or SATA candidate: {0} is NOT blocked by keywords")
+    @ValueSource(strings = {
+            "SanDisk Extreme Portable SSD",
+            "Crucial MX500 SATA SSD",
+            "Samsung Portable SSD T7",
+            "Kingston External SATA Dock",
+            "WD My Passport SSD"
+    })
+    void testExternalUsbSsdAndSataNotBlockedByKeywords(String externalCandidate) {
+        boolean isSystemDisk = UsbDetector.isSystemOrSsdDisk("/dev/rdisk4", externalCandidate, "EXT-SERIAL-1234");
+        assertThat(isSystemDisk).isFalse();
+    }
+
+    @Test
+    @DisplayName("Disk size formatter correctly formats gigabytes and terabytes")
+    void testFormatDiskSize() {
+        assertThat(UsbDetector.formatDiskSize(32L * 1024 * 1024 * 1024)).isEqualTo("32 GB");
+        assertThat(UsbDetector.formatDiskSize(500L * 1024 * 1024 * 1024)).isEqualTo("500 GB");
+        assertThat(UsbDetector.formatDiskSize(1024L * 1024 * 1024 * 1024)).isEqualTo("1.0 TB");
+        assertThat(UsbDetector.formatDiskSize(2048L * 1024 * 1024 * 1024)).isEqualTo("2.0 TB");
     }
 
     @Test

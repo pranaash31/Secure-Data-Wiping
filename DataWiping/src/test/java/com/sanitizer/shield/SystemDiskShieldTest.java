@@ -22,11 +22,7 @@ class SystemDiskShieldTest {
             "PhysicalDrive0",
             "C:",
             "c:\\",
-            "C:\\Windows",
-            "/dev/sda",
-            "/dev/sda1",
-            "/dev/nvme0n1",
-            "/dev/nvme0n1p1"
+            "C:\\Windows"
     })
     void testBlockedSystemDiskPatterns(String path) {
         SystemDiskShield.SafetyVerdict verdict = SystemDiskShield.evaluate(path);
@@ -46,7 +42,7 @@ class SystemDiskShieldTest {
     }
 
     @Test
-    @DisplayName("Safe secondary external drive paths pass evaluation")
+    @DisplayName("Safe secondary external drive paths pass evaluation (including external /dev/sda when unmounted)")
     void testSafeSecondaryDrives() {
         SystemDiskShield.SafetyVerdict verdict = SystemDiskShield.evaluate("/dev/rdisk4");
         assertThat(verdict.isSafe()).isTrue();
@@ -54,5 +50,42 @@ class SystemDiskShieldTest {
 
         SystemDiskShield.SafetyVerdict winVerdict = SystemDiskShield.evaluate("\\\\.\\PhysicalDrive2");
         assertThat(winVerdict.isSafe()).isTrue();
+
+        // External /dev/sda or /dev/sdb on non-root drives must NOT be blocked blindly
+        SystemDiskShield.SafetyVerdict sdaVerdict = SystemDiskShield.evaluate("/dev/sda");
+        assertThat(sdaVerdict.isSafe()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Mock blocked path mechanism properly protects flagged targets")
+    void testMockBlockedPathProtection() {
+        String testTarget = "/dev/mock_test_root_disk";
+        SystemDiskShield.clearMockBlockedPaths();
+
+        assertThat(SystemDiskShield.evaluate(testTarget).isSafe()).isTrue();
+
+        SystemDiskShield.setMockBlockedPath(testTarget);
+        SystemDiskShield.SafetyVerdict blockedVerdict = SystemDiskShield.evaluate(testTarget);
+        assertThat(blockedVerdict.isSafe()).isFalse();
+        assertThat(blockedVerdict.blockReason()).contains("Path explicitly flagged as protected system disk");
+
+        SystemDiskShield.clearMockBlockedPaths();
+        assertThat(SystemDiskShield.evaluate(testTarget).isSafe()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Live OS mount inspection reliably blocks active filesystem root")
+    void testLiveMountInspectionProtectsRoot() {
+        oshi.software.os.OperatingSystem os = new oshi.SystemInfo().getOperatingSystem();
+        for (oshi.software.os.OSFileStore store : os.getFileSystem().getFileStores()) {
+            if ("/".equals(store.getMount()) || "C:\\".equalsIgnoreCase(store.getMount())) {
+                String volume = store.getVolume();
+                if (volume != null && !volume.isBlank()) {
+                    SystemDiskShield.SafetyVerdict verdict = SystemDiskShield.evaluate(volume);
+                    assertThat(verdict.isSafe()).isFalse();
+                    assertThat(verdict.blockReason()).contains("CRITICAL SAFETY SHIELD");
+                }
+            }
+        }
     }
 }
