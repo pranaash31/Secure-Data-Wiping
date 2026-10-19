@@ -7,21 +7,24 @@ import com.sanitizer.util.AppLogger;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import org.apache.commons.text.StringEscapeUtils;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
 /**
- * High-performance, zero-dependency embedded HTTP Verification Server.
+ * High-performance, embedded HTTP Verification Server.
  * Serves the mobile-responsive Web Verification Portal for phone camera QR code scans
  * and REST API validation for enterprise B2B compliance audits.
+ *
+ * Hardened against XSS attacks via HTML entity escaping (StringEscapeUtils.escapeHtml4)
+ * and dynamically resolves local LAN IP or configured external domains for seamless mobile scanning.
  */
 public class WebVerificationServer {
 
@@ -29,6 +32,11 @@ public class WebVerificationServer {
     private static HttpServer server;
     private static int activePort = 8080;
     private static boolean isRunning = false;
+
+    private static volatile String customBaseVerificationUrl = System.getProperty(
+            "sanitizer.verify.url",
+            System.getenv("SANITIZER_VERIFY_URL")
+    );
 
     static {
         startServerAuto();
@@ -50,7 +58,7 @@ public class WebVerificationServer {
                 server.start();
                 activePort = server.getAddress().getPort();
                 isRunning = true;
-                AppLogger.info(MODULE, "Web Verification Portal started on http://localhost:" + activePort + "/verify");
+                AppLogger.info(MODULE, "Web Verification Portal started on " + getBaseVerificationUrl());
                 break;
             } catch (IOException e) {
                 AppLogger.warn(MODULE, "Port " + port + " unavailable, trying next...");
@@ -75,13 +83,80 @@ public class WebVerificationServer {
     }
 
     /**
+     * Configures an explicit external domain or base URL (e.g. "https://verify.enterprise.com/cert")
+     * for mobile QR code scan routing.
+     */
+    public static synchronized void setBaseVerificationUrl(String url) {
+        customBaseVerificationUrl = url;
+    }
+
+    /**
+     * Resolves the base verification URL:
+     * 1. If an external domain is configured, uses that domain.
+     * 2. Otherwise, automatically resolves the local LAN IP (e.g. 192.168.x.x) via NetworkInterface.
+     * 3. Falls back to localhost if no active network interface is reachable.
+     */
+    public static synchronized String getBaseVerificationUrl() {
+        if (customBaseVerificationUrl != null && !customBaseVerificationUrl.isBlank()) {
+            String trimmed = customBaseVerificationUrl.trim();
+            return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+        }
+
+        String lanIp = resolveLocalLanIp();
+        return "http://" + lanIp + ":" + activePort + "/verify";
+    }
+
+    /**
+     * Dynamically detects the local workstation's active LAN IPv4 address (e.g. 192.168.1.x, 10.0.0.x)
+     * using NetworkInterface so mobile phone cameras on the same network can access the portal.
+     */
+    public static String resolveLocalLanIp() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            if (interfaces != null) {
+                // Priority 1: Site-local IPv4 address (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+                while (interfaces.hasMoreElements()) {
+                    NetworkInterface nif = interfaces.nextElement();
+                    if (nif.isLoopback() || !nif.isUp() || nif.isVirtual()) {
+                        continue;
+                    }
+                    Enumeration<InetAddress> addresses = nif.getInetAddresses();
+                    while (addresses.hasMoreElements()) {
+                        InetAddress addr = addresses.nextElement();
+                        if (addr instanceof Inet4Address && !addr.isLoopbackAddress() && addr.isSiteLocalAddress()) {
+                            return addr.getHostAddress();
+                        }
+                    }
+                }
+                // Priority 2: Any non-loopback IPv4 address
+                interfaces = NetworkInterface.getNetworkInterfaces();
+                while (interfaces.hasMoreElements()) {
+                    NetworkInterface nif = interfaces.nextElement();
+                    if (nif.isLoopback() || !nif.isUp()) continue;
+                    Enumeration<InetAddress> addresses = nif.getInetAddresses();
+                    while (addresses.hasMoreElements()) {
+                        InetAddress addr = addresses.nextElement();
+                        if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
+                            return addr.getHostAddress();
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            AppLogger.warn(MODULE, "Could not resolve local LAN IP, defaulting to localhost: " + e.getMessage());
+        }
+        return "localhost";
+    }
+
+    /**
      * Generates a fully qualified universal verification web link for a certificate.
      */
     public static String generateVerificationUrl(AuditDb.AuditRecord record) {
-        String base = "http://localhost:" + activePort + "/verify";
+        String base = getBaseVerificationUrl();
         String sig = record.digitalSignature() != null ? record.digitalSignature() : "";
+        String keyId = record.keyId() != null ? record.keyId() : "";
 
-        return String.format("%s?certId=SAN-CERT-%d&model=%s&serial=%s&cap=%s&std=%s&status=%s&sig=%s",
+        return String.format("%s?certId=SAN-CERT-%d&model=%s&serial=%s&cap=%s&std=%s&status=%s&sig=%s&keyId=%s",
                 base,
                 record.id(),
                 urlEncode(record.driveModel()),
@@ -89,7 +164,8 @@ public class WebVerificationServer {
                 urlEncode(record.capacity()),
                 urlEncode(record.wipeStandard()),
                 urlEncode(record.status()),
-                urlEncode(sig)
+                urlEncode(sig),
+                urlEncode(keyId)
         );
     }
 
@@ -119,18 +195,30 @@ public class WebVerificationServer {
         public void handle(HttpExchange exchange) throws IOException {
             Map<String, String> params = parseQueryParams(exchange.getRequestURI().getRawQuery());
 
-            String certId = params.getOrDefault("certId", "SAN-CERT-UNKNOWN");
-            String model = params.getOrDefault("model", "Unknown Storage Device");
-            String serial = params.getOrDefault("serial", "N/A");
-            String cap = params.getOrDefault("cap", "N/A");
-            String std = params.getOrDefault("std", "DoD 5220.22-M");
-            String status = params.getOrDefault("status", "SUCCESS");
-            String sig = params.getOrDefault("sig", "");
+            String rawCertId = params.getOrDefault("certId", "SAN-CERT-UNKNOWN");
+            String rawModel = params.getOrDefault("model", "Unknown Storage Device");
+            String rawSerial = params.getOrDefault("serial", "N/A");
+            String rawCap = params.getOrDefault("cap", "N/A");
+            String rawStd = params.getOrDefault("std", "DoD 5220.22-M");
+            String rawStatus = params.getOrDefault("status", "SUCCESS");
+            String rawSig = params.getOrDefault("sig", "");
+            String rawKeyId = params.getOrDefault("keyId", "");
 
-            String payload = model + "|" + serial + "|" + cap + "|" + std + "|" + status;
-            boolean isValid = !sig.isBlank() && CryptoSigner.verifySignature(payload, sig);
+            // Cryptographic validation against Key Vault (supports rotated keys)
+            String payload = rawModel + "|" + rawSerial + "|" + rawCap + "|" + rawStd + "|" + rawStatus;
+            boolean isValid = !rawSig.isBlank() && CryptoSigner.verifySignatureWithKey(payload, rawSig, rawKeyId);
 
-            String html = generateHtmlPage(certId, model, serial, cap, std, status, sig, isValid);
+            // Harden against XSS: Sanitize all parameters using HTML entity escaping before interpolating
+            String safeCertId = StringEscapeUtils.escapeHtml4(rawCertId);
+            String safeModel = StringEscapeUtils.escapeHtml4(rawModel);
+            String safeSerial = StringEscapeUtils.escapeHtml4(rawSerial);
+            String safeCap = StringEscapeUtils.escapeHtml4(rawCap);
+            String safeStd = StringEscapeUtils.escapeHtml4(rawStd);
+            String safeStatus = StringEscapeUtils.escapeHtml4(rawStatus);
+            String safeSig = StringEscapeUtils.escapeHtml4(rawSig);
+            String safeKeyId = StringEscapeUtils.escapeHtml4(rawKeyId);
+
+            String html = generateHtmlPage(safeCertId, safeModel, safeSerial, safeCap, safeStd, safeStatus, safeSig, safeKeyId, isValid);
 
             byte[] bytes = html.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
@@ -153,15 +241,16 @@ public class WebVerificationServer {
             String std = params.getOrDefault("std", "");
             String status = params.getOrDefault("status", "");
             String sig = params.getOrDefault("sig", "");
+            String keyId = params.getOrDefault("keyId", "");
 
             String payload = model + "|" + serial + "|" + cap + "|" + std + "|" + status;
-            boolean isValid = !sig.isBlank() && CryptoSigner.verifySignature(payload, sig);
+            boolean isValid = !sig.isBlank() && CryptoSigner.verifySignatureWithKey(payload, sig, keyId);
 
             EsgCalculator.EsgMetrics esg = EsgCalculator.calculate(cap);
 
             String json = String.format(
                     java.util.Locale.US,
-                    "{\"valid\":%b,\"certId\":\"%s\",\"model\":\"%s\",\"serial\":\"%s\",\"capacity\":\"%s\",\"standard\":\"%s\",\"status\":\"%s\",\"algorithm\":\"SHA256withRSA\",\"message\":\"%s\",\"esg\":{\"eWasteDivertedKg\":%.1f,\"co2EmissionsSavedKg\":%.1f,\"treesEquivalent\":%.2f,\"energySavedKwh\":%.1f,\"impactStatement\":\"%s\"}}",
+                    "{\"valid\":%b,\"certId\":\"%s\",\"model\":\"%s\",\"serial\":\"%s\",\"capacity\":\"%s\",\"standard\":\"%s\",\"status\":\"%s\",\"keyId\":\"%s\",\"algorithm\":\"SHA256withRSA\",\"message\":\"%s\",\"esg\":{\"eWasteDivertedKg\":%.1f,\"co2EmissionsSavedKg\":%.1f,\"treesEquivalent\":%.2f,\"energySavedKwh\":%.1f,\"impactStatement\":\"%s\"}}",
                     isValid,
                     escapeJson(certId),
                     escapeJson(model),
@@ -169,6 +258,7 @@ public class WebVerificationServer {
                     escapeJson(cap),
                     escapeJson(std),
                     escapeJson(status),
+                    escapeJson(keyId),
                     isValid ? "Cryptographically Authenticated" : "Invalid Signature",
                     esg.eWasteDivertedKg(),
                     esg.co2EmissionsSavedKg(),
@@ -192,7 +282,7 @@ public class WebVerificationServer {
     }
 
     private static String generateHtmlPage(String certId, String model, String serial, String cap,
-                                           String std, String status, String sig, boolean isValid) {
+                                           String std, String status, String sig, String keyId, boolean isValid) {
         String badgeColor = isValid ? "#10B981" : "#EF4444";
         String badgeBg = isValid ? "#ECFDF5" : "#FEF2F2";
         String statusTitle = isValid ? "AUTHENTIC CERTIFICATE VERIFIED" : "SIGNATURE VERIFICATION FAILED";
@@ -202,6 +292,7 @@ public class WebVerificationServer {
 
         String sigSnippet = (sig != null && sig.length() > 40) ? sig.substring(0, 40) + "..." : sig;
         EsgCalculator.EsgMetrics esg = EsgCalculator.calculate(cap);
+        String safeKeyDisplay = (keyId != null && !keyId.isBlank()) ? keyId : "PRIMARY-VAULT-KEY";
 
         return """
                 <!DOCTYPE html>
@@ -266,6 +357,10 @@ public class WebVerificationServer {
                                 <div class="cell-label">Execution Status</div>
                                 <div class="cell-value" style="color: %s;">%s</div>
                             </div>
+                            <div class="cell" style="grid-column: span 2;">
+                                <div class="cell-label">Key Vault KeyId (Fingerprint Tag)</div>
+                                <div class="cell-value" style="font-family: monospace; color: #38BDF8;">%s</div>
+                            </div>
                         </div>
 
                         <div class="esg-box">
@@ -298,6 +393,7 @@ public class WebVerificationServer {
                 serial,
                 cap,
                 badgeColor, status,
+                safeKeyDisplay,
                 esg.impactStatement(),
                 esg.treesEquivalent(),
                 esg.energySavedKwh(),

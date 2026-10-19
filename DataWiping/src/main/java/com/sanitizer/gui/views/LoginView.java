@@ -226,8 +226,8 @@ public class LoginView {
         lblPass.getStyleClass().add("gov-field-label");
 
         txtPass = new PasswordField();
-        txtPass.setText("••••••••");
-        txtPass.setPromptText("Enter PIN");
+        txtPass.setText("1234");
+        txtPass.setPromptText("Enter PIN (Default: 1234)");
         txtPass.setMaxWidth(Double.MAX_VALUE);
         txtPass.getStyleClass().add("gov-input-control");
         AccessibilityManager.setupAccessible(txtPass, "Security PIN", "Enter PIN", AccessibleRole.PASSWORD_FIELD);
@@ -290,6 +290,7 @@ public class LoginView {
             txtUser.setText(username);
             txtAgency.setText("GOV-DEF-8942");
             cmbRole.setValue(role);
+            txtPass.setText("1234");
             navManager.loginSuccess(username, "GOV-DEF-8942", role);
         });
         return btn;
@@ -314,6 +315,7 @@ public class LoginView {
     private void handleLogin() {
         String username = txtUser.getText() != null ? txtUser.getText().trim() : "";
         String agency = txtAgency.getText() != null ? txtAgency.getText().trim() : "";
+        String pin = txtPass.getText() != null ? txtPass.getText().trim() : "";
         UserRole role = cmbRole.getValue() != null ? cmbRole.getValue() : UserRole.INSPECTOR;
 
         if (username.isEmpty()) {
@@ -325,6 +327,19 @@ public class LoginView {
         if (agency.isEmpty()) {
             showError("Please enter your Agency / Department Code.");
             txtAgency.requestFocus();
+            return;
+        }
+
+        if (pin.isEmpty()) {
+            showError("Please enter your Security PIN.");
+            txtPass.requestFocus();
+            return;
+        }
+
+        if (!com.sanitizer.session.SessionAutoLockManager.getInstance().verifyPin(pin)) {
+            showError("Authentication failed: Invalid Security PIN.");
+            txtPass.selectAll();
+            txtPass.requestFocus();
             return;
         }
 

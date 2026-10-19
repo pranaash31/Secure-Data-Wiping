@@ -40,7 +40,9 @@ public class AuditDb {
             String verificationHash,
             // Cryptographic Ledger Block Chaining (SHA-256 Tamper Proof)
             String prevRecordHash,
-            String recordHash
+            String recordHash,
+            // Key Vault Integration
+            String keyId
     ) {
         /** Backward-compat 8-field constructor (legacy records / seeds). */
         public AuditRecord(
@@ -57,7 +59,7 @@ public class AuditDb {
                  100, 100, 0, 0, "Integrity Verified: 0 Defects", 0, 0, 0, "OPTIMAL",
                  "PASS — Zero Residual Data Confirmed (0.000% Entropy)", 20480, 0.0000,
                  "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                 LedgerIntegrityEngine.GENESIS_PREV_HASH, "");
+                 LedgerIntegrityEngine.GENESIS_PREV_HASH, "", com.sanitizer.crypto.CryptoSigner.getActiveKeyId());
         }
 
         /** Backward-compat 17-field constructor (pre-verifier records). */
@@ -85,7 +87,7 @@ public class AuditDb {
                  peakTempCelsius, thermalPauseCount, crcErrors, interfaceAnomalySummary,
                  "PASS — Zero Residual Data Confirmed (0.000% Entropy)", 20480, 0.0000,
                  "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                 LedgerIntegrityEngine.GENESIS_PREV_HASH, "");
+                 LedgerIntegrityEngine.GENESIS_PREV_HASH, "", com.sanitizer.crypto.CryptoSigner.getActiveKeyId());
         }
 
         /** Backward-compat 21-field constructor (pre-ledger records). */
@@ -116,7 +118,40 @@ public class AuditDb {
                  preHealthScore, postHealthScore, badBlocksDelta, wearDeltaPercent, smartDeltaSummary,
                  peakTempCelsius, thermalPauseCount, crcErrors, interfaceAnomalySummary,
                  verificationStatus, verifiedSectorsCount, entropyScore, verificationHash,
-                 LedgerIntegrityEngine.GENESIS_PREV_HASH, "");
+                 LedgerIntegrityEngine.GENESIS_PREV_HASH, "", com.sanitizer.crypto.CryptoSigner.getActiveKeyId());
+        }
+
+        /** Backward-compat 23-field constructor (pre-keyvault records). */
+        public AuditRecord(
+                int id,
+                String timestamp,
+                String driveModel,
+                String serialNumber,
+                String capacity,
+                String wipeStandard,
+                String status,
+                String digitalSignature,
+                int preHealthScore,
+                int postHealthScore,
+                int badBlocksDelta,
+                int wearDeltaPercent,
+                String smartDeltaSummary,
+                int peakTempCelsius,
+                int thermalPauseCount,
+                int crcErrors,
+                String interfaceAnomalySummary,
+                String verificationStatus,
+                long verifiedSectorsCount,
+                double entropyScore,
+                String verificationHash,
+                String prevRecordHash,
+                String recordHash
+        ) {
+            this(id, timestamp, driveModel, serialNumber, capacity, wipeStandard, status, digitalSignature,
+                 preHealthScore, postHealthScore, badBlocksDelta, wearDeltaPercent, smartDeltaSummary,
+                 peakTempCelsius, thermalPauseCount, crcErrors, interfaceAnomalySummary,
+                 verificationStatus, verifiedSectorsCount, entropyScore, verificationHash,
+                 prevRecordHash, recordHash, com.sanitizer.crypto.CryptoSigner.getActiveKeyId());
         }
     }
 
@@ -167,7 +202,8 @@ public class AuditDb {
                 entropy_score REAL DEFAULT 0.0,
                 verification_hash TEXT DEFAULT 'SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
                 prev_record_hash TEXT,
-                record_hash TEXT
+                record_hash TEXT,
+                key_id TEXT DEFAULT 'SE-KEY-PRIMARY'
             );
             """;
         try (Connection conn = getConnection();
@@ -190,6 +226,7 @@ public class AuditDb {
             try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN verification_hash TEXT DEFAULT 'SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';"); } catch (Exception ignored) {}
             try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN prev_record_hash TEXT;"); } catch (Exception ignored) {}
             try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN record_hash TEXT;"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE wipe_logs ADD COLUMN key_id TEXT DEFAULT 'SE-KEY-PRIMARY';"); } catch (Exception ignored) {}
 
             // Auto-seal any legacy or unsealed records
             LedgerIntegrityEngine.sealDatabaseLedgerIfUnsealed(conn);
@@ -250,14 +287,34 @@ public class AuditDb {
                                                   int crcErrors, String interfaceAnomalySummary,
                                                   String verificationStatus, long verifiedSectorsCount,
                                                   double entropyScore, String verificationHash) {
+        return saveRecord(driveModel, serialNumber, capacity, wipeStandard, status, signature,
+                preHealthScore, postHealthScore, badBlocksDelta, wearDeltaPercent, deltaSummary,
+                peakTempCelsius, thermalPauseCount, crcErrors, interfaceAnomalySummary,
+                verificationStatus, verifiedSectorsCount, entropyScore, verificationHash,
+                com.sanitizer.crypto.CryptoSigner.getActiveKeyId());
+    }
+
+    /**
+     * Full-fidelity audit record save — includes thermal telemetry, interface anomaly,
+     * post-wipe entropy verification, SHA-256 block chain linking, and Key Vault KeyId tagging.
+     */
+    public static synchronized boolean saveRecord(String driveModel, String serialNumber, String capacity,
+                                                  String wipeStandard, String status, String signature,
+                                                  int preHealthScore, int postHealthScore,
+                                                  int badBlocksDelta, int wearDeltaPercent, String deltaSummary,
+                                                  int peakTempCelsius, int thermalPauseCount,
+                                                  int crcErrors, String interfaceAnomalySummary,
+                                                  String verificationStatus, long verifiedSectorsCount,
+                                                  double entropyScore, String verificationHash,
+                                                  String keyId) {
         String insertSql = """
             INSERT INTO wipe_logs(
                 drive_model, serial_number, capacity, wipe_standard, status, digital_signature,
                 pre_health_score, post_health_score, bad_blocks_delta, wear_delta_percent, smart_delta_summary,
                 peak_temp_celsius, thermal_pause_count, crc_errors, interface_anomaly_summary,
                 verification_status, verified_sectors_count, entropy_score, verification_hash,
-                prev_record_hash, record_hash
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                prev_record_hash, record_hash, key_id
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """;
 
         try (Connection conn = getConnection()) {
@@ -288,6 +345,7 @@ public class AuditDb {
             String effectiveInterfaceSummary = interfaceAnomalySummary != null ? interfaceAnomalySummary : "OPTIMAL";
             String effectiveVerificationStatus = verificationStatus != null ? verificationStatus : "PASS — Zero Residual Data Confirmed (0.000% Entropy)";
             String effectiveVerificationHash = verificationHash != null ? verificationHash : "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+            String effectiveKeyId = (keyId != null && !keyId.isBlank()) ? keyId : com.sanitizer.crypto.CryptoSigner.getActiveKeyId();
 
             // Compute block hash
             String blockHash = LedgerIntegrityEngine.computeRecordHash(
@@ -322,6 +380,7 @@ public class AuditDb {
                 pstmt.setString(19, effectiveVerificationHash);
                 pstmt.setString(20, prevHash);
                 pstmt.setString(21, blockHash);
+                pstmt.setString(22, effectiveKeyId);
                 pstmt.executeUpdate();
 
                 // Fetch generated ID and actual stored timestamp to ensure exact canonical seal
@@ -397,7 +456,9 @@ public class AuditDb {
                         rs.getString("prev_record_hash") != null
                                 ? rs.getString("prev_record_hash") : LedgerIntegrityEngine.GENESIS_PREV_HASH,
                         rs.getString("record_hash") != null
-                                ? rs.getString("record_hash") : ""
+                                ? rs.getString("record_hash") : "",
+                        rs.getString("key_id") != null
+                                ? rs.getString("key_id") : com.sanitizer.crypto.CryptoSigner.getActiveKeyId()
                 ));
             }
         } catch (SQLException e) {

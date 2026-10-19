@@ -100,4 +100,69 @@ class WebVerificationServerTest {
         assertThat(response.body()).contains("\"esg\":{");
         assertThat(response.body()).contains("\"eWasteDivertedKg\":");
     }
+
+    @Test
+    @DisplayName("HTML entity escaping sanitizes malicious parameters against XSS injection")
+    void testHtmlEntityEscapingPreventsXss() throws Exception {
+        String xssModel = "<script>alert('pwned')</script>";
+        String xssSerial = "\"><img src=x onerror=alert(1)>";
+
+        String verifyUrl = String.format("http://localhost:%d/verify?certId=SAN-CERT-XSS&model=%s&serial=%s&cap=128+GB&std=DoD+5220.22-M&status=SUCCESS&sig=dummy",
+                WebVerificationServer.getPort(),
+                java.net.URLEncoder.encode(xssModel, java.nio.charset.StandardCharsets.UTF_8),
+                java.net.URLEncoder.encode(xssSerial, java.nio.charset.StandardCharsets.UTF_8)
+        );
+
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(verifyUrl))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        String body = response.body();
+
+        // Must NOT contain raw executable script or img tags
+        assertThat(body).doesNotContain("<script>alert('pwned')</script>");
+        assertThat(body).doesNotContain("<img src=x onerror=alert(1)>");
+
+        // Must contain escaped HTML entities
+        assertThat(body).contains("&lt;script&gt;");
+        assertThat(body).contains("&lt;/script&gt;");
+        assertThat(body).contains("&lt;img src=x onerror=alert(1)&gt;");
+    }
+
+    @Test
+    @DisplayName("External QR code URL configuration and LAN IP resolution")
+    void testExternalQrCodeUrlConfiguration() {
+        // 1. Verify LAN IP resolution
+        String lanIp = WebVerificationServer.resolveLocalLanIp();
+        assertThat(lanIp).isNotNull().isNotBlank();
+
+        // 2. Default base URL contains resolved LAN IP or localhost
+        String defaultBase = WebVerificationServer.getBaseVerificationUrl();
+        assertThat(defaultBase).startsWith("http://");
+        assertThat(defaultBase).contains(":" + WebVerificationServer.getPort() + "/verify");
+
+        // 3. Test external domain configuration
+        try {
+            WebVerificationServer.setBaseVerificationUrl("https://verify.enterprise.com/cert");
+            assertThat(WebVerificationServer.getBaseVerificationUrl()).isEqualTo("https://verify.enterprise.com/cert");
+
+            AuditDb.AuditRecord record = new AuditDb.AuditRecord(
+                    55, "2026-10-19 12:00:00", "Enterprise NVMe", "SN-ENT-001",
+                    "1 TB", "NIST SP 800-88", "SUCCESS", "MOCK_SIG"
+            );
+
+            String url = WebVerificationServer.generateVerificationUrl(record);
+            assertThat(url).startsWith("https://verify.enterprise.com/cert?");
+            assertThat(url).contains("certId=SAN-CERT-55");
+            assertThat(url).contains("keyId=SE-KEY-");
+        } finally {
+            // Restore default
+            WebVerificationServer.setBaseVerificationUrl(null);
+        }
+    }
 }

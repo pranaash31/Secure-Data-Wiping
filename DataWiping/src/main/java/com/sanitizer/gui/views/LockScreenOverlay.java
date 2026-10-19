@@ -81,7 +81,7 @@ public class LockScreenOverlay extends StackPane {
         Label lblPinPrompt = new Label("Security PIN / Passcode:");
         lblPinPrompt.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #E2E8F0;");
 
-        txtPin.setPromptText("Enter PIN to resume (e.g. 1234)");
+        txtPin.setPromptText("Enter Security PIN to resume");
         txtPin.setStyle("-fx-font-size: 14px; -fx-padding: 10 14;");
         txtPin.setMaxWidth(Double.MAX_VALUE);
         txtPin.setOnAction(e -> handleUnlock());
@@ -104,7 +104,7 @@ public class LockScreenOverlay extends StackPane {
         Button btnSignOut = new Button("🚪 Sign Out / Switch Officer");
         btnSignOut.setStyle("-fx-background-color: transparent; -fx-text-fill: #94A3B8; -fx-font-size: 12px; -fx-cursor: hand;");
         btnSignOut.setOnAction(e -> {
-            SessionAutoLockManager.getInstance().unlockSession("1234", navManager.getOfficerName(), navManager.getAgencyId(), navManager.getRole());
+            SessionAutoLockManager.getInstance().forceUnlockForLogout();
             navManager.logout();
         });
 

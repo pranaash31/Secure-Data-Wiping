@@ -63,7 +63,17 @@ public class SessionAutoLockTest {
             assertFalse(failUnlock);
             assertTrue(manager.isLocked());
 
-            // 3. Unlock with correct custom PIN
+            // 3. Backdoor PINs ("1234" and "admin") MUST strictly fail
+            assertFalse(manager.unlockSession("1234", "Officer Test", "DEF-01", "INSPECTOR"), "Backdoor PIN '1234' must be rejected");
+            assertFalse(manager.unlockSession("admin", "Officer Test", "DEF-01", "INSPECTOR"), "Backdoor PIN 'admin' must be rejected");
+            assertTrue(manager.isLocked());
+
+            // 4. Verify verifyPin method
+            assertTrue(manager.verifyPin("4321"));
+            assertFalse(manager.verifyPin("1234"));
+            assertFalse(manager.verifyPin("admin"));
+
+            // 5. Unlock with correct custom PIN
             boolean successUnlock = manager.unlockSession("4321", "Officer Test", "DEF-01", "INSPECTOR");
             assertTrue(successUnlock);
             assertFalse(manager.isLocked());

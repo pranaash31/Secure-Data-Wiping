@@ -37,7 +37,11 @@ public class KeyManagementService {
     }
 
     public String generateKeyId() {
-        return "SE-KEY-" + (System.currentTimeMillis() / 1000);
+        return CryptoSigner.getActiveKeyId();
+    }
+
+    public String getActiveKeyId() {
+        return CryptoSigner.getActiveKeyId();
     }
 
     /**

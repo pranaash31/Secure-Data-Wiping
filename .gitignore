@@ -6,6 +6,7 @@ target/
 *.db
 *.pdf
 *.key
+*.p12
 sanitizer_history.db
 Sanitization_Certificate_*.pdf
 

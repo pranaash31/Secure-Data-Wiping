@@ -41,7 +41,7 @@ public class SessionAutoLockManager {
     private final AtomicBoolean locked = new AtomicBoolean(false);
     private Timeline monitorTimeline;
     private Scene currentAttachedScene;
-    private String officerPin = "1234"; // Default security PIN
+    private String officerPinHash = com.sanitizer.security.PasswordHasher.hashPassword("1234");
 
     private final List<LockListener> listeners = new ArrayList<>();
 
@@ -97,14 +97,20 @@ public class SessionAutoLockManager {
         return locked.get();
     }
 
+    /**
+     * Stores the officer PIN as a salted PBKDF2 hash.
+     */
     public void setOfficerPin(String pin) {
         if (pin != null && !pin.isBlank()) {
-            this.officerPin = pin.trim();
+            this.officerPinHash = com.sanitizer.security.PasswordHasher.hashPassword(pin.trim());
         }
     }
 
-    public String getOfficerPin() {
-        return officerPin;
+    /**
+     * Verifies the entered PIN against the salted PBKDF2 hash.
+     */
+    public boolean verifyPin(String pin) {
+        return pin != null && com.sanitizer.security.PasswordHasher.verifyPassword(pin.trim(), officerPinHash);
     }
 
     /**
@@ -120,9 +126,10 @@ public class SessionAutoLockManager {
 
     /**
      * Attempts to unlock the session with PIN.
+     * Backdoor credentials ("1234" / "admin") are strictly forbidden.
      */
     public synchronized boolean unlockSession(String enteredPin, String officerName, String agencyId, String role) {
-        boolean valid = (enteredPin != null && (enteredPin.trim().equals(officerPin) || enteredPin.trim().equals("1234") || enteredPin.trim().equals("admin")));
+        boolean valid = verifyPin(enteredPin);
         if (valid) {
             locked.set(false);
             recordUserActivity();
@@ -135,6 +142,16 @@ public class SessionAutoLockManager {
             SecurityAuditLogger.logSessionUnlock(officerName, agencyId, role, false);
             return false;
         }
+    }
+
+    /**
+     * Unlocks the session specifically for an explicit sign-out action,
+     * resetting state without bypassing credential requirements.
+     */
+    public synchronized void forceUnlockForLogout() {
+        locked.set(false);
+        recordUserActivity();
+        notifyUnlocked();
     }
 
     public int getRemainingSecondsBeforeLock() {

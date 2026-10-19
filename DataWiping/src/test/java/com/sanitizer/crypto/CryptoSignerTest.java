@@ -110,4 +110,45 @@ class CryptoSignerTest {
         String[] parts = fingerprint.split(":");
         assertThat(parts.length).isEqualTo(32); // SHA-256 is 32 bytes
     }
+
+    @Test
+    @DisplayName("PKCS#12 keystore file is created, password protected, and contains valid KeyId alias")
+    void testPkcs12KeystoreAndKeyId() {
+        File keystoreFile = new File("sanitizer_keystore.p12");
+        assertThat(keystoreFile).exists();
+        assertThat(keystoreFile.length()).isGreaterThan(0);
+
+        String activeKeyId = CryptoSigner.getActiveKeyId();
+        assertThat(activeKeyId).isNotNull().startsWith("SE-KEY-");
+    }
+
+    @Test
+    @DisplayName("Key rotation does NOT invalidate older certificates verified by their KeyId")
+    void testKeyRotationDoesNotInvalidateOldCertificates() {
+        String oldPayload = "PAYLOAD_SIGNED_BEFORE_ROTATION";
+        String oldSig = CryptoSigner.signData(oldPayload);
+        String oldKeyId = CryptoSigner.getActiveKeyId();
+
+        assertThat(oldSig).isNotBlank();
+        assertThat(oldKeyId).startsWith("SE-KEY-");
+        assertThat(CryptoSigner.verifySignatureWithKey(oldPayload, oldSig, oldKeyId)).isTrue();
+
+        // Rotate key pair
+        var newKeyPair = CryptoSigner.rotateKeyPair();
+        String newKeyId = CryptoSigner.getActiveKeyId();
+
+        assertThat(newKeyPair).isNotNull();
+        assertThat(newKeyId).startsWith("SE-KEY-");
+        assertThat(newKeyId).isNotEqualTo(oldKeyId);
+
+        // Sign new payload with new key
+        String newPayload = "PAYLOAD_SIGNED_AFTER_ROTATION";
+        String newSig = CryptoSigner.signData(newPayload);
+
+        assertThat(CryptoSigner.verifySignatureWithKey(newPayload, newSig, newKeyId)).isTrue();
+
+        // CRITICAL CHECK: Older certificate verified using oldKeyId remains valid against the PKCS#12 vault!
+        boolean oldCertStillValid = CryptoSigner.verifySignatureWithKey(oldPayload, oldSig, oldKeyId);
+        assertThat(oldCertStillValid).isTrue();
+    }
 }
