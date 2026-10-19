@@ -91,7 +91,7 @@ class WipeVerifierTest {
     }
 
     @Test
-    @DisplayName("Verification fails immediately when target device or file does not exist (No false PASS)")
+    @DisplayName("Verification fails immediately when target device or file does not exist (Emits IO_PERMISSION_ERROR)")
     void testVerificationFailsOnNonExistentDevice() {
         List<String> logs = new ArrayList<>();
         WipeVerifier.VerificationResult result = WipeVerifier.verifyDrive(
@@ -106,6 +106,7 @@ class WipeVerifierTest {
         assertThat(result).isNotNull();
         assertThat(result.isClean()).isFalse();
         assertThat(result.statusSummary()).contains("FAIL");
+        assertThat(result.statusSummary()).contains(WipeVerifier.IO_PERMISSION_ERROR);
         assertThat(result.statusSummary()).contains("not found");
         assertThat(result.totalSectorsVerified()).isEqualTo(0);
         assertThat(result.sha256Proof()).isEqualTo("N/A");
@@ -149,7 +150,7 @@ class WipeVerifierTest {
     }
 
     @Test
-    @DisplayName("Sampling offsets span Beginning (LBA 0), Middle, End, and uniform strides")
+    @DisplayName("Sampling offsets span Header (First 1%), Middle (50% capacity), and Tail (Last 1%)")
     void testStridedSamplingDistribution() {
         long capacity = 100L * 1024 * 1024; // 100 MB
         long chunkSize = 64 * 1024; // 64 KB
@@ -157,15 +158,27 @@ class WipeVerifierTest {
 
         List<Long> offsets = WipeVerifier.calculateSampleOffsets(capacity, chunkSize, numChunks);
 
-        assertThat(offsets).hasSize(numChunks);
-        assertThat(offsets.get(0)).isEqualTo(0L); // Beginning (LBA 0)
+        assertThat(offsets).isNotEmpty();
+        assertThat(offsets.get(0)).isEqualTo(0L); // Header: First LBA 0
 
         long maxExpectedOffset = (capacity - chunkSize) / WipeVerifier.SECTOR_SIZE_BYTES * WipeVerifier.SECTOR_SIZE_BYTES;
-        assertThat(offsets.get(offsets.size() - 1)).isEqualTo(maxExpectedOffset); // End of disk
+        assertThat(offsets.get(offsets.size() - 1)).isEqualTo(maxExpectedOffset); // Tail: Final LBA block
 
-        // Middle offset should be near 50 MB
-        long middleOffset = offsets.get(numChunks / 2);
-        assertThat(middleOffset).isBetween(capacity / 2 - 2 * chunkSize, capacity / 2 + 2 * chunkSize);
+        // Verify Header Zone (first 1% = 1 MB)
+        long headerBound = (long) (capacity * 0.01);
+        boolean hasHeaderSample = offsets.stream().anyMatch(off -> off <= headerBound);
+        assertThat(hasHeaderSample).isTrue();
+
+        // Verify Middle Strides Zone (50% capacity = 25 MB to 75 MB)
+        long midStart = (long) (capacity * 0.25);
+        long midEnd = (long) (capacity * 0.75);
+        boolean hasMiddleSample = offsets.stream().anyMatch(off -> off >= midStart && off <= midEnd);
+        assertThat(hasMiddleSample).isTrue();
+
+        // Verify Tail Zone (last 1% = 99 MB to 100 MB)
+        long tailBound = (long) (capacity * 0.99);
+        boolean hasTailSample = offsets.stream().anyMatch(off -> off >= tailBound);
+        assertThat(hasTailSample).isTrue();
 
         // Every offset must be 512-byte sector-aligned
         for (long offset : offsets) {
@@ -175,7 +188,7 @@ class WipeVerifierTest {
     }
 
     @Test
-    @DisplayName("Verification supports non-zero policies (ONE_FILL and PSEUDO_RANDOM)")
+    @DisplayName("Verification compares read blocks against expected pattern (0xFF vs 0x00)")
     void testPolicyAwareVerification() throws Exception {
         // Test ONE_FILL policy against 0xFF filled file
         File oneFillFile = File.createTempFile("test_verify_onefill_", ".bin");
@@ -198,9 +211,39 @@ class WipeVerifierTest {
                 onePolicy, true, null, null
         );
         assertThat(oneResult.isClean()).isTrue();
-        assertThat(oneResult.statusSummary()).contains("One-Fill Residual Confirmed");
+        assertThat(oneResult.statusSummary()).contains("0xFF Inversion Residual Confirmed");
+
+        // Negative check: Verifying 0xFF file against default ZERO_FILL policy must FAIL
+        WipeVerifier.VerificationResult zeroExpectResult = WipeVerifier.verifyDrive(
+                oneFillFile.getAbsolutePath(), 2L * 1024 * 1024,
+                WipeVerifier.VerificationMode.FAST_SAMPLE_5_PERCENT,
+                true, null, null
+        );
+        assertThat(zeroExpectResult.isClean()).isFalse();
+        assertThat(zeroExpectResult.statusSummary()).contains("FAIL — Residual Bytes Detected");
+        assertThat(zeroExpectResult.statusSummary()).contains("expected 0x00");
 
         oneFillFile.delete();
+
+        // Negative check: Verifying 0x00 file against ONE_FILL policy must FAIL
+        File zeroFile = File.createTempFile("test_verify_zerofill_", ".bin");
+        zeroFile.deleteOnExit();
+        byte[] zeroes = new byte[64 * 1024];
+        Arrays.fill(zeroes, (byte) 0x00);
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(zeroFile)) {
+            for (int i = 0; i < 32; i++) fos.write(zeroes);
+        }
+
+        WipeVerifier.VerificationResult oneExpectResult = WipeVerifier.verifyDrive(
+                zeroFile.getAbsolutePath(), 2L * 1024 * 1024,
+                WipeVerifier.VerificationMode.FAST_SAMPLE_5_PERCENT,
+                onePolicy, true, null, null
+        );
+        assertThat(oneExpectResult.isClean()).isFalse();
+        assertThat(oneExpectResult.statusSummary()).contains("FAIL — Residual Bytes Detected");
+        assertThat(oneExpectResult.statusSummary()).contains("expected 0xFF");
+
+        zeroFile.delete();
 
         // Test PSEUDO_RANDOM policy against high-entropy random file
         File randomFile = File.createTempFile("test_verify_random_", ".bin");

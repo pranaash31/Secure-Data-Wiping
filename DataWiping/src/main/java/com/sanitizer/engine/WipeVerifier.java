@@ -26,6 +26,7 @@ import java.util.function.Consumer;
 public class WipeVerifier {
 
     private static final String MODULE = "WipeVerifier";
+    public static final String IO_PERMISSION_ERROR = "IO_PERMISSION_ERROR";
     public static final int SECTOR_SIZE_BYTES = 512;
     private static final int BUFFER_CHUNK_SIZE = 64 * 1024; // 64 KB chunk
 
@@ -87,7 +88,7 @@ public class WipeVerifier {
 
         File devFile = new File(systemPath);
         if (!devFile.exists()) {
-            String status = "FAIL — Verification Aborted: Target device or file not found (" + systemPath + ")";
+            String status = "FAIL — " + IO_PERMISSION_ERROR + ": Target device or file not found (" + systemPath + ")";
             log(logCallback, "[VERIFIER] " + status);
             log(logCallback, "═════════════════════════════════════════════════════════════════");
             return new VerificationResult(
@@ -103,7 +104,7 @@ public class WipeVerifier {
         }
 
         if (!devFile.canRead()) {
-            String status = "FAIL — Read Verification Failed: Permission denied for " + systemPath;
+            String status = "FAIL — " + IO_PERMISSION_ERROR + ": Permission denied for " + systemPath;
             log(logCallback, "[VERIFIER] " + status);
             log(logCallback, "═════════════════════════════════════════════════════════════════");
             return new VerificationResult(
@@ -226,7 +227,13 @@ public class WipeVerifier {
             }
         } catch (Exception ex) {
             AppLogger.error(MODULE, "Direct disk read failed: " + ex.getMessage(), ex);
-            String status = "FAIL — Read Verification Failed: " + ex.getMessage();
+            boolean isPermission = !devFile.canRead()
+                    || ex instanceof SecurityException
+                    || (ex.getMessage() != null && (ex.getMessage().toLowerCase().contains("permission")
+                    || ex.getMessage().toLowerCase().contains("access denied")
+                    || ex.getMessage().toLowerCase().contains("operation not permitted")));
+            String errTag = isPermission ? IO_PERMISSION_ERROR : "IO_READ_ERROR";
+            String status = "FAIL — " + errTag + ": " + ex.getMessage();
             log(logCallback, "[VERIFIER] " + status);
             log(logCallback, "═════════════════════════════════════════════════════════════════");
             return new VerificationResult(
@@ -242,7 +249,7 @@ public class WipeVerifier {
         }
 
         if (bytesReadTotal == 0) {
-            String status = "FAIL — Read Verification Failed: Zero bytes read from media";
+            String status = "FAIL — " + IO_PERMISSION_ERROR + ": Zero bytes read from media";
             log(logCallback, "[VERIFIER] " + status);
             log(logCallback, "═════════════════════════════════════════════════════════════════");
             return new VerificationResult(false, status, 0, Double.NaN, "N/A", 0, 0,
@@ -269,7 +276,7 @@ public class WipeVerifier {
             isClean = (nonCompliantCount == 0) && (entropy < 0.001);
             if (isClean) {
                 if (patternType == WipePatternType.ONE_FILL) {
-                    status = "PASS — One-Fill Residual Confirmed (0.000% Entropy)";
+                    status = "PASS — 0xFF Inversion Residual Confirmed (0.000% Entropy)";
                 } else if (patternType == WipePatternType.CUSTOM_BYTE) {
                     status = String.format("PASS — Fixed Pattern 0x%02X Residual Confirmed (0.000%% Entropy)", expectedByte);
                 } else if (patternType == WipePatternType.COMPLEMENT) {
@@ -278,8 +285,9 @@ public class WipeVerifier {
                     status = "PASS — Zero Residual Data Confirmed (0.000% Entropy)";
                 }
             } else {
-                status = String.format("FAIL — Residual Bytes Detected (%,d non-compliant bytes, Entropy: %.4f bits/byte)",
-                        nonCompliantCount, entropy);
+                String expectedHex = String.format("0x%02X", expectedByte);
+                status = String.format("FAIL — Residual Bytes Detected (expected %s, found %,d non-compliant bytes, Entropy: %.4f bits/byte)",
+                        expectedHex, nonCompliantCount, entropy);
             }
         }
 
@@ -318,8 +326,11 @@ public class WipeVerifier {
     }
 
     /**
-     * Generates representative sample offsets across Beginning, Middle, End, and uniform random strides
-     * in accordance with NIST SP 800-88 Rev. 1 Section 4.7.
+     * Generates representative non-contiguous sample offsets across:
+     * 1. Header: First 1% LBAs
+     * 2. Middle Strides: Randomly sampled throughout 50% capacity (25% to 75% range)
+     * 3. Tail: Last 1% LBAs
+     * All offsets are strictly 512-byte sector-aligned in accordance with NIST SP 800-88 Rev. 1 Section 4.7.
      */
     public static List<Long> calculateSampleOffsets(long capacity, long chunkSize, int numChunks) {
         List<Long> offsets = new ArrayList<>(numChunks);
@@ -331,46 +342,63 @@ public class WipeVerifier {
         long maxOffset = Math.max(0L, capacity - chunkSize);
         maxOffset = (maxOffset / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
 
-        if (numChunks == 2) {
-            offsets.add(0L);
-            offsets.add(maxOffset);
-            return offsets;
-        }
-
-        if (numChunks == 3) {
-            offsets.add(0L);
+        if (numChunks <= 3 || capacity <= chunkSize * 3) {
+            offsets.add(0L); // Header (LBA 0)
             long middle = ((maxOffset / 2) / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
-            offsets.add(middle);
-            offsets.add(maxOffset);
+            offsets.add(middle); // Middle
+            offsets.add(maxOffset); // Tail
             return offsets;
         }
 
-        // numChunks >= 4:
-        // Beginning (LBA 0), Middle of media, End of media, and uniform strides with pseudo-random offsets
+        // Zone 1: Header (First 1% LBAs)
+        long headerRange = Math.max(chunkSize, (long) (capacity * 0.01));
+        headerRange = Math.min(headerRange, maxOffset);
+
+        // Zone 3: Tail (Last 1% LBAs)
+        long tailStart = Math.max(0L, (long) (capacity * 0.99));
+        tailStart = (tailStart / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
+        tailStart = Math.min(tailStart, maxOffset);
+
+        // Zone 2: Middle (50% capacity range: 25% to 75%)
+        long midStart = (long) (capacity * 0.25);
+        midStart = (midStart / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
+        long midEnd = Math.max(midStart + chunkSize, (long) (capacity * 0.75) - chunkSize);
+        midEnd = (midEnd / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
+        midEnd = Math.min(midEnd, maxOffset);
+
+        // Allocate block budget: at least 1 Header, at least 1 Tail, majority in Middle 50%
+        int headerBlocks = Math.max(1, numChunks / 10);
+        int tailBlocks = Math.max(1, numChunks / 10);
+        int middleBlocks = Math.max(1, numChunks - headerBlocks - tailBlocks);
+
         Random rng = new Random(capacity ^ 0x5A5A5A5AL);
-        double stride = (double) maxOffset / (numChunks - 1);
 
-        offsets.add(0L); // Beginning (LBA 0)
-
-        int middleIndex = numChunks / 2;
-        for (int i = 1; i < numChunks - 1; i++) {
-            if (i == middleIndex) {
-                long middle = ((maxOffset / 2) / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
-                offsets.add(middle);
-            } else {
-                long windowStart = (long) (i * stride);
-                long windowEnd = (long) ((i + 1) * stride);
-                long windowRange = Math.max(1, windowEnd - windowStart);
-                long jitter = (long) (rng.nextDouble() * windowRange);
-                long offset = windowStart + jitter;
-                offset = (offset / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
-                offset = Math.max(0L, Math.min(maxOffset, offset));
-                offsets.add(offset);
-            }
+        // 1. Header (First 1% LBAs)
+        offsets.add(0L); // LBA 0
+        for (int i = 1; i < headerBlocks; i++) {
+            long off = (long) (rng.nextDouble() * Math.max(1, headerRange - chunkSize));
+            off = (off / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
+            offsets.add(Math.min(headerRange, off));
         }
 
-        offsets.add(maxOffset); // End of disk
-        return offsets;
+        // 2. Middle Strides (Randomly sampled throughout 50% capacity [25% - 75%])
+        for (int i = 0; i < middleBlocks; i++) {
+            long range = Math.max(1, midEnd - midStart);
+            long off = midStart + (long) (rng.nextDouble() * range);
+            off = (off / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
+            offsets.add(Math.min(midEnd, Math.max(midStart, off)));
+        }
+
+        // 3. Tail (Last 1% LBAs)
+        for (int i = 0; i < tailBlocks - 1; i++) {
+            long range = Math.max(1, maxOffset - tailStart);
+            long off = tailStart + (long) (rng.nextDouble() * range);
+            off = (off / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
+            offsets.add(Math.min(maxOffset, Math.max(tailStart, off)));
+        }
+        offsets.add(maxOffset); // Final LBA block
+
+        return offsets.stream().distinct().sorted().toList();
     }
 
     private static boolean isDiscrepancy(WipePatternType patternType, int expectedByte, int actualByte) {
