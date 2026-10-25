@@ -10,6 +10,8 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
+import javafx.stage.Window;
+import com.sanitizer.gui.components.ComplianceStandardsDialog;
 
 import java.net.URL;
 
@@ -170,6 +172,10 @@ public class HeroView extends ScrollPane {
 
         Button btnStandards = new Button("View Standards");
         btnStandards.getStyleClass().add("hero-cta-secondary");
+        btnStandards.setOnAction(e -> {
+            Window owner = getScene() != null ? getScene().getWindow() : null;
+            ComplianceStandardsDialog.show(owner);
+        });
 
         actions.getChildren().addAll(btnSignIn, btnStandards);
 
@@ -179,6 +185,10 @@ public class HeroView extends ScrollPane {
         for (String std : new String[]{"NIST SP 800-88", "DoD 5220.22-M", "FIPS 140-3", "IEEE 2883"}) {
             Label badge = new Label("✓ " + std);
             badge.getStyleClass().add("hero-cert-badge");
+            badge.setOnMouseClicked(e -> {
+                Window owner = getScene() != null ? getScene().getWindow() : null;
+                ComplianceStandardsDialog.show(owner);
+            });
             sealsRow.getChildren().add(badge);
         }
 

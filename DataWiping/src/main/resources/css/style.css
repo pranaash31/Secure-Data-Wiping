@@ -153,7 +153,7 @@
     -fx-font-size: 13px;
     -fx-font-weight: bold;
     -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.03), 6, 0, 0, 1);
-    -fx-cursor: default;
+    -fx-cursor: hand;
 }
 .hero-split-container {
     -fx-padding: 56 60 48 60;
