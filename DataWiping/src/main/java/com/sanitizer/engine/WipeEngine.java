@@ -115,6 +115,15 @@ public class WipeEngine {
         // Acquire Disk Lock and Unmount Logical Volumes
         com.sanitizer.shield.DiskLockShield.prepareAndLockDisk(systemPath);
 
+        // Presentation Simulator Mode Dispatch (Safely bypass real OS block I/O)
+        if (com.sanitizer.demo.DemoSimulatorManager.isSimulatedDrive(systemPath)) {
+            try {
+                return executeSimulatedWipe(systemPath, totalBytes, policy, isTestMode, metricsCallback, logCallback, badSectorCallback);
+            } finally {
+                com.sanitizer.shield.DiskLockShield.releaseDiskLock(systemPath);
+            }
+        }
+
         try {
             long targetBytes = isTestMode ? Math.min(totalBytes, TEST_CAP_BYTES) : totalBytes;
             List<WipePass> passes = policy.getPasses();
@@ -315,6 +324,153 @@ public class WipeEngine {
             case COMPLEMENT -> (~prevByte) & 0xFF;
             case PSEUDO_RANDOM -> -1;
         };
+    }
+
+    /**
+     * Executes high-fidelity Presentation Simulator Mode sanitization.
+     * Safely emulates block-level overwriting with realistic I/O throughput, oscilloscope waveform data,
+     * thermal curves, live dd console logging, and sector heatmap progression without touching real storage devices.
+     */
+    private static boolean executeSimulatedWipe(
+            String systemPath,
+            long totalBytes,
+            WipePolicy policy,
+            boolean isTestMode,
+            Consumer<WipeMetrics> metricsCallback,
+            Consumer<String> logCallback,
+            Consumer<com.sanitizer.quarantine.LbaFailureRecord> badSectorCallback
+    ) {
+        if (policy == null) {
+            policy = WipePolicyManager.getInstance().getDefaultPolicy();
+        }
+
+        List<WipePass> passes = policy.getPasses();
+        if (passes == null || passes.isEmpty()) {
+            passes = List.of(new WipePass(1, WipePatternType.ZERO_FILL, 0x00, "Default Zero Fill"));
+        }
+
+        int totalPasses = passes.size();
+        long targetBytes = isTestMode ? Math.min(totalBytes, TEST_CAP_BYTES) : totalBytes;
+        long totalWipeTargetBytes = targetBytes * totalPasses;
+        long startNanoTime = System.nanoTime();
+
+        log(logCallback, "═════════════════════════════════════════════════════════════════");
+        log(logCallback, String.format("⚡ [SIMULATOR MODE] Starting %s (%d-Pass Standard) on %s%s",
+                policy.getName(), totalPasses, systemPath, isTestMode ? " [TEST MODE: 1GB CAP]" : " [FULL CAPACITY: 16 GB]"));
+        log(logCallback, String.format("Standard Org: %s | Pattern Sequence: %s",
+                policy.getOrganization(), policy.getPatternSummary()));
+        log(logCallback, "⚡ [SIMULATOR MODE] Live presentation execution active — real storage disks protected.");
+        log(logCallback, "═════════════════════════════════════════════════════════════════");
+
+        double passSlice = 100.0 / totalPasses;
+        long accumulatedBytesWritten = 0;
+        int currentTemp = 36;
+
+        for (int i = 0; i < totalPasses; i++) {
+            WipePass pass = passes.get(i);
+            int currentPass = i + 1;
+            double startPct = i * passSlice;
+            double endPct = (i + 1) * passSlice;
+
+            log(logCallback, String.format("[%s] [SIMULATOR] Pass %d/%d: %s (%s)...",
+                    policy.getStandardCode(), currentPass, totalPasses, pass.getDescription(), pass.getPatternHex()));
+
+            int steps = 24;
+            for (int s = 1; s <= steps; s++) {
+                if (Thread.currentThread().isInterrupted()) {
+                    log(logCallback, "[SIMULATOR] Sanitization task interrupted / aborted by user.");
+                    return false;
+                }
+
+                double passFraction = (double) s / steps;
+                double overallPercent = startPct + (passFraction * (endPct - startPct));
+                long bytesInThisPass = (long) (passFraction * targetBytes);
+                long totalProcessed = accumulatedBytesWritten + bytesInThisPass;
+                long remainingBytes = Math.max(0, totalWipeTargetBytes - totalProcessed);
+
+                // Simulated dynamic transfer speed (between 62 and 78 MB/s with realistic jitter)
+                double speedMBs = 62.0 + (ThreadLocalRandom.current().nextDouble() * 16.0);
+                long etaSeconds = speedMBs > 0 ? (long) (remainingBytes / (speedMBs * 1024.0 * 1024.0)) : 0;
+
+                // Telemetry metrics
+                double iops = (speedMBs * 1024.0 * 1024.0) / 4096.0;
+                double latencyMs = 0.85 + (ThreadLocalRandom.current().nextDouble() * 0.35);
+                double busSaturation = Math.min(100.0, (speedMBs / 450.0) * 100.0);
+
+                if (s % 6 == 0 && currentTemp < 41) {
+                    currentTemp++;
+                }
+
+                if (metricsCallback != null) {
+                    WipeMetrics metrics = new WipeMetrics(
+                            systemPath,
+                            overallPercent,
+                            currentPass,
+                            totalPasses,
+                            pass.getDisplayName() + " [SIMULATOR]",
+                            bytesInThisPass,
+                            targetBytes,
+                            speedMBs,
+                            etaSeconds,
+                            currentTemp,
+                            com.sanitizer.detector.SmartDiagnostics.ThermalStatus.NORMAL,
+                            false,
+                            100,
+                            "Optimal (Demo)",
+                            iops,
+                            latencyMs,
+                            busSaturation
+                    );
+                    metricsCallback.accept(metrics);
+                }
+
+                // Periodic dd console output stream emulation
+                if (s % 6 == 0 || s == steps) {
+                    double elapsedSec = Math.max(0.1, (System.nanoTime() - startNanoTime) / 1_000_000_000.0);
+                    log(logCallback, String.format("dd: %,d bytes (%.1f GB) copied, %.1f s, %.1f MB/s",
+                            bytesInThisPass, (double) bytesInThisPass / (1024 * 1024 * 1024), elapsedSec, speedMBs));
+                }
+
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    log(logCallback, "[SIMULATOR] Sanitization task interrupted / cancelled.");
+                    return false;
+                }
+            }
+
+            accumulatedBytesWritten += targetBytes;
+            log(logCallback, String.format("[SIMULATOR] Pass %d/%d successfully completed (%s).",
+                    currentPass, totalPasses, pass.getDescription()));
+        }
+
+        if (metricsCallback != null) {
+            metricsCallback.accept(new WipeMetrics(
+                    systemPath,
+                    100.0,
+                    totalPasses,
+                    totalPasses,
+                    "Completed [SIMULATOR]",
+                    targetBytes,
+                    targetBytes,
+                    0.0,
+                    0,
+                    currentTemp,
+                    com.sanitizer.detector.SmartDiagnostics.ThermalStatus.NORMAL,
+                    false,
+                    100,
+                    "Complete",
+                    0,
+                    0,
+                    0
+            ));
+        }
+
+        log(logCallback, String.format("[SUCCESS] [SIMULATOR] All %d passes of %s successfully executed on %s.",
+                totalPasses, policy.getName(), systemPath));
+        log(logCallback, "═════════════════════════════════════════════════════════════════");
+        return true;
     }
 
     private static boolean runDdCommand(String systemPath, WipePass pass, int effectiveByte, long targetBytes, boolean isTestMode,

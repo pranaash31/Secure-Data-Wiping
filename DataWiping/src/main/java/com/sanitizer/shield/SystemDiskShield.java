@@ -56,6 +56,11 @@ public class SystemDiskShield {
 
         String norm = normalize(systemPath);
 
+        // 0. Presentation Simulator Mode / Mock Drives are 100% safe
+        if (com.sanitizer.demo.DemoSimulatorManager.isSimulatedDrive(norm)) {
+            return SafetyVerdict.safe(systemPath);
+        }
+
         // 1. Mock blocked paths for tests
         if (mockBlockedPaths.contains(norm)) {
             return SafetyVerdict.blocked(systemPath, "CRITICAL SAFETY SHIELD: Path explicitly flagged as protected system disk.");

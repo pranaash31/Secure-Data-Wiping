@@ -25,6 +25,12 @@ public class DiskLockShield {
     public static boolean prepareAndLockDisk(String systemPath) {
         if (systemPath == null) return false;
 
+        if (com.sanitizer.demo.DemoSimulatorManager.isSimulatedDrive(systemPath)) {
+            activeLocks.add(systemPath);
+            AppLogger.info(MODULE, "[SIMULATED DISK] Virtual advisory disk lock engaged for " + systemPath);
+            return true;
+        }
+
         String os = System.getProperty("os.name").toLowerCase();
         boolean unmounted = false;
 

@@ -81,6 +81,11 @@ public class WipeVerifier {
     ) {
         if (mode == null) mode = VerificationMode.FAST_SAMPLE_5_PERCENT;
 
+        // Presentation Simulator Mode Dispatch
+        if (com.sanitizer.demo.DemoSimulatorManager.isSimulatedDrive(systemPath)) {
+            return verifySimulatedDrive(systemPath, totalBytes, mode, policy, isTestMode, progressCallback, logCallback);
+        }
+
         log(logCallback, "═════════════════════════════════════════════════════════════════");
         log(logCallback, "[VERIFIER] Initiating Automated Post-Wipe Verification Pass...");
         log(logCallback, "[VERIFIER] Standard: NIST SP 800-88 Rev. 1 Section 4.7 & ISO/IEC 27040");
@@ -422,6 +427,76 @@ public class WipeVerifier {
      * Calculates Shannon Entropy H(X) = - sum(p * log2(p)) over the byte frequency histogram.
      * Pure zero-fill results in 0.0000 bits/byte.
      */
+    /**
+     * Executes simulated NIST SP 800-88 strided read-back and mathematical entropy verification.
+     */
+    private static VerificationResult verifySimulatedDrive(
+            String systemPath,
+            long totalBytes,
+            VerificationMode mode,
+            WipePolicy policy,
+            boolean isTestMode,
+            Consumer<Double> progressCallback,
+            Consumer<String> logCallback
+    ) {
+        log(logCallback, "═════════════════════════════════════════════════════════════════");
+        log(logCallback, "⚡ [VERIFIER] [SIMULATOR] Initiating Automated Post-Wipe Verification Pass...");
+        log(logCallback, "[VERIFIER] Standard: NIST SP 800-88 Rev. 1 Section 4.7 & ISO/IEC 27040:2015");
+        log(logCallback, "[VERIFIER] Sampling Mode: " + mode.getDisplayName());
+        log(logCallback, "[VERIFIER] Target Device: " + systemPath + " (Simulated 16GB Secure USB)");
+
+        String[] stages = {
+                "[VERIFIER] [SIMULATOR] Stage 1/4: Sampling Beginning Strides (LBA 0x00000000 - 0x00001400)...",
+                "[VERIFIER] [SIMULATOR] Stage 2/4: Sampling Middle Strides (LBA 0x00FA0000 - 0x00FA1400)...",
+                "[VERIFIER] [SIMULATOR] Stage 3/4: Sampling End Sectors (LBA 0x01F3EBFF - 0x01F3FFFF)...",
+                "[VERIFIER] [SIMULATOR] Stage 4/4: Evaluating Shannon Entropy across pseudo-random strides..."
+        };
+
+        for (int i = 0; i < stages.length; i++) {
+            if (Thread.currentThread().isInterrupted()) {
+                log(logCallback, "[VERIFIER] Verification pass interrupted.");
+                break;
+            }
+            log(logCallback, stages[i]);
+            double p = (double) (i + 1) / stages.length;
+            if (progressCallback != null) {
+                progressCallback.accept(p);
+            }
+            try {
+                Thread.sleep(220);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
+        long verifiedSectors = 20480;
+        long sampleBytes = verifiedSectors * SECTOR_SIZE_BYTES;
+        double entropyScore = 0.0000;
+        String sha256Proof = "SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        String status = "PASS — Zero Residual Data Confirmed (0.000% Entropy) [SIMULATED ATTESTATION]";
+
+        log(logCallback, String.format(java.util.Locale.US,
+                "[VERIFIER] [SIMULATOR] Verified %,d Sectors (%,d KB sampled)", verifiedSectors, sampleBytes / 1024));
+        log(logCallback, String.format(java.util.Locale.US,
+                "[VERIFIER] [SIMULATOR] Shannon Residual Entropy: %.4f bits/byte (0.000%% Residual)", entropyScore));
+        log(logCallback, "[VERIFIER] [SIMULATOR] Non-Compliant Residual Bytes: 0 / " + sampleBytes);
+        log(logCallback, "[VERIFIER] [SIMULATOR] SHA-256 Sample Proof Digest: " + sha256Proof);
+        log(logCallback, "[VERIFIER] [SIMULATOR] Attestation Status: " + status);
+        log(logCallback, "═════════════════════════════════════════════════════════════════");
+
+        return new VerificationResult(
+                true,
+                status,
+                verifiedSectors,
+                entropyScore,
+                sha256Proof,
+                sampleBytes,
+                0,
+                "NIST SP 800-88 Rev. 1 Section 4.7 / ISO/IEC 27040:2015 (Simulator Verification)"
+        );
+    }
+
     public static double calculateShannonEntropy(int[] byteFrequencies, long totalBytes) {
         if (totalBytes <= 0) return 0.0;
         double entropy = 0.0;

@@ -146,7 +146,7 @@ public class NavigationManager {
     // ── Static Web Hero Landing Page ─────────────────────────────────────────
     public void showHeroView() {
         Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
-        HeroView heroView = new HeroView(this::showLoginView);
+        HeroView heroView = new HeroView(this::showLoginView, this::startDemoPresentation);
         AccessibilityManager.applyThemeAndScale(heroView);
         scene = new Scene(heroView, bounds.getWidth(), bounds.getHeight());
         applyCss(scene);
@@ -198,6 +198,15 @@ public class NavigationManager {
         AppLogger.info(MODULE, "Authenticated session established for: " + sessionContext.officerName() + " [" + role.getTitle() + "]");
         SecurityAuditLogger.logLogin(sessionContext.officerName(), sessionContext.agencyId(), role.getTitle(), true);
         showMainPortal();
+    }
+
+    public void startDemoPresentation() {
+        com.sanitizer.demo.DemoSimulatorManager.enableDemoMode();
+        loginSuccess("Presentation Evaluator", "DEMO-US-GOV", UserRole.INSPECTOR);
+        navigateTo("wiping");
+        showNotification("Presentation Simulator Active",
+                "Simulated 16GB Secure USB loaded. Safe for live presentation without physical hardware.",
+                ToastType.INFO);
     }
 
     public void showMainPortal() {

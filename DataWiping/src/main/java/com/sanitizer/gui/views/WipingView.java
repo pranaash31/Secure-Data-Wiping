@@ -50,6 +50,7 @@ public class WipingView implements ViewLifecycle {
 
     private ComboBox<UsbDetector.UsbDriveInfo> cmbDrives;
     private Button btnRefreshDrives;
+    private Button btnDemoToggle;
     private Label lblDriveBadge;
     private Label lblSelectedDriveInfo;
 
@@ -77,11 +78,14 @@ public class WipingView implements ViewLifecycle {
 
     private final java.util.function.Consumer<java.util.List<UsbDetector.UsbDriveInfo>> usbListener =
             drives -> Platform.runLater(() -> updateDriveList(drives));
+    private final java.util.function.Consumer<Boolean> demoModeListener =
+            active -> Platform.runLater(() -> updateDemoButtonStyle(active));
     private boolean isListening = false;
 
     public synchronized void startListening() {
         if (!isListening) {
             UsbDetector.registerListener(usbListener);
+            com.sanitizer.demo.DemoSimulatorManager.addDemoModeListener(demoModeListener);
             isListening = true;
         }
     }
@@ -89,6 +93,7 @@ public class WipingView implements ViewLifecycle {
     public synchronized void stopListening() {
         if (isListening) {
             UsbDetector.unregisterListener(usbListener);
+            com.sanitizer.demo.DemoSimulatorManager.removeDemoModeListener(demoModeListener);
             isListening = false;
         }
     }
@@ -196,7 +201,23 @@ public class WipingView implements ViewLifecycle {
             if (ev.getCode() == KeyCode.ENTER) updateSelectedDriveDetails();
         });
 
-        HBox driveActionBox = new HBox(10, cmbDrives, btnRefreshDrives);
+        btnDemoToggle = new Button();
+        updateDemoButtonStyle(com.sanitizer.demo.DemoSimulatorManager.isDemoModeActive());
+        btnDemoToggle.setTooltip(new Tooltip("Toggle Presentation Simulator Mode (Demonstrate wiping safely without disposable physical USB drives)"));
+        btnDemoToggle.setOnAction(e -> {
+            boolean nowActive = com.sanitizer.demo.DemoSimulatorManager.toggleDemoMode();
+            updateDemoButtonStyle(nowActive);
+            refreshDriveList();
+            if (nowActive) {
+                com.sanitizer.gui.components.ToastNotification.info("Presentation Simulator Mode Active",
+                        "Simulated 16GB Secure USB mounted. Safe for evaluator demonstration.");
+            } else {
+                com.sanitizer.gui.components.ToastNotification.info("Simulator Mode Disabled",
+                        "Simulated USB unmounted.");
+            }
+        });
+
+        HBox driveActionBox = new HBox(8, cmbDrives, btnRefreshDrives, btnDemoToggle);
         HBox.setHgrow(cmbDrives, Priority.ALWAYS);
 
         lblSelectedDriveInfo = new Label("No drive selected.");
@@ -352,15 +373,23 @@ public class WipingView implements ViewLifecycle {
         if (drives.isEmpty()) {
             lblDriveBadge.setText("0 Target Drives");
             lblDriveBadge.getStyleClass().setAll("badge-warning");
-            lblSelectedDriveInfo.setText("Scanning... Insert a USB drive to begin.");
+            lblDriveBadge.setStyle("");
+            lblSelectedDriveInfo.setText("Scanning... Insert a physical USB drive, or click '⚡ Insert Demo 16GB USB' to demonstrate.");
             if (lblPreWipeHealthBadge != null) lblPreWipeHealthBadge.setText("Health Score: --/100");
             if (lblLiveTempBadge != null) lblLiveTempBadge.setText("Temp: -- °C");
             if (ioOscilloscope != null) ioOscilloscope.reset();
             if (thermalGraph != null) thermalGraph.reset();
             btnExecuteWipe.setDisable(true);
         } else {
-            lblDriveBadge.setText(drives.size() + " Pen Drive(s) Auto-Detected");
-            lblDriveBadge.getStyleClass().setAll("badge-success");
+            if (com.sanitizer.demo.DemoSimulatorManager.isDemoModeActive()) {
+                lblDriveBadge.setText("⚡ Presentation Simulator Mode (16GB Demo Target)");
+                lblDriveBadge.getStyleClass().setAll("badge-info");
+                lblDriveBadge.setStyle("-fx-background-color: #F5F3FF; -fx-text-fill: #7C3AED; -fx-font-weight: bold; -fx-padding: 3 8; -fx-background-radius: 4px;");
+            } else {
+                lblDriveBadge.setText(drives.size() + " Pen Drive(s) Auto-Detected");
+                lblDriveBadge.getStyleClass().setAll("badge-success");
+                lblDriveBadge.setStyle("");
+            }
 
             if (prevSelected != null && drives.contains(prevSelected)) {
                 cmbDrives.getSelectionModel().select(prevSelected);
@@ -369,6 +398,17 @@ public class WipingView implements ViewLifecycle {
             }
             updateSelectedDriveDetails();
             btnExecuteWipe.setDisable(false);
+        }
+    }
+
+    private void updateDemoButtonStyle(boolean active) {
+        if (btnDemoToggle == null) return;
+        if (active) {
+            btnDemoToggle.setText("🔌 Eject Demo USB");
+            btnDemoToggle.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #059669; -fx-border-color: #A7F3D0; -fx-background-color: #ECFDF5; -fx-padding: 5 12; -fx-background-radius: 6px; -fx-border-radius: 6px;");
+        } else {
+            btnDemoToggle.setText("⚡ Insert Demo 16GB USB");
+            btnDemoToggle.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #7C3AED; -fx-border-color: #C4B5FD; -fx-background-color: #F5F3FF; -fx-padding: 5 12; -fx-background-radius: 6px; -fx-border-radius: 6px;");
         }
     }
 

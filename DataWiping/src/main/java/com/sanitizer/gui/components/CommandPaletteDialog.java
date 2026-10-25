@@ -383,6 +383,19 @@ public class CommandPaletteDialog {
         }));
 
         // ── 🔌 HARDWARE & DISK TOOLS ─────────────────────────────────────
+        items.add(new CommandItem("demo_mount_sim", "Enable Presentation Simulator Mode (Mount 16GB Demo USB)", "Mounts virtual Simulated 16GB Secure USB for safe evaluator presentations without hardware",
+                Category.HARDWARE, "⚡", "", List.of("demo", "simulator", "mock", "presentation", "virtual", "usb", "test"), () -> {
+            com.sanitizer.demo.DemoSimulatorManager.enableDemoMode();
+            navManager.navigateTo("wiping");
+            navManager.showNotification("Presentation Simulator Active", "Simulated 16GB Secure USB mounted. Safe for evaluator demonstration.", ToastType.INFO);
+        }));
+
+        items.add(new CommandItem("demo_eject_sim", "Disable Presentation Simulator Mode (Eject Demo USB)", "Unmounts virtual Simulated 16GB USB and returns to physical hardware detection",
+                Category.HARDWARE, "🔌", "", List.of("demo", "simulator", "eject", "disable", "hardware", "unmount"), () -> {
+            com.sanitizer.demo.DemoSimulatorManager.disableDemoMode();
+            navManager.showNotification("Simulator Mode Disabled", "Simulated USB unmounted.", ToastType.INFO);
+        }));
+
         items.add(new CommandItem("hw_rescan", "Rescan & Detect Connected Drives", "Trigger hardware bus inspection for USB flash, NVMe and external storage",
                 Category.HARDWARE, "🔄", "", List.of("rescan", "refresh", "drives", "detect", "usb", "nvme"), () -> {
             List<UsbDetector.UsbDriveInfo> drives = UsbDetector.getConnectedUsbDrives();

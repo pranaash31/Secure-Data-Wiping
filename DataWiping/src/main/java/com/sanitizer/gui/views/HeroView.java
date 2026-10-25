@@ -5,6 +5,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
@@ -22,9 +23,15 @@ import java.net.URL;
 public class HeroView extends ScrollPane {
 
     private final Runnable onLoginClicked;
+    private final Runnable onDemoClicked;
 
     public HeroView(Runnable onLoginClicked) {
+        this(onLoginClicked, null);
+    }
+
+    public HeroView(Runnable onLoginClicked, Runnable onDemoClicked) {
         this.onLoginClicked = onLoginClicked;
+        this.onDemoClicked = onDemoClicked;
         getStyleClass().addAll("hero-root", "edge-to-edge");
         setFitToWidth(true);
         setHbarPolicy(ScrollBarPolicy.NEVER);
@@ -177,7 +184,20 @@ public class HeroView extends ScrollPane {
             ComplianceStandardsDialog.show(owner);
         });
 
-        actions.getChildren().addAll(btnSignIn, btnStandards);
+        Button btnDemo = new Button("⚡ Live Demo");
+        btnDemo.getStyleClass().add("hero-cta-secondary");
+        btnDemo.setStyle("-fx-text-fill: #7C3AED; -fx-border-color: #DDD6FE; -fx-background-color: #F5F3FF; -fx-font-weight: bold;");
+        btnDemo.setTooltip(new Tooltip("Start Live Presentation Simulator Mode with Simulated 16GB USB"));
+        btnDemo.setOnAction(e -> {
+            if (onDemoClicked != null) {
+                onDemoClicked.run();
+            } else {
+                com.sanitizer.demo.DemoSimulatorManager.enableDemoMode();
+                if (onLoginClicked != null) onLoginClicked.run();
+            }
+        });
+
+        actions.getChildren().addAll(btnSignIn, btnStandards, btnDemo);
 
         // 6. Certification Seals Row
         HBox sealsRow = new HBox(10);

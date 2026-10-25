@@ -261,11 +261,26 @@ public class LoginView {
         Button btnSup = buildQuickButton("Supervisor", "Supervisor Vance", UserRole.SUPERVISOR);
         Button btnAud = buildQuickButton("Auditor", "Chief Auditor Davis", UserRole.CHIEF_AUDITOR);
 
+        Button btnDemo = new Button("⚡ Live Demo");
+        btnDemo.getStyleClass().add("gov-demo-btn");
+        btnDemo.setStyle("-fx-text-fill: #7C3AED; -fx-border-color: #C4B5FD; -fx-background-color: #F5F3FF; -fx-font-weight: bold;");
+        btnDemo.setTooltip(new Tooltip("Launch Presentation Simulator Mode with Simulated 16GB USB"));
+        btnDemo.setOnAction(e -> {
+            com.sanitizer.demo.DemoSimulatorManager.enableDemoMode();
+            txtUser.setText("Presentation Evaluator");
+            txtAgency.setText("DEMO-US-GOV");
+            cmbRole.setValue(UserRole.INSPECTOR);
+            txtPass.setText("1234");
+            navManager.loginSuccess("Presentation Evaluator", "DEMO-US-GOV", UserRole.INSPECTOR);
+            navManager.navigateTo("wiping");
+        });
+
         HBox.setHgrow(btnOp, Priority.ALWAYS);
         HBox.setHgrow(btnSup, Priority.ALWAYS);
         HBox.setHgrow(btnAud, Priority.ALWAYS);
+        HBox.setHgrow(btnDemo, Priority.ALWAYS);
 
-        demoButtons.getChildren().addAll(btnOp, btnSup, btnAud);
+        demoButtons.getChildren().addAll(btnOp, btnSup, btnAud, btnDemo);
         demoBox.getChildren().addAll(lblDemo, demoButtons);
 
         card.getChildren().addAll(

@@ -275,8 +275,26 @@ public class WipeWizardView implements ViewLifecycle {
     private VBox buildStep1View() {
         VBox box = new VBox(18);
 
+        HBox step1Header = new HBox(16);
+        step1Header.setAlignment(Pos.CENTER_LEFT);
+
         Label lblSection = new Label("Step 1: Choose the Storage Drive to Sanitize");
         lblSection.setStyle("-fx-font-size: 17px; -fx-font-weight: bold; -fx-text-fill: #0F172A;");
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button btnDemoToggle = new Button(com.sanitizer.demo.DemoSimulatorManager.isDemoModeActive() ? "🔌 Eject Demo USB" : "⚡ Insert Demo 16GB USB");
+        btnDemoToggle.setStyle(com.sanitizer.demo.DemoSimulatorManager.isDemoModeActive()
+                ? "-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #059669; -fx-border-color: #A7F3D0; -fx-background-color: #ECFDF5; -fx-padding: 5 12; -fx-background-radius: 6px; -fx-border-radius: 6px;"
+                : "-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #7C3AED; -fx-border-color: #C4B5FD; -fx-background-color: #F5F3FF; -fx-padding: 5 12; -fx-background-radius: 6px; -fx-border-radius: 6px;");
+        btnDemoToggle.setTooltip(new Tooltip("Toggle Presentation Simulator Mode (Demonstrate wiping safely without physical drives)"));
+        btnDemoToggle.setOnAction(e -> {
+            com.sanitizer.demo.DemoSimulatorManager.toggleDemoMode();
+            refreshStepView();
+        });
+
+        step1Header.getChildren().addAll(lblSection, spacer, btnDemoToggle);
 
         Label lblDesc = new Label("Plug in the target USB thumb drive, external SSD, or memory card. The system shield will automatically protect internal operating system disks.");
         lblDesc.setStyle("-fx-font-size: 12px; -fx-text-fill: #475569;");
@@ -296,18 +314,31 @@ public class WipeWizardView implements ViewLifecycle {
         List<UsbDetector.UsbDriveInfo> drives = UsbDetector.getConnectedUsbDrives();
 
         if (drives.isEmpty()) {
-            VBox emptyBox = new VBox(10);
+            VBox emptyBox = new VBox(12);
             emptyBox.setAlignment(Pos.CENTER);
             emptyBox.setPadding(new Insets(36));
             Label lblEmpty = new Label("⚪ No external storage drives detected");
             lblEmpty.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #64748B;");
-            Label lblEmptySub = new Label("Please insert a USB flash drive or external SSD into any port.");
+            Label lblEmptySub = new Label("Please insert a USB flash drive, or use Presentation Simulator Mode to demonstrate safely.");
             lblEmptySub.setStyle("-fx-font-size: 12px; -fx-text-fill: #94A3B8;");
+
+            HBox emptyActions = new HBox(12);
+            emptyActions.setAlignment(Pos.CENTER);
+
             Button btnRescan = new Button("🔄 Refresh Drives");
             btnRescan.getStyleClass().add("button-secondary");
             btnRescan.setOnAction(e -> refreshStepView());
-            emptyBox.getChildren().addAll(lblEmpty, lblEmptySub, btnRescan);
-            box.getChildren().addAll(lblSection, lblDesc, shieldNotice, emptyBox);
+
+            Button btnDemoMode = new Button("⚡ Insert Demo 16GB USB (Simulator Mode)");
+            btnDemoMode.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #7C3AED; -fx-border-color: #C4B5FD; -fx-background-color: #F5F3FF; -fx-padding: 7 16; -fx-background-radius: 6px; -fx-border-radius: 6px;");
+            btnDemoMode.setOnAction(e -> {
+                com.sanitizer.demo.DemoSimulatorManager.enableDemoMode();
+                refreshStepView();
+            });
+
+            emptyActions.getChildren().addAll(btnRescan, btnDemoMode);
+            emptyBox.getChildren().addAll(lblEmpty, lblEmptySub, emptyActions);
+            box.getChildren().addAll(step1Header, lblDesc, shieldNotice, emptyBox);
             return box;
         }
 
@@ -316,7 +347,7 @@ public class WipeWizardView implements ViewLifecycle {
             drivesPane.getChildren().add(card);
         }
 
-        box.getChildren().addAll(lblSection, lblDesc, shieldNotice, drivesPane);
+        box.getChildren().addAll(step1Header, lblDesc, shieldNotice, drivesPane);
         return box;
     }
 
@@ -349,6 +380,12 @@ public class WipeWizardView implements ViewLifecycle {
         serial.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B;");
 
         card.getChildren().addAll(top, size, path, serial);
+
+        if (com.sanitizer.demo.DemoSimulatorManager.isSimulatedDrive(drive)) {
+            Label demoChip = new Label("⚡ LIVE PRESENTATION SIMULATOR");
+            demoChip.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #7C3AED; -fx-background-color: #F5F3FF; -fx-padding: 3 8; -fx-background-radius: 4px;");
+            card.getChildren().add(demoChip);
+        }
 
         card.setOnMouseClicked(e -> {
             this.selectedDrive = drive;

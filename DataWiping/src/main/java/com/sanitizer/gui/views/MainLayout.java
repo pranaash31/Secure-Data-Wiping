@@ -229,6 +229,32 @@ public class MainLayout {
         btnSpotlight.setOnAction(e -> navManager.showCommandPalette());
         AccessibilityManager.setupAccessible(btnSpotlight, "Command Palette Quick Search", "Opens spotlight search and command runner (Ctrl/Cmd + K)", AccessibleRole.BUTTON);
 
+        // ── Live Presentation Simulator Mode Toggle Button ──
+        Button btnDemoTop = new Button();
+        Runnable updateTopDemoBtn = () -> {
+            boolean active = com.sanitizer.demo.DemoSimulatorManager.isDemoModeActive();
+            if (active) {
+                btnDemoTop.setText("⚡ Demo: ON");
+                btnDemoTop.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #ffffff; -fx-background-color: #7C3AED; -fx-border-color: #6D28D9; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+            } else {
+                btnDemoTop.setText("⚡ Demo Mode");
+                btnDemoTop.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #7C3AED; -fx-background-color: #F5F3FF; -fx-border-color: #DDD6FE; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+            }
+        };
+        updateTopDemoBtn.run();
+        btnDemoTop.setTooltip(new Tooltip("Toggle Presentation Simulator Mode (Demonstrate wiping safely without disposable USB drives)"));
+        btnDemoTop.setOnAction(e -> {
+            boolean active = com.sanitizer.demo.DemoSimulatorManager.toggleDemoMode();
+            updateTopDemoBtn.run();
+            if (active) {
+                ToastNotification.info("Presentation Simulator Active", "Mounted Simulated 16GB Secure USB for safe evaluation.");
+            } else {
+                ToastNotification.info("Simulator Disabled", "Simulated USB unmounted.");
+            }
+        });
+        com.sanitizer.demo.DemoSimulatorManager.addDemoModeListener(act -> javafx.application.Platform.runLater(updateTopDemoBtn));
+        AccessibilityManager.setupAccessible(btnDemoTop, "Demo Mode", "Toggle Presentation Simulator Mode", AccessibleRole.BUTTON);
+
         // ── FISMA Session Lock Button ──
         btnLockSession = new Button("🔒 Lock");
         btnLockSession.getStyleClass().add("button-theme-toggle");
@@ -245,7 +271,7 @@ public class MainLayout {
 
         topBar.getChildren().addAll(
                 brandRow, lblBadge, lblRoleBadge, spacer,
-                btnSpotlight, lblUserInfo, cmbLanguage, zoomGroup, btnThemeToggle, btnA11yHelp, btnUpdate, btnLockSession, btnLogoutTop
+                btnSpotlight, btnDemoTop, lblUserInfo, cmbLanguage, zoomGroup, btnThemeToggle, btnA11yHelp, btnUpdate, btnLockSession, btnLogoutTop
         );
         rootPane.setTop(topBar);
 
@@ -347,11 +373,14 @@ public class MainLayout {
         );
         rootPane.setBottom(statusBar);
 
-        // Register USB Poller for Live Drive Count & Toast Notifications
         final int[] prevDriveCount = {-1};
         usbListener = drives -> {
             int count = (drives != null) ? drives.size() : 0;
-            if (count == 0) {
+            if (com.sanitizer.demo.DemoSimulatorManager.isDemoModeActive()) {
+                lblDrivesStatus.setText("⚡ Demo Mode: 16GB USB Mounted");
+                lblDrivesStatus.getStyleClass().setAll("telemetry-chip", "telemetry-chip-purple");
+                lblDrivesStatus.setTooltip(new Tooltip("Presentation Simulator Mode Active: Simulated 16GB Secure USB (/dev/mock_usb_16gb)"));
+            } else if (count == 0) {
                 lblDrivesStatus.setText("⚪ 0 Drives Connected");
                 lblDrivesStatus.getStyleClass().setAll("telemetry-chip", "telemetry-chip-dim");
                 lblDrivesStatus.setTooltip(new Tooltip("No external USB pen drives detected"));
