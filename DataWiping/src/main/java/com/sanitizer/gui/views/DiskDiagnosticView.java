@@ -130,11 +130,14 @@ public class DiskDiagnosticView implements ViewLifecycle {
         scrollRoot.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
                 viewModel.startListening();
-                newScene.setOnKeyPressed(ev -> {
-                    if (ev.getCode() == KeyCode.F5) viewModel.refreshDrives();
-                });
             } else {
                 viewModel.stopListening();
+            }
+        });
+        scrollRoot.setOnKeyPressed(ev -> {
+            if (ev.getCode() == KeyCode.F5) {
+                viewModel.refreshDrives();
+                ev.consume();
             }
         });
 

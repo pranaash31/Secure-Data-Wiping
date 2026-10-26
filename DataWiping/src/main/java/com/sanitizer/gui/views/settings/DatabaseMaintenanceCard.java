@@ -16,6 +16,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
+import javafx.stage.Window;
 
 import java.io.File;
 import java.util.Optional;
@@ -113,6 +114,10 @@ public class DatabaseMaintenanceCard extends VBox {
         }
 
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        Window owner = (getScene() != null) ? getScene().getWindow() : null;
+        if (owner != null) {
+            confirm.initOwner(owner);
+        }
         confirm.setTitle(I18n.get("dialog.db.clear.title"));
         confirm.setHeaderText(I18n.get("dialog.db.clear.header"));
         confirm.setContentText(I18n.get("dialog.db.clear.content"));
@@ -140,7 +145,8 @@ public class DatabaseMaintenanceCard extends VBox {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(I18n.get("dialog.db.backup.title"));
         chooser.setInitialFileName("sanitizer_history_backup.db");
-        File dest = chooser.showSaveDialog(null);
+        Window owner = (getScene() != null) ? getScene().getWindow() : null;
+        File dest = chooser.showSaveDialog(owner);
 
         if (dest != null) {
             configService.exportDatabaseBackupAsync(dest)

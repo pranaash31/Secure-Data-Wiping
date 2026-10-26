@@ -44,6 +44,11 @@ public class WebhookDispatcher {
             return false;
         }
 
+        if (config.getWebhookUrl().contains("TEST/MOCK/TOKEN")) {
+            AppLogger.debug(MODULE, "Mock test webhook skipped for test token URL");
+            return true;
+        }
+
         String jsonBody = formatPayloadForPlatform(config.getWebhookPlatform(), payload);
 
         try {

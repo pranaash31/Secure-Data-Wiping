@@ -1,5 +1,6 @@
 package com.sanitizer.gui.views;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -347,35 +348,50 @@ public class HeroView extends ScrollPane {
         statsRow.setAlignment(Pos.CENTER);
         statsRow.setPadding(new Insets(24, 60, 64, 60));
 
-        int totalWipes = 0;
-        double successRate = 100.0;
-        int signatures = 0;
-        int activeDrives = 0;
+        Label valWipes = new Label("0");
+        valWipes.getStyleClass().add("hero-stat-value");
+        Label valRate = new Label("100.0%");
+        valRate.getStyleClass().add("hero-stat-value");
+        Label valSigs = new Label("0");
+        valSigs.getStyleClass().add("hero-stat-value");
+        Label valDrives = new Label("0");
+        valDrives.getStyleClass().add("hero-stat-value");
 
-        try {
-            totalWipes = com.sanitizer.db.AuditDb.getAllRecords().size();
-            successRate = com.sanitizer.db.AuditDb.getSuccessRatePercentage();
-            signatures = com.sanitizer.db.AuditDb.getTamperVerifiedCount();
-            activeDrives = com.sanitizer.detector.UsbDetector.getConnectedUsbDrives().size();
-        } catch (Exception ignored) {}
-
-        VBox s1 = createStatCard(String.valueOf(totalWipes), "WIPES COMPLETED");
-        VBox s2 = createStatCard(String.format("%.1f%%", successRate), "PASS RATE");
-        VBox s3 = createStatCard(String.valueOf(signatures), "SIGNED CERTIFICATES");
-        VBox s4 = createStatCard(String.valueOf(activeDrives), "CONNECTED DRIVES");
+        VBox s1 = createStatCardWithLabel(valWipes, "WIPES COMPLETED");
+        VBox s2 = createStatCardWithLabel(valRate, "PASS RATE");
+        VBox s3 = createStatCardWithLabel(valSigs, "SIGNED CERTIFICATES");
+        VBox s4 = createStatCardWithLabel(valDrives, "CONNECTED DRIVES");
 
         statsRow.getChildren().addAll(s1, s2, s3, s4);
+
+        // Load telemetry asynchronously on a daemon thread to prevent UI thread stutter
+        Thread bgLoader = new Thread(() -> {
+            try {
+                var records = com.sanitizer.db.AuditDb.getAllRecords();
+                int totalWipes = records.size();
+                double successRate = com.sanitizer.db.AuditDb.getSuccessRatePercentage(records);
+                int signatures = com.sanitizer.db.AuditDb.getTamperVerifiedCount(records);
+                int activeDrives = com.sanitizer.detector.UsbDetector.getConnectedUsbDrives().size();
+
+                Platform.runLater(() -> {
+                    valWipes.setText(String.valueOf(totalWipes));
+                    valRate.setText(String.format("%.1f%%", successRate));
+                    valSigs.setText(String.valueOf(signatures));
+                    valDrives.setText(String.valueOf(activeDrives));
+                });
+            } catch (Exception ignored) {}
+        }, "Hero-Telemetry-Loader");
+        bgLoader.setDaemon(true);
+        bgLoader.start();
+
         return statsRow;
     }
 
-    private VBox createStatCard(String value, String label) {
+    private VBox createStatCardWithLabel(Label valLbl, String label) {
         VBox card = new VBox(8);
         card.setAlignment(Pos.CENTER);
         card.getStyleClass().add("hero-stat-card");
         card.setMinWidth(250);
-
-        Label valLbl = new Label(value);
-        valLbl.getStyleClass().add("hero-stat-value");
 
         Label lblLbl = new Label(label);
         lblLbl.getStyleClass().add("hero-stat-label");
@@ -395,13 +411,37 @@ public class HeroView extends ScrollPane {
         Label subtitle = new Label("Sign in to start wiping drives or review audit certificates.");
         subtitle.getStyleClass().add("hero-cta-desc");
 
+        HBox ctaActions = new HBox(16);
+        ctaActions.setAlignment(Pos.CENTER);
+
         Button btnBigCta = new Button("Sign In →");
         btnBigCta.getStyleClass().addAll("hero-cta-primary", "hero-cta-large");
         btnBigCta.setOnAction(e -> {
             if (onLoginClicked != null) onLoginClicked.run();
         });
 
-        cta.getChildren().addAll(title, subtitle, btnBigCta);
+        Button btnDemoCta = new Button("⚡ Live Demo Mode");
+        btnDemoCta.getStyleClass().addAll("hero-cta-secondary", "hero-cta-large");
+        btnDemoCta.setStyle("-fx-text-fill: #7C3AED; -fx-border-color: #DDD6FE; -fx-background-color: #F5F3FF; -fx-font-weight: bold;");
+        btnDemoCta.setTooltip(new Tooltip("Start Live Presentation Simulator Mode with Simulated 16GB USB"));
+        btnDemoCta.setOnAction(e -> {
+            if (onDemoClicked != null) {
+                onDemoClicked.run();
+            } else {
+                com.sanitizer.demo.DemoSimulatorManager.enableDemoMode();
+                if (onLoginClicked != null) onLoginClicked.run();
+            }
+        });
+
+        Button btnStandardsCta = new Button("View Standards");
+        btnStandardsCta.getStyleClass().addAll("hero-cta-secondary", "hero-cta-large");
+        btnStandardsCta.setOnAction(e -> {
+            Window owner = getScene() != null ? getScene().getWindow() : null;
+            ComplianceStandardsDialog.show(owner);
+        });
+
+        ctaActions.getChildren().addAll(btnBigCta, btnDemoCta, btnStandardsCta);
+        cta.getChildren().addAll(title, subtitle, ctaActions);
         return cta;
     }
 

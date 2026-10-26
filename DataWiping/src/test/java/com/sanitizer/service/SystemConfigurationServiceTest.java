@@ -33,6 +33,7 @@ class SystemConfigurationServiceTest {
     private File tempDbFile;
     private ConfigurationService configService;
     private SessionContext session;
+    private AlertConfig originalAlertConfig;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -40,10 +41,14 @@ class SystemConfigurationServiceTest {
         AuditDb.setDbUrlForTesting("jdbc:sqlite:" + tempDbFile.getAbsolutePath());
         configService = SystemConfigurationService.getInstance();
         session = new SessionContext("Lead Architect", "AGY-HQ-001", UserRole.SUPERVISOR);
+        originalAlertConfig = configService.getAlertConfig();
     }
 
     @AfterEach
     void tearDown() {
+        if (originalAlertConfig != null) {
+            configService.saveAlertConfig(originalAlertConfig, session);
+        }
         AuditDb.setDbUrlForTesting("jdbc:sqlite:sanitizer_history.db");
         if (tempDbFile != null && tempDbFile.exists()) {
             tempDbFile.delete();
