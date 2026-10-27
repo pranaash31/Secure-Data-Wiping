@@ -1,7 +1,6 @@
 package com.sanitizer.gui.components;
 
 import com.sanitizer.a11y.AccessibilityManager;
-import com.sanitizer.i18n.I18n;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;

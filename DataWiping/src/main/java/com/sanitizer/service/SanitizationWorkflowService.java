@@ -214,6 +214,9 @@ public class SanitizationWorkflowService implements SanitizationService {
                     vEntropy,
                     vHash
             );
+            if (!saved) {
+                AppLogger.warn(MODULE, "Audit record could not be persisted to local ledger database");
+            }
 
             // Audit Trail in SIEM
             SecurityAuditLogger.logWipeAction(
